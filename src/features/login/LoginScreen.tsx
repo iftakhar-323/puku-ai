@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
   Image,
+  Linking,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -17,247 +20,304 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { theme, navigate, updateProfile } = useApp();
 
-  const [showEmailForm, setShowEmailForm] = useState(false);
-  const [email, setEmail] = useState('developer@puku.sh');
-  const [password, setPassword] = useState('puku123');
-  const [authToken, setAuthToken] = useState('');
+  // SnackBar state matching Flutter's ScaffoldMessenger
+  const [snackBarMessage, setSnackBarMessage] = useState<string | null>(null);
+  const snackBarOpacity = useRef(new Animated.Value(0)).current;
+  const snackBarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleGoogleSignIn = () => {
-    pukuApi.setAuthToken('puku_google_token_active');
+  // Google Sign-In WebView state matching Flutter's GoogleSignInWebViewScreen
+  const [showGoogleAuthModal, setShowGoogleAuthModal] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authFailed, setAuthFailed] = useState(false);
+
+  // Helper matching Flutter's _handleTap
+  const showSnackBar = (message: string) => {
+    if (snackBarTimer.current) {
+      clearTimeout(snackBarTimer.current);
+    }
+    setSnackBarMessage(message);
+    Animated.timing(snackBarOpacity, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+
+    snackBarTimer.current = setTimeout(() => {
+      Animated.timing(snackBarOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setSnackBarMessage(null);
+      });
+    }, 2500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (snackBarTimer.current) clearTimeout(snackBarTimer.current);
+    };
+  }, []);
+
+  // Google Sign-In flow matching Flutter's NavigationService.goGoogleSignIn()
+  const handleStartGoogleSignIn = () => {
+    setShowGoogleAuthModal(true);
+    setIsAuthLoading(true);
+    setAuthFailed(false);
+
+    // Try opening the real PKCE authorize endpoint if available, or authenticate locally
+    const authUrl =
+      'https://web.dev.puku.sh/api/oauth/authorize?response_type=code&client_id=puku-app&redirect_uri=https%3A%2F%2Fapi.app.dev.puku.sh%2Fcallback&scope=openid%20profile%20email&code_challenge_method=S256';
+
+    Linking.canOpenURL(authUrl).then(supported => {
+      if (supported) {
+        Linking.openURL(authUrl).catch(() => {});
+      }
+    });
+
+    // Simulate authentic OAuth code exchange matching AuthBloc.exchangeCode
+    setTimeout(() => {
+      setIsAuthLoading(false);
+    }, 1200);
+  };
+
+  const handleCompleteGoogleAuth = () => {
+    pukuApi.setAuthToken('puku_oauth_token_' + Date.now());
     updateProfile({
       name: 'Google User',
-      email: 'user@gmail.com',
+      email: 'developer@puku.sh',
+      organization: 'puku',
+      plan: 'Power',
       provider: 'google',
-      plan: 'Power',
     });
-    navigate('chat');
-  };
-
-  const handleEmailSubmit = () => {
-    const finalToken = authToken.trim() || 'puku_session_token_' + Date.now();
-    pukuApi.setAuthToken(finalToken);
-    updateProfile({
-      name: email.split('@')[0] || 'Puku Developer',
-      email: email.trim(),
-      provider: 'email',
-      plan: 'Power',
-    });
-    navigate('chat');
-  };
-
-  const handleGuest = () => {
+    setShowGoogleAuthModal(false);
     navigate('chat');
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme.background,
-          paddingTop: Math.max(insets.top, 16),
-        },
-      ]}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}>
-        {/* Brand Header */}
-        <View style={styles.header}>
-          <PukuLogoIcon size={36} />
-          <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
-            Puku Editor
-          </Text>
-        </View>
-
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <Text style={[styles.heroHeadline, { color: theme.textPrimary }]}>
-            The{' '}
-            <Text style={{ color: theme.coolGrey }}>AI Code Editor</Text>
-            {'\n'}That Understands{'\n'}Your Entire{'\n'}
-            <Text style={{ color: theme.pumpkin }}>Codebase</Text>
-          </Text>
-
-          <Text style={[styles.heroSubtitle, { color: theme.coolGrey }]}>
-            <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>
-              Puku{' '}
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={styles.contentColumn}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: Math.max(insets.top, 16) },
+          ]}
+          showsVerticalScrollIndicator={false}>
+          {/* 1. LoginBrandHeader */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => showSnackBar('Menu action placeholder')}
+            style={styles.brandHeader}>
+            <PukuLogoIcon size={32} />
+            <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
+              Puku Editor
             </Text>
-            understands your entire codebase, predicts what needs to change
-            next, and guides you through it so you can build faster without
-            losing context.
-          </Text>
-        </View>
+          </TouchableOpacity>
 
-        {showEmailForm ? (
-          /* Email & Password / Token Form */
-          <View
+          {/* 2. LoginHeroSection */}
+          <View style={styles.heroSection}>
+            <Text style={[styles.heroHeadline, { color: theme.textPrimary }]}>
+              The <Text style={{ color: theme.coolGrey }}>AI Code Editor</Text>
+              {'\n'}That Understands{'\n'}Your Entire{'\n'}
+              <Text style={{ color: theme.pumpkin }}>Codebase</Text>
+            </Text>
+
+            <Text style={[styles.heroSubtitle, { color: theme.coolGrey }]}>
+              <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>
+                Puku{' '}
+              </Text>
+              understands your entire codebase, predicts what needs to change
+              next, and guides you through it so you can build faster without
+              losing context.
+            </Text>
+          </View>
+
+          {/* 3. LoginGoogleCta */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleStartGoogleSignIn}
+            style={styles.googleCtaBtn}>
+            <GoogleIcon size={20} color="#000000" />
+            <Text style={styles.googleCtaText}>Continue with Google</Text>
+          </TouchableOpacity>
+
+          {/* 4. OR Divider */}
+          <View style={styles.orRow}>
+            <View style={[styles.orLine, { backgroundColor: theme.outline }]} />
+            <Text style={[styles.orLabel, { color: theme.coolGrey }]}>OR</Text>
+            <View style={[styles.orLine, { backgroundColor: theme.outline }]} />
+          </View>
+
+          {/* 5. LoginEmailCta ("Enter your email" in Flutter) */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() =>
+              showSnackBar('Email sign-in flow is not connected yet')
+            }
             style={[
-              styles.formCard,
+              styles.emailCtaBtn,
               {
-                backgroundColor: theme.secondaryBackground,
                 borderColor: theme.outline,
+                backgroundColor: 'rgba(107, 107, 142, 0.1)',
               },
             ]}>
-            <Text style={[styles.formTitle, { color: theme.textPrimary }]}>
-              Sign In to Puku
+            <Text style={[styles.emailCtaText, { color: theme.textPrimary }]}>
+              Enter your email
             </Text>
+          </TouchableOpacity>
 
-            <Text style={[styles.inputLabel, { color: theme.coolGrey }]}>
-              Email Address
-            </Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="e.g. developer@puku.sh"
-              placeholderTextColor={theme.placeholderText}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              style={[
-                styles.formInput,
-                {
-                  color: theme.textPrimary,
-                  borderColor: theme.outline,
-                  backgroundColor: theme.background,
-                },
-              ]}
-            />
-
-            <Text style={[styles.inputLabel, { color: theme.coolGrey }]}>
-              Password
-            </Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter password (e.g. puku123)"
-              placeholderTextColor={theme.placeholderText}
-              secureTextEntry
-              style={[
-                styles.formInput,
-                {
-                  color: theme.textPrimary,
-                  borderColor: theme.outline,
-                  backgroundColor: theme.background,
-                },
-              ]}
-            />
-
-            <Text style={[styles.inputLabel, { color: theme.coolGrey }]}>
-              Puku Auth Token (Optional for cloud models)
-            </Text>
-            <TextInput
-              value={authToken}
-              onChangeText={setAuthToken}
-              placeholder="Paste Bearer token from chat.puku.sh"
-              placeholderTextColor={theme.placeholderText}
-              autoCapitalize="none"
-              style={[
-                styles.formInput,
-                {
-                  color: theme.textPrimary,
-                  borderColor: theme.outline,
-                  backgroundColor: theme.background,
-                },
-              ]}
-            />
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleEmailSubmit}
-              style={[styles.submitBtn, { backgroundColor: theme.primaryLight }]}>
-              <Text style={styles.submitBtnText}>Sign In & Continue</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowEmailForm(false)}
-              style={styles.cancelBtn}>
-              <Text style={[styles.cancelBtnText, { color: theme.coolGrey }]}>
-                Back to options
+          {/* 6. LoginLegalText */}
+          <View style={styles.legalWrapper}>
+            <Text style={[styles.legalBase, { color: 'rgba(107, 107, 142, 0.7)' }]}>
+              By continuing, you agree to Puku's{' '}
+              <Text
+                onPress={() => showSnackBar('Terms link placeholder')}
+                style={[styles.legalLink, { color: theme.coolGrey }]}>
+                Consumer Terms
               </Text>
-            </TouchableOpacity>
+              {' and '}
+              <Text
+                onPress={() => showSnackBar('Usage Policy link placeholder')}
+                style={[styles.legalLink, { color: theme.coolGrey }]}>
+                Usage Policy,
+              </Text>
+              {' and acknowledge their '}
+              <Text
+                onPress={() => showSnackBar('Privacy Policy link placeholder')}
+                style={[styles.legalLink, { color: theme.coolGrey }]}>
+                Privacy Policy
+              </Text>
+              .
+            </Text>
           </View>
-        ) : (
-          <>
-            {/* Google CTA Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleGoogleSignIn}
-              style={styles.googleBtn}>
-              <GoogleIcon size={20} color="#000000" />
-              <Text style={styles.googleBtnText}>Continue with Google</Text>
-            </TouchableOpacity>
+        </ScrollView>
 
-            {/* OR Divider */}
-            <View style={styles.orRow}>
-              <View style={[styles.orLine, { backgroundColor: theme.outline }]} />
-              <Text style={[styles.orText, { color: theme.coolGrey }]}>OR</Text>
-              <View style={[styles.orLine, { backgroundColor: theme.outline }]} />
-            </View>
-
-            {/* Email CTA Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setShowEmailForm(true)}
-              style={[styles.emailBtn, { borderColor: theme.outline }]}>
-              <Text style={[styles.emailBtnText, { color: theme.textPrimary }]}>
-                Continue with Email & Password
-              </Text>
-            </TouchableOpacity>
-
-            {/* Guest / Direct Chat */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleGuest}
-              style={styles.guestBtn}>
-              <Text style={[styles.guestBtnText, { color: theme.textPrimary }]}>
-                Continue as Guest / Offline AI →
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {/* Legal Links */}
-        <View style={styles.legalBox}>
-          <Text style={[styles.legalText, { color: theme.coolGrey }]}>
-            By signing in, you agree to our{' '}
-            <Text
-              onPress={handleGuest}
-              style={[styles.legalLink, { color: theme.textPrimary }]}>
-              Terms
-            </Text>
-            ,{' '}
-            <Text
-              onPress={handleGuest}
-              style={[styles.legalLink, { color: theme.textPrimary }]}>
-              Usage Policy
-            </Text>{' '}
-            and{' '}
-            <Text
-              onPress={handleGuest}
-              style={[styles.legalLink, { color: theme.textPrimary }]}>
-              Privacy Policy
-            </Text>
-            .
-          </Text>
+        {/* 7. Bottom Illustration from Flutter */}
+        <View style={styles.bottomStack}>
+          <Image
+            source={require('../../assets/images/login_screen_bottom.png')}
+            style={styles.bottomImage}
+            resizeMode="cover"
+          />
+          <View
+            style={[
+              styles.bottomGradientOverlay,
+              { backgroundColor: theme.background },
+            ]}
+          />
         </View>
-      </ScrollView>
+      </View>
 
-      {/* Bottom Illustration from Flutter */}
-      <View style={styles.bottomIllustrationContainer}>
-        <Image
-          source={require('../../assets/images/login_screen_bottom.png')}
-          style={styles.bottomImage}
-          resizeMode="cover"
-        />
+      {/* Floating SnackBar matching Flutter's ScaffoldMessenger */}
+      {snackBarMessage && (
+        <Animated.View
+          style={[
+            styles.snackBar,
+            {
+              opacity: snackBarOpacity,
+              bottom: Math.max(insets.bottom, 24) + 12,
+            },
+          ]}>
+          <Text style={styles.snackBarText}>{snackBarMessage}</Text>
+        </Animated.View>
+      )}
+
+      {/* GoogleSignInWebViewScreen Modal matching Flutter */}
+      <Modal
+        visible={showGoogleAuthModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowGoogleAuthModal(false)}>
         <View
           style={[
-            styles.bottomFadeOverlay,
+            styles.authModalContainer,
             {
               backgroundColor: theme.background,
+              paddingTop: Math.max(insets.top, 16),
             },
-          ]}
-        />
-      </View>
+          ]}>
+          {/* Auth Header */}
+          <View
+            style={[
+              styles.authModalHeader,
+              { borderBottomColor: theme.outline },
+            ]}>
+            <TouchableOpacity
+              onPress={() => setShowGoogleAuthModal(false)}
+              style={styles.authBackBtn}>
+              <Text style={[styles.authBackText, { color: theme.textPrimary }]}>
+                ✕
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.authModalTitle, { color: theme.textPrimary }]}>
+              Continue with Google
+            </Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {/* Auth Content */}
+          <View style={styles.authModalBody}>
+            {isAuthLoading ? (
+              <View style={styles.authLoadingBox}>
+                <ActivityIndicator size="large" color="#2B7FFF" />
+                <Text
+                  style={[styles.authLoadingText, { color: theme.textPrimary }]}>
+                  Connecting to Puku OAuth (PKCE)...
+                </Text>
+                <Text
+                  style={[styles.authLoadingSub, { color: theme.coolGrey }]}>
+                  https://web.dev.puku.sh/api/oauth/authorize
+                </Text>
+              </View>
+            ) : authFailed ? (
+              <View style={styles.authErrorBox}>
+                <Text style={styles.authErrorTitle}>
+                  Sign in failed. Please try again.
+                </Text>
+                <TouchableOpacity
+                  onPress={handleStartGoogleSignIn}
+                  style={[styles.authRetryBtn, { backgroundColor: '#2B7FFF' }]}>
+                  <Text style={styles.authRetryText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.authSuccessBox}>
+                <View
+                  style={[
+                    styles.googleAvatarCircle,
+                    { backgroundColor: theme.secondaryBackground },
+                  ]}>
+                  <GoogleIcon size={40} color="#000000" />
+                </View>
+                <Text style={[styles.authReadyTitle, { color: theme.textPrimary }]}>
+                  Puku Developer Account
+                </Text>
+                <Text style={[styles.authReadyEmail, { color: theme.coolGrey }]}>
+                  developer@puku.sh
+                </Text>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleCompleteGoogleAuth}
+                  style={[styles.authConfirmBtn, { backgroundColor: '#2B7FFF' }]}>
+                  <Text style={styles.authConfirmText}>
+                    Confirm Sign In & Chat
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setAuthFailed(true)}
+                  style={styles.authSimulateFailBtn}>
+                  <Text style={[styles.authSimulateText, { color: theme.coolGrey }]}>
+                    Simulate Failure
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -266,37 +326,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scroll: {
+  contentColumn: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  scrollContent: {
     paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingBottom: 20,
     zIndex: 2,
   },
-  header: {
+  // Brand Header matching LoginBrandHeader
+  brandHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 8,
+    gap: 16,
+    paddingVertical: 8,
   },
   brandTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
   },
+  // Hero Section matching LoginHeroSection
   heroSection: {
-    marginTop: 32,
-    marginBottom: 28,
+    marginTop: 24,
+    marginBottom: 36,
   },
   heroHeadline: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '800',
-    lineHeight: 40,
-    letterSpacing: -1,
-    marginBottom: 16,
+    lineHeight: 38,
+    letterSpacing: -0.5,
   },
   heroSubtitle: {
     fontSize: 14,
     lineHeight: 22,
+    fontWeight: '400',
+    marginTop: 30,
   },
-  googleBtn: {
+  // Google CTA matching LoginGoogleCta
+  googleCtaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -304,130 +372,196 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 16,
     gap: 10,
-    marginTop: 8,
   },
-  googleBtnText: {
+  googleCtaText: {
     color: '#000000',
     fontSize: 15,
     fontWeight: '700',
   },
+  // OR Divider
   orRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 18,
-    gap: 16,
+    marginVertical: 20,
+    gap: 22,
   },
   orLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
   },
-  orText: {
-    fontSize: 14,
-    fontWeight: '600',
+  orLabel: {
+    fontSize: 16,
+    fontWeight: '500',
   },
-  emailBtn: {
+  // Email CTA matching LoginEmailCta
+  emailCtaBtn: {
     height: 52,
     borderRadius: 16,
     borderWidth: 1,
-    backgroundColor: 'rgba(107, 107, 142, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emailBtnText: {
+  emailCtaText: {
     fontSize: 15,
     fontWeight: '700',
   },
-  guestBtn: {
-    marginTop: 14,
+  // Legal text matching LoginLegalText
+  legalWrapper: {
+    marginTop: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
+    paddingHorizontal: 4,
   },
-  guestBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    opacity: 0.9,
-  },
-  formCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    marginVertical: 10,
-  },
-  formTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 6,
-    marginTop: 10,
-  },
-  formInput: {
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 14,
-  },
-  submitBtn: {
-    height: 50,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  submitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  cancelBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    paddingVertical: 6,
-  },
-  cancelBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  legalBox: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  legalText: {
+  legalBase: {
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
+    fontWeight: '400',
   },
   legalLink: {
     textDecorationLine: 'underline',
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  bottomIllustrationContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 180,
+  // Bottom illustration Stack
+  bottomStack: {
+    height: 160,
+    width: '100%',
     overflow: 'hidden',
-    zIndex: 1,
-    opacity: 0.85,
+    position: 'relative',
   },
   bottomImage: {
     width: '100%',
     height: '100%',
   },
-  bottomFadeOverlay: {
+  bottomGradientOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 60,
-    opacity: 0.9,
+    height: 70,
+    opacity: 0.95,
+  },
+  // SnackBar matching Flutter ScaffoldMessenger SnackBar
+  snackBar: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    backgroundColor: '#201C59',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(165, 165, 255, 0.3)',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    zIndex: 99,
+  },
+  snackBarText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  // Google Auth Modal
+  authModalContainer: {
+    flex: 1,
+  },
+  authModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  authBackBtn: {
+    padding: 8,
+  },
+  authBackText: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  authModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  authModalBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  authLoadingBox: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  authLoadingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  authLoadingSub: {
+    fontSize: 12,
+  },
+  authErrorBox: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  authErrorTitle: {
+    color: '#FF4D4F',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  authRetryBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  authRetryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  authSuccessBox: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  googleAvatarCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  authReadyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  authReadyEmail: {
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 24,
+  },
+  authConfirmBtn: {
+    width: '100%',
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  authSimulateFailBtn: {
+    marginTop: 16,
+    padding: 8,
+  },
+  authSimulateText: {
+    fontSize: 13,
   },
 });
