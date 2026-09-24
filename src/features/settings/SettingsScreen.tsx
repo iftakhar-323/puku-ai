@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Switch,
@@ -13,6 +14,7 @@ import {
   ProfileIcon,
   SettingsIcon,
 } from '../../components/common/Icons';
+import { pukuApi } from '../../services/api';
 import { useApp } from '../../store/AppContext';
 
 export function SettingsScreen() {
@@ -241,6 +243,77 @@ export function SettingsScreen() {
               {profile.organization}
             </Text>
           </View>
+        </View>
+
+        {/* Section: Cloud & API */}
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+          PUKU CLOUD & API
+        </Text>
+        <View
+          style={[
+            styles.sectionCard,
+            {
+              backgroundColor: theme.secondaryBackground,
+              borderColor: theme.border,
+            },
+          ]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              Alert.alert(
+                'Puku Cloud Engine',
+                `Status: ${pukuApi.getAuthToken() ? 'Connected with Cloud Token' : 'Active (Intelligent Offline Reasoning)'}\n\nEndpoint: ${pukuApi.getBaseUrl()}\n\nTip: You can login via Login Screen or enter token to stream live models.`
+              );
+            }}
+            style={styles.settingRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>
+                Cloud Token Status
+              </Text>
+              <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>
+                {pukuApi.getAuthToken()
+                  ? '••••••••' + pukuApi.getAuthToken()?.slice(-4) + ' (Active)'
+                  : 'Operating via Intelligent Puku Engine'}
+              </Text>
+            </View>
+            <Text style={[styles.settingValue, { color: theme.tagText }]}>
+              {pukuApi.getAuthToken() ? 'Connected' : 'Active'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              const current = pukuApi.getBaseUrl();
+              if (current.includes('dev')) {
+                pukuApi.setEnvironment('prod');
+                Alert.alert(
+                  'Environment Changed',
+                  'Switched to Production Server (https://api.puku.sh)'
+                );
+              } else {
+                pukuApi.setEnvironment('dev');
+                Alert.alert(
+                  'Environment Changed',
+                  'Switched to Dev Server (https://chat.api.dev.puku.sh)'
+                );
+              }
+            }}
+            style={styles.settingRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>
+                Server Endpoint
+              </Text>
+              <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>
+                {pukuApi.getBaseUrl()}
+              </Text>
+            </View>
+            <Text style={[styles.settingValue, { color: theme.tagText }]}>
+              Switch
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Log Out */}

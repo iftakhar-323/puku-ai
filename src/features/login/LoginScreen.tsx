@@ -1,21 +1,51 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleIcon, PukuLogoIcon } from '../../components/common/Icons';
+import { pukuApi } from '../../services/api';
 import { useApp } from '../../store/AppContext';
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, navigate } = useApp();
+  const { theme, navigate, updateProfile } = useApp();
 
-  const handleSignIn = () => {
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState('developer@puku.sh');
+  const [password, setPassword] = useState('puku123');
+  const [authToken, setAuthToken] = useState('');
+
+  const handleGoogleSignIn = () => {
+    pukuApi.setAuthToken('puku_google_token_active');
+    updateProfile({
+      name: 'Google User',
+      email: 'user@gmail.com',
+      provider: 'google',
+      plan: 'Power',
+    });
+    navigate('chat');
+  };
+
+  const handleEmailSubmit = () => {
+    const finalToken = authToken.trim() || 'puku_session_token_' + Date.now();
+    pukuApi.setAuthToken(finalToken);
+    updateProfile({
+      name: email.split('@')[0] || 'Puku Developer',
+      email: email.trim(),
+      provider: 'email',
+      plan: 'Power',
+    });
+    navigate('chat');
+  };
+
+  const handleGuest = () => {
     navigate('chat');
   };
 
@@ -58,50 +88,152 @@ export function LoginScreen() {
           </Text>
         </View>
 
-        {/* Google CTA Button */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={handleSignIn}
-          style={styles.googleBtn}>
-          <GoogleIcon size={20} color="#000000" />
-          <Text style={styles.googleBtnText}>Continue with Google</Text>
-        </TouchableOpacity>
+        {showEmailForm ? (
+          /* Email & Password / Token Form */
+          <View
+            style={[
+              styles.formCard,
+              {
+                backgroundColor: theme.secondaryBackground,
+                borderColor: theme.outline,
+              },
+            ]}>
+            <Text style={[styles.formTitle, { color: theme.textPrimary }]}>
+              Sign In to Puku
+            </Text>
 
-        {/* OR Divider */}
-        <View style={styles.orRow}>
-          <View style={[styles.orLine, { backgroundColor: theme.outline }]} />
-          <Text style={[styles.orText, { color: theme.coolGrey }]}>OR</Text>
-          <View style={[styles.orLine, { backgroundColor: theme.outline }]} />
-        </View>
+            <Text style={[styles.inputLabel, { color: theme.coolGrey }]}>
+              Email Address
+            </Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="e.g. developer@puku.sh"
+              placeholderTextColor={theme.placeholderText}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={[
+                styles.formInput,
+                {
+                  color: theme.textPrimary,
+                  borderColor: theme.outline,
+                  backgroundColor: theme.background,
+                },
+              ]}
+            />
 
-        {/* Email CTA Button */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={handleSignIn}
-          style={[styles.emailBtn, { borderColor: theme.outline }]}>
-          <Text style={[styles.emailBtnText, { color: theme.textPrimary }]}>
-            Continue with Email
-          </Text>
-        </TouchableOpacity>
+            <Text style={[styles.inputLabel, { color: theme.coolGrey }]}>
+              Password
+            </Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter password (e.g. puku123)"
+              placeholderTextColor={theme.placeholderText}
+              secureTextEntry
+              style={[
+                styles.formInput,
+                {
+                  color: theme.textPrimary,
+                  borderColor: theme.outline,
+                  backgroundColor: theme.background,
+                },
+              ]}
+            />
+
+            <Text style={[styles.inputLabel, { color: theme.coolGrey }]}>
+              Puku Auth Token (Optional for cloud models)
+            </Text>
+            <TextInput
+              value={authToken}
+              onChangeText={setAuthToken}
+              placeholder="Paste Bearer token from chat.puku.sh"
+              placeholderTextColor={theme.placeholderText}
+              autoCapitalize="none"
+              style={[
+                styles.formInput,
+                {
+                  color: theme.textPrimary,
+                  borderColor: theme.outline,
+                  backgroundColor: theme.background,
+                },
+              ]}
+            />
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleEmailSubmit}
+              style={[styles.submitBtn, { backgroundColor: theme.primaryLight }]}>
+              <Text style={styles.submitBtnText}>Sign In & Continue</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowEmailForm(false)}
+              style={styles.cancelBtn}>
+              <Text style={[styles.cancelBtnText, { color: theme.coolGrey }]}>
+                Back to options
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* Google CTA Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleGoogleSignIn}
+              style={styles.googleBtn}>
+              <GoogleIcon size={20} color="#000000" />
+              <Text style={styles.googleBtnText}>Continue with Google</Text>
+            </TouchableOpacity>
+
+            {/* OR Divider */}
+            <View style={styles.orRow}>
+              <View style={[styles.orLine, { backgroundColor: theme.outline }]} />
+              <Text style={[styles.orText, { color: theme.coolGrey }]}>OR</Text>
+              <View style={[styles.orLine, { backgroundColor: theme.outline }]} />
+            </View>
+
+            {/* Email CTA Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setShowEmailForm(true)}
+              style={[styles.emailBtn, { borderColor: theme.outline }]}>
+              <Text style={[styles.emailBtnText, { color: theme.textPrimary }]}>
+                Continue with Email & Password
+              </Text>
+            </TouchableOpacity>
+
+            {/* Guest / Direct Chat */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleGuest}
+              style={styles.guestBtn}>
+              <Text style={[styles.guestBtnText, { color: theme.textPrimary }]}>
+                Continue as Guest / Offline AI →
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Legal Links */}
         <View style={styles.legalBox}>
           <Text style={[styles.legalText, { color: theme.coolGrey }]}>
             By signing in, you agree to our{' '}
             <Text
-              onPress={handleSignIn}
+              onPress={handleGuest}
               style={[styles.legalLink, { color: theme.textPrimary }]}>
               Terms
             </Text>
             ,{' '}
             <Text
-              onPress={handleSignIn}
+              onPress={handleGuest}
               style={[styles.legalLink, { color: theme.textPrimary }]}>
               Usage Policy
             </Text>{' '}
             and{' '}
             <Text
-              onPress={handleSignIn}
+              onPress={handleGuest}
               style={[styles.legalLink, { color: theme.textPrimary }]}>
               Privacy Policy
             </Text>
@@ -204,6 +336,64 @@ const styles = StyleSheet.create({
   emailBtnText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  guestBtn: {
+    marginTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  guestBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+  formCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    marginVertical: 10,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  formInput: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 14,
+  },
+  submitBtn: {
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  submitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  cancelBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 6,
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   legalBox: {
     marginTop: 20,

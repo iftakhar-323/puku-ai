@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -34,9 +35,32 @@ export function ChatScreen() {
   const [inputVal, setInputVal] = useState('');
   const [showModelSheet, setShowModelSheet] = useState(false);
   const [showAttachmentSheet, setShowAttachmentSheet] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const messages = activeConversation?.messages || [];
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setIsKeyboardVisible(true);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+      }
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handleSend = () => {
     if (!inputVal.trim() || isGenerating) return;
@@ -46,13 +70,14 @@ export function ChatScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       style={[
         styles.container,
         {
           backgroundColor: theme.background,
           paddingTop: Math.max(insets.top, 12),
-          paddingBottom: Math.max(insets.bottom, 12),
+          paddingBottom: isKeyboardVisible ? 4 : Math.max(insets.bottom, 12),
         },
       ]}>
       {/* 1:1 Authentic Header */}
@@ -78,6 +103,7 @@ export function ChatScreen() {
             ref={flatListRef}
             data={messages}
             keyExtractor={item => item.id}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.listContent}
             onContentSizeChange={() =>
               flatListRef.current?.scrollToEnd({ animated: true })
@@ -96,6 +122,11 @@ export function ChatScreen() {
         onChangeText={setInputVal}
         selectedModelLabel={selectedModel}
         isSending={isGenerating}
+        onFocus={() => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 80);
+        }}
         onPlusTap={() => setShowAttachmentSheet(true)}
         onModelTap={() => setShowModelSheet(true)}
         onSubmitTap={handleSend}

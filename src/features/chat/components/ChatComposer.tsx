@@ -21,6 +21,7 @@ interface ChatComposerProps {
   onChangeText: (text: string) => void;
   selectedModelLabel: string;
   isSending?: boolean;
+  onFocus?: () => void;
   onPlusTap: () => void;
   onModelTap: () => void;
   onSubmitTap: () => void;
@@ -34,6 +35,7 @@ export function ChatComposer({
   onChangeText,
   selectedModelLabel,
   isSending = false,
+  onFocus,
   onPlusTap,
   onModelTap,
   onSubmitTap,
@@ -56,6 +58,7 @@ export function ChatComposer({
         <TextInput
           value={inputVal}
           onChangeText={onChangeText}
+          onFocus={onFocus}
           placeholder="Chat with Puku..."
           placeholderTextColor={theme.placeholderText}
           multiline
