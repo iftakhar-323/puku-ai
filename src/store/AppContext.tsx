@@ -12,6 +12,7 @@ import {
   UserProfile,
 } from '../types';
 import { darkTheme, lightTheme, ThemeColors } from '../theme/theme';
+import { pukuApi } from '../services/api';
 
 interface AppContextValue {
   theme: ThemeColors;
@@ -309,7 +310,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const sendMessage = (text: string, modelOverride?: ChatModelType) => {
+  const sendMessage = async (text: string, modelOverride?: ChatModelType) => {
     if (!text.trim()) return;
     const modelToUse = modelOverride || selectedModel;
     const userMsg: ChatMessage = {
@@ -345,27 +346,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setIsGenerating(true);
 
-    setTimeout(() => {
-      let assistantReply = `I understand your request regarding: "${text}". Here is what Puku AI recommends:\n\n- Ensure modular component hierarchy\n- Keep design system colors unified\n- All features from Flutter are now directly ported to React Native!`;
-      if (text.toLowerCase().includes('code')) {
-        assistantReply = `Here is the requested implementation:\n\n\`\`\`typescript\nimport React from 'react';\nimport { View, Text } from 'react-native';\n\nexport const PukuCard = () => (\n  <View style={{ padding: 16, backgroundColor: '#6C47EB', borderRadius: 18 }}>\n    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Puku AI Mobile</Text>\n  </View>\n);\n\`\`\``;
-      }
-
+    try {
+      const response = await pukuApi.generateResponse(text, modelToUse, targetConvId);
       const aiMsg: ChatMessage = {
         id: 'msg_' + (Date.now() + 1),
         role: 'assistant',
-        content: assistantReply,
+        content: response.text,
         model: modelToUse,
         createdAt: 'Just now',
         blocks: [
           {
             type: 'thinking',
-            text: `Processed prompt with ${modelToUse}. Context window tokens: 1,420. Output tokens: 310.`,
+            text: response.thinking,
             isExpanded: false,
           },
           {
             type: 'text',
-            text: assistantReply,
+            text: response.text,
           },
         ],
       };
@@ -377,8 +374,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           )
         );
       }
+    } catch {
+      // Fallback assistant response
+      const fallbackMsg: ChatMessage = {
+        id: 'msg_' + (Date.now() + 1),
+        role: 'assistant',
+        content: `Response from ${modelToUse} for: "${text}"`,
+        model: modelToUse,
+        createdAt: 'Just now',
+      };
+      if (!isIncognito && targetConvId) {
+        setConversations(prev =>
+          prev.map(c =>
+            c.id === targetConvId ? { ...c, messages: [...c.messages, fallbackMsg] } : c
+          )
+        );
+      }
+    } finally {
       setIsGenerating(false);
-    }, 900);
+    }
   };
 
   const activeProject = projects.find(p => p.id === activeProjectId) || null;
