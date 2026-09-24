@@ -78,7 +78,7 @@ const initialProfile: UserProfile = {
 };
 
 const initialSettings: AppSettings = {
-  themeMode: 'light',
+  themeMode: 'dark',
   isIncognitoDefault: false,
   hapticFeedback: true,
   soundEffects: true,

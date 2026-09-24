@@ -1,36 +1,30 @@
 /**
- * Puku AI Color Palette
- * Extracted directly from the official Puku AI Flutter design interface
+ * Puku AI Color Tokens
+ * 1:1 match with /lib/theme/app_colors.dart from Flutter
  */
 
-export const colors = {
-  // Brand & Accent Gradients
-  primary: '#6C47EB',           // Brand Purple / Violet
-  primaryLight: '#9B7BF7',      // Soft Lilac / Gradient highlight
-  primaryDark: '#5534DA',       // Deep Purple
-  gradientStart: '#5C3BE6',
-  gradientEnd: '#B598FB',
+export const AppColors = {
+  black: '#000000',
+  white: '#FFFFFF',
 
-  // Backgrounds
-  backgroundTop: '#FFFFFF',     // Pure white top fade
-  background: '#FAF8FE',        // Main screen subtle lavender background
-  backgroundBottom: '#EFEBFA',  // Bottom subtle gradient tint
+  primaryText: '#FFFFFF',
+  secondaryText: '#87868E',
 
-  // Card / Bottom Bar Surfaces
-  chatBarBackground: '#EFEBFA', // Floating input card
-  chatBarBorder: '#E3DCF4',     // Card subtle border
-  pillBackground: '#E4DCF5',    // "puku-ai-2.7" model tag pill
-  buttonBackground: '#E4DCF5',  // Plus (+) & Mic icon button circle
-
-  // Typography
-  textPrimary: '#111115',       // "How can i help you"
-  textSecondary: '#7A768A',     // "today!"
-  placeholderText: '#938FA4',   // "Chat with Puku"
-  tagText: '#3D384C',           // Model tag & icon color
-
-  // UI Accents
-  menuIcon: '#111115',          // Top hamburger menu
-  homeIndicator: '#201E29',     // Android / iOS home indicator
+  primary: '#201C59',
+  secondary: '#0B0817',
+  background: '#100D1D',
+  secondaryBackground: '#151125',
+  iconBackground: '#1C1732',
+  outline: 'rgba(255, 255, 255, 0.2)',
+  outlineVariant: 'rgba(255, 255, 255, 0.12)',
+  coolGrey: '#6B6B8E',
+  pumpkin: '#E07830',
+  accent: '#A5A5FF',
+  blue: '#2B7FFF',
+  blueLite: '#51A2FF',
+  paleSky: '#B8C4D0',
+  link: '#5AC8FA',
 } as const;
 
-export type Colors = typeof colors;
+export const colors = AppColors;
+export type Colors = typeof AppColors;

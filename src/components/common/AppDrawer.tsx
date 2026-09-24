@@ -11,195 +11,177 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../store/AppContext';
 import {
-  ArtifactsIcon,
-  ChatsIcon,
-  CloseIcon,
-  CodeIcon,
-  LiveVoiceIcon,
+  ArtboardIcon,
+  FolderLibraryIcon,
+  MessageIcon,
   PlusIcon,
-  ProjectsIcon,
-  PukuLogoBadge,
-  RemoteIcon,
-  SettingsIcon,
-  TranscribeIcon,
+  SourceCodeIcon,
 } from './Icons';
 
 export function AppDrawer() {
   const insets = useSafeAreaInsets();
   const {
-    theme,
     isDrawerOpen,
     setDrawerOpen,
-    navigate,
+    theme,
     conversations,
+    activeConversationId,
+    profile,
+    navigate,
     selectConversation,
     startNewChat,
-    profile,
   } = useApp();
 
   if (!isDrawerOpen) return null;
 
-  const avatarInitial = profile.name ? profile.name[0].toUpperCase() : 'P';
+  const userInitial = profile.name ? profile.name[0].toUpperCase() : 'P';
 
   return (
-    <Modal
-      transparent
-      animationType="fade"
-      visible={isDrawerOpen}
-      onRequestClose={() => setDrawerOpen(false)}>
+    <Modal visible={isDrawerOpen} transparent animationType="fade">
       <View style={styles.overlay}>
-        {/* Backdrop touchable */}
+        {/* Backdrop */}
         <TouchableWithoutFeedback onPress={() => setDrawerOpen(false)}>
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
 
-        {/* Drawer container */}
+        {/* Drawer Panel */}
         <View
           style={[
             styles.drawerContent,
             {
-              backgroundColor: theme.secondaryBackground,
-              paddingTop: Math.max(insets.top, 20),
+              backgroundColor: theme.background,
+              paddingTop: Math.max(insets.top, 24),
               paddingBottom: Math.max(insets.bottom, 20),
             },
           ]}>
-          {/* Header */}
-          <View style={styles.drawerHeader}>
-            <View style={styles.brandRow}>
-              <PukuLogoBadge size={38} bg={theme.primary} />
-              <Text style={[styles.drawerTitle, { color: theme.textPrimary }]}>
-                Puku
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => setDrawerOpen(false)}
-              style={[styles.closeButton, { backgroundColor: theme.buttonBackground }]}>
-              <CloseIcon size={18} color={theme.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Navigation Items */}
           <ScrollView
-            style={styles.scrollArea}
+            contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}>
-            <View style={styles.navGroup}>
-              <DrawerNavRow
-                icon={<ChatsIcon size={22} color={theme.primary} />}
-                label="Chats"
-                onPress={() => navigate('chats')}
-                textColor={theme.textPrimary}
-              />
-              <DrawerNavRow
-                icon={<ProjectsIcon size={22} color={theme.primary} />}
-                label="Projects"
-                onPress={() => navigate('projects')}
-                textColor={theme.textPrimary}
-              />
-              <DrawerNavRow
-                icon={<ArtifactsIcon size={22} color={theme.primary} />}
-                label="Artifacts"
-                onPress={() => navigate('artifacts')}
-                textColor={theme.textPrimary}
-              />
-              <DrawerNavRow
-                icon={<CodeIcon size={22} color={theme.primary} />}
-                label="Code Sessions"
-                onPress={() => navigate('code')}
-                textColor={theme.textPrimary}
-              />
-              <DrawerNavRow
-                icon={<RemoteIcon size={22} color={theme.primary} />}
-                label="Remote Session"
-                onPress={() => navigate('remoteSession')}
-                textColor={theme.textPrimary}
-              />
-              <DrawerNavRow
-                icon={<TranscribeIcon size={22} color={theme.primary} />}
-                label="Transcribe"
-                onPress={() => navigate('transcribe')}
-                textColor={theme.textPrimary}
-              />
-              <DrawerNavRow
-                icon={<LiveVoiceIcon size={22} color={theme.primary} />}
-                label="Live Voice"
-                onPress={() => navigate('liveVoice')}
-                textColor={theme.textPrimary}
-              />
-              <DrawerNavRow
-                icon={<SettingsIcon size={22} color={theme.primary} />}
-                label="Settings"
-                onPress={() => navigate('settings')}
-                textColor={theme.textPrimary}
-              />
+            {/* Header */}
+            <Text style={[styles.drawerTitle, { color: theme.textPrimary }]}>
+              Puku AI
+            </Text>
+
+            {/* Menu Items */}
+            <View style={styles.menuGroup}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setDrawerOpen(false);
+                  navigate('chats');
+                }}
+                style={styles.menuItem}>
+                <MessageIcon size={22} color={theme.textPrimary} />
+                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>
+                  Chats
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setDrawerOpen(false);
+                  navigate('projects');
+                }}
+                style={styles.menuItem}>
+                <FolderLibraryIcon size={22} color={theme.textPrimary} />
+                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>
+                  Projects
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setDrawerOpen(false);
+                  navigate('artifacts');
+                }}
+                style={styles.menuItem}>
+                <ArtboardIcon size={22} color={theme.textPrimary} />
+                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>
+                  Artifacts
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setDrawerOpen(false);
+                  navigate('code');
+                }}
+                style={styles.menuItem}>
+                <SourceCodeIcon size={22} color={theme.textPrimary} />
+                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>
+                  Code
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Recents list */}
+            {/* Recents Section */}
             {conversations.length > 0 && (
               <View style={styles.recentsSection}>
-                <Text style={[styles.sectionHeader, { color: theme.textMuted }]}>
+                <Text style={[styles.recentsHeader, { color: theme.textMuted }]}>
                   RECENTS
                 </Text>
-                {conversations.slice(0, 8).map(conv => (
-                  <TouchableOpacity
-                    key={conv.id}
-                    onPress={() => {
-                      selectConversation(conv.id);
-                      setDrawerOpen(false);
-                    }}
-                    style={styles.recentItem}>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.recentText, { color: theme.textSecondary }]}>
-                      {conv.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+
+                {conversations.slice(0, 15).map(conv => {
+                  const isActive = conv.id === activeConversationId;
+                  return (
+                    <TouchableOpacity
+                      key={conv.id}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        selectConversation(conv.id);
+                        setDrawerOpen(false);
+                      }}
+                      style={[
+                        styles.recentItem,
+                        isActive && { backgroundColor: theme.buttonBackground },
+                      ]}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.recentText,
+                          {
+                            color: isActive ? theme.blue : theme.textPrimary,
+                            fontWeight: isActive ? '600' : '400',
+                          },
+                        ]}>
+                        {conv.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
           </ScrollView>
 
-          {/* Footer */}
-          <View style={[styles.footer, { borderTopColor: theme.border }]}>
+          {/* Drawer Footer */}
+          <View style={[styles.footer, { borderTopColor: theme.outline }]}>
             <TouchableOpacity
-              onPress={() => navigate('profile')}
-              style={[styles.avatarButton, { backgroundColor: theme.primary }]}>
-              <Text style={styles.avatarText}>{avatarInitial}</Text>
+              activeOpacity={0.7}
+              onPress={() => {
+                setDrawerOpen(false);
+                navigate('settings');
+              }}
+              style={[styles.avatarBtn, { backgroundColor: theme.primary }]}>
+              <Text style={styles.avatarText}>{userInitial}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => startNewChat()}
-              style={[
-                styles.newChatButton,
-                { backgroundColor: theme.pillBackground },
-              ]}>
-              <PlusIcon size={16} color={theme.tagText} />
-              <Text style={[styles.newChatText, { color: theme.tagText }]}>
-                New chat
-              </Text>
+              activeOpacity={0.8}
+              onPress={() => {
+                startNewChat();
+                setDrawerOpen(false);
+              }}
+              style={styles.newChatBtn}>
+              <PlusIcon size={18} color="#000000" />
+              <Text style={styles.newChatText}>New Chat</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
     </Modal>
-  );
-}
-
-function DrawerNavRow({
-  icon,
-  label,
-  onPress,
-  textColor,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
-  textColor: string;
-}) {
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.navRow}>
-      <View style={styles.iconContainer}>{icon}</View>
-      <Text style={[styles.navLabel, { color: textColor }]}>{label}</Text>
-    </TouchableOpacity>
   );
 }
 
@@ -209,92 +191,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   drawerContent: {
-    width: '82%',
-    maxWidth: 340,
+    width: '80%',
+    maxWidth: 320,
     height: '100%',
     paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
+    zIndex: 10,
     elevation: 16,
   },
-  drawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    marginBottom: 8,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  scroll: {
+    flexGrow: 1,
+    paddingTop: 16,
   },
   drawerTitle: {
     fontSize: 24,
     fontWeight: '800',
+    marginBottom: 28,
     letterSpacing: -0.5,
   },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+  menuGroup: {
+    gap: 18,
+    marginBottom: 28,
   },
-  scrollArea: {
-    flex: 1,
-  },
-  navGroup: {
-    paddingVertical: 6,
-  },
-  navRow: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 11,
-    gap: 14,
+    gap: 16,
   },
-  iconContainer: {
-    width: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navLabel: {
+  menuLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   recentsSection: {
-    marginTop: 18,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(150, 150, 150, 0.2)',
+    marginTop: 8,
   },
-  sectionHeader: {
-    fontSize: 12,
+  recentsHeader: {
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 10,
+    letterSpacing: 1.6,
+    marginBottom: 12,
   },
   recentItem: {
-    paddingVertical: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 4,
   },
   recentText: {
     fontSize: 14,
-    fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 16,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  avatarButton: {
+  avatarBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -306,16 +266,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  newChatButton: {
+  newChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 24,
-    gap: 8,
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
   },
   newChatText: {
-    fontSize: 15,
+    color: '#000000',
+    fontSize: 14,
     fontWeight: '600',
   },
 });
