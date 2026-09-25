@@ -509,3 +509,93 @@ export function SettingsIcon({ size = 22, color = '#FFFFFF' }: IconProps) {
     </Svg>
   );
 }
+
+export function EmailIcon({ size = 22, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect
+        x="3"
+        y="5"
+        width="18"
+        height="14"
+        rx="3"
+        stroke={color}
+        strokeWidth="1.8"
+      />
+      <Path
+        d="M3 7L12 13L21 7"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function LockIcon({ size = 22, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect
+        x="5"
+        y="11"
+        width="14"
+        height="10"
+        rx="2"
+        stroke={color}
+        strokeWidth="1.8"
+      />
+      <Path
+        d="M8 11V7C8 4.79 9.79 3 12 3C14.21 3 16 4.79 16 7V11"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <Circle cx="12" cy="16" r="1.2" fill={color} />
+    </Svg>
+  );
+}
+
+export function EyeIcon({ size = 20, color = '#87868E' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth="1.8" />
+    </Svg>
+  );
+}
+
+export function EyeOffIcon({ size = 20, color = '#87868E' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M17.94 17.94A10.07 10.07 0 0 1 12 20C5 20 1 12 1 12A18.45 18.45 0 0 1 5.06 7.06M9.9 4.24A9.12 9.12 0 0 1 12 4C19 4 23 12 23 12A18.5 18.5 0 0 1 19.46 16.54"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M1 1L23 23"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M9.88 9.88A3 3 0 1 0 14.12 14.12"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+

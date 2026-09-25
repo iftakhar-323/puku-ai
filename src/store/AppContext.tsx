@@ -230,8 +230,8 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
   const [settings, setSettings] = useState<AppSettings>(initialSettings);
-  const [activeRoute, setActiveRoute] = useState<AppRoute>('chat');
-  const [routeHistory, setRouteHistory] = useState<AppRoute[]>(['chat']);
+  const [activeRoute, setActiveRoute] = useState<AppRoute>('login');
+  const [routeHistory, setRouteHistory] = useState<AppRoute[]>(['login']);
   const [routeParams, setRouteParams] = useState<any>(null);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
@@ -592,6 +592,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    pukuApi.setAuthToken(null);
     navigate('login');
   };
 

@@ -5,20 +5,21 @@
  */
 
 import { ChatModelType } from '../types';
+import { ENV } from '../config/env';
 
 export const API_CONFIG = {
   dev: {
-    chatApiUrl: 'https://chat.api.dev.puku.sh',
-    authWebUrl: 'https://web.dev.puku.sh',
-    relayHost: 'puku-cli.relay.dev.puku.sh',
+    chatApiUrl: ENV.API_BASE_URL,
+    authWebUrl: ENV.AUTH_BASE_URL,
+    relayHost: ENV.REMOTE_SESSION_RELAY_HOST,
   },
   prod: {
     chatApiUrl: 'https://api.puku.sh',
     authWebUrl: 'https://web.puku.sh',
     relayHost: 'puku-cli.relay.puku.sh',
   },
-  clientId: 'puku-app',
-  redirectUri: 'puku://callback/',
+  clientId: ENV.AUTH_CLIENT_ID,
+  redirectUri: ENV.AUTH_REDIRECT_URI,
 };
 
 // Maps client model type to server API model string
@@ -58,7 +59,7 @@ export interface HealthCheckResult {
 
 export class PukuApiService {
   private baseUrl = API_CONFIG.dev.chatApiUrl;
-  private authToken: string | null = null;
+  private authToken: string | null = ENV.TEST_CREDENTIALS.bearerToken || null;
 
   setAuthToken(token: string | null) {
     this.authToken = token;

@@ -23,11 +23,23 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
         <!-- Deep Link for OAuth PKCE callback from Chrome/Brave browser -->
-        <intent-filter>
+        <intent-filter android:label="puku_callback">
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
-            <data android:scheme="puku" android:host="callback" />
+            <data
+                android:scheme="puku"
+                android:host="callback"
+                android:pathPrefix="/" />
+        </intent-filter>
+        <intent-filter android:label="puku_web_callback">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data
+                android:scheme="https"
+                android:host="api.app.dev.puku.sh"
+                android:path="/callback" />
         </intent-filter>
       </activity>
     </application>
