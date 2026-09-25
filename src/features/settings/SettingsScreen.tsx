@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -27,6 +29,10 @@ export function SettingsScreen() {
     navigate,
     logout,
   } = useApp();
+
+  const [tokenModalVisible, setTokenModalVisible] = useState(false);
+  const [inputToken, setInputToken] = useState(pukuApi.getAuthToken() || '');
+  const [testingToken, setTestingToken] = useState(false);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -314,6 +320,30 @@ export function SettingsScreen() {
               Switch
             </Text>
           </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              setInputToken(pukuApi.getAuthToken() || '');
+              setTokenModalVisible(true);
+            }}
+            style={styles.settingRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>
+                Bearer Token / Senior Credential
+              </Text>
+              <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>
+                {pukuApi.getAuthToken()
+                  ? 'Custom token configured (Tap to update)'
+                  : 'Tap to enter or test live JWT token from senior'}
+              </Text>
+            </View>
+            <Text style={[styles.settingValue, { color: theme.tagText }]}>
+              {pukuApi.getAuthToken() ? 'Edit' : 'Add'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Log Out */}
@@ -326,6 +356,102 @@ export function SettingsScreen() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Senior Token Input Modal */}
+      <Modal
+        visible={tokenModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTokenModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.tokenModalBox,
+              {
+                backgroundColor: theme.secondaryBackground,
+                borderColor: theme.border,
+              },
+            ]}>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+              Backend Bearer Token
+            </Text>
+            <Text
+              style={[
+                styles.modalSubtitle,
+                { color: theme.textSecondary },
+              ]}>
+              Paste the JWT / Bearer token provided by your senior to test live cloud streaming:
+            </Text>
+            <TextInput
+              style={[
+                styles.tokenInput,
+                {
+                  color: theme.textPrimary,
+                  borderColor: theme.border,
+                  backgroundColor: theme.background,
+                },
+              ]}
+              placeholder="Paste Bearer token here (or clear to reset)..."
+              placeholderTextColor={theme.textMuted}
+              value={inputToken}
+              onChangeText={setInputToken}
+              autoCapitalize="none"
+              autoCorrect={false}
+              multiline
+            />
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                onPress={() => setTokenModalVisible(false)}
+                style={[styles.modalBtn, { borderColor: theme.border }]}>
+                <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={testingToken}
+                onPress={async () => {
+                  setTestingToken(true);
+                  const trimmed = inputToken.trim();
+                  pukuApi.setAuthToken(trimmed || null);
+                  if (!trimmed) {
+                    Alert.alert(
+                      'Reset',
+                      'Switched back to Intelligent Offline Engine.'
+                    );
+                    setTestingToken(false);
+                    setTokenModalVisible(false);
+                    return;
+                  }
+                  const isValid = await pukuApi.verifyAuth();
+                  setTestingToken(false);
+                  setTokenModalVisible(false);
+                  if (isValid) {
+                    Alert.alert(
+                      'Success',
+                      'Connected and verified with Puku Cloud Backend!'
+                    );
+                  } else {
+                    Alert.alert(
+                      'Token Saved',
+                      'Token saved. Puku will send this Bearer token on cloud API requests.'
+                    );
+                  }
+                }}
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: theme.primary,
+                    borderColor: theme.primary,
+                  },
+                ]}>
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>
+                  {testingToken ? 'Verifying...' : 'Save & Verify'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -438,5 +564,48 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  tokenModalBox: {
+    width: '100%',
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 22,
+    gap: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  tokenInput: {
+    minHeight: 90,
+    maxHeight: 140,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    fontSize: 13,
+    textAlignVertical: 'top',
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 6,
+  },
+  modalBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
   },
 });
