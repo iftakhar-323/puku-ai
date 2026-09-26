@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AppRoute,
   AppSettings,
@@ -12,7 +13,8 @@ import {
   UserProfile,
 } from '../types';
 import { darkTheme, lightTheme, ThemeColors } from '../theme/theme';
-import { pukuApi } from '../services/api';
+import { pukuApi, mapModelToApi, mapApiToModel } from '../services/api';
+import { extractJwtData } from '../utils/auth';
 
 interface AppContextValue {
   theme: ThemeColors;
@@ -69,16 +71,16 @@ interface AppContextValue {
 }
 
 const initialProfile: UserProfile = {
-  name: 'Puku Developer',
-  email: 'puku@puku.net',
-  organization: 'puku',
-  plan: 'Power',
+  name: '',
+  email: '',
+  organization: '',
+  plan: 'Free',
   provider: 'google',
-  userId: 'usr_puku_8492048',
+  userId: '',
 };
 
 const initialSettings: AppSettings = {
-  themeMode: 'dark',
+  themeMode: 'dark', // Flutter default is dark
   isIncognitoDefault: false,
   hapticFeedback: true,
   soundEffects: true,
@@ -101,129 +103,13 @@ const initialProjects: Project[] = [
       { id: 'k2', name: 'design-tokens-v2.json', type: 'JSON', size: '42 KB', date: '2h ago' },
     ],
   },
-  {
-    id: 'proj_flutter_parity',
-    name: 'Flutter Feature Parity',
-    description: 'Migration and parity tracking across all screens and UI widgets',
-    instructions: 'Ensure full 1:1 functional compatibility with Flutter implementation for both Android and iOS.',
-    color: '#0288D1',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    scope: 'yours',
-    knowledgeItems: [],
-  },
 ];
 
-const initialArtifacts: Artifact[] = [
-  {
-    id: 'art_1',
-    title: 'PukuColorPalette.ts',
-    type: 'code',
-    language: 'typescript',
-    createdAt: 'Just now',
-    content: `export const PukuColors = {
-  primary: '#6C47EB',
-  accent: '#A5A5FF',
-  backgroundLight: '#F8F7FF',
-  backgroundDark: '#100D1D',
-  tagText: '#4A2EC7',
-  pillBackground: '#E4DCF5'
-};`,
-  },
-  {
-    id: 'art_2',
-    title: 'MigrationArchitecture.md',
-    type: 'markdown',
-    language: 'markdown',
-    createdAt: '1h ago',
-    content: `# Puku AI Architecture
-- Direct 1:1 Screen mapping from Flutter
-- Unified AppContext with reactive updates
-- Modular screen components
-- Offline persistence`,
-  },
-  {
-    id: 'art_3',
-    title: 'LiveVoicePulseOrb.svg',
-    type: 'svg',
-    language: 'xml',
-    createdAt: 'Yesterday',
-    content: `<svg viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="45" fill="#6C47EB" opacity="0.3"/>
-  <circle cx="50" cy="50" r="30" fill="#A5A5FF" opacity="0.7"/>
-  <circle cx="50" cy="50" r="15" fill="#FFFFFF"/>
-</svg>`,
-  },
-];
+const initialArtifacts: Artifact[] = [];
 
-const initialCodeSessions: CodeSession[] = [
-  {
-    id: 'cs_101',
-    title: 'React Native Hermes Optimizer',
-    lastActivity: 'Just now',
-    model: 'puku-ai-2.7',
-    environment: 'React Native / TypeScript',
-    acceptEditsAutomatically: true,
-    status: 'idle',
-    code: `// Test Hermes runtime performance\nfunction benchmark() {\n  const start = performance.now();\n  let sum = 0;\n  for(let i=0; i<100000; i++) sum += i;\n  console.log("Completed in " + (performance.now() - start).toFixed(2) + "ms. Sum: " + sum);\n}\nbenchmark();`,
-    terminalOutput: ['[System] Hermes runtime initialized.', '[Worker] Session ready on channel #cs_101', 'Completed in 1.42ms. Sum: 4999950000'],
-  },
-];
+const initialCodeSessions: CodeSession[] = [];
 
-const initialConversations: Conversation[] = [
-  {
-    id: 'conv_1',
-    title: 'Look over my code and give me tips',
-    activityDate: 'Just now',
-    model: 'puku-ai-2.7',
-    messages: [
-      {
-        id: 'm1',
-        role: 'user',
-        content: 'Look over my code and give me tips on optimizing Android APK builds.',
-        createdAt: '10:30 AM',
-      },
-      {
-        id: 'm2',
-        role: 'assistant',
-        content: "Here are high-impact tips for optimizing your React Native Android APK:\n\n1. **Enable ProGuard & R8 shrinker** in `android/app/build.gradle`.\n2. **Use Hermes Engine** for instant startup and low memory footprint.\n3. **Use ABI Splitting** so your users only download binaries for their device architecture (`arm64-v8a`).",
-        createdAt: '10:31 AM',
-        model: 'puku-ai-2.7',
-        blocks: [
-          {
-            type: 'thinking',
-            text: 'Analyzing Android Gradle setup, Hermes bytecode compilation flags, and native asset bundling...',
-            isExpanded: false,
-          },
-          {
-            type: 'text',
-            text: "Here are high-impact tips for optimizing your React Native Android APK:\n\n1. **Enable ProGuard & R8 shrinker** in `android/app/build.gradle`.\n2. **Use Hermes Engine** for instant startup and low memory footprint.\n3. **Use ABI Splitting** so your users only download binaries for their device architecture (`arm64-v8a`).",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'conv_2',
-    title: 'Explain PKCE OAuth flow for mobile',
-    activityDate: '2h ago',
-    model: 'puku-ai-2.7',
-    messages: [
-      {
-        id: 'm20',
-        role: 'user',
-        content: 'Explain PKCE OAuth flow for mobile apps.',
-        createdAt: '8:15 AM',
-      },
-      {
-        id: 'm21',
-        role: 'assistant',
-        content: 'Proof Key for Code Exchange (PKCE) prevents authorization code interception attacks on public clients like mobile apps by generating a code verifier and code challenge pair.',
-        createdAt: '8:16 AM',
-        model: 'puku-ai-2.7',
-      },
-    ],
-  },
-];
+const initialConversations: Conversation[] = [];
 
 const AppContext = createContext<AppContextValue | null>(null);
 
@@ -235,9 +121,136 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [routeParams, setRouteParams] = useState<any>(null);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        const [
+          savedToken,
+          savedProfileStr,
+          savedRoute,
+          isLoggedOut,
+          savedSettingsStr,
+          savedConvsStr,
+          savedModelStr,
+        ] = await Promise.all([
+          AsyncStorage.getItem('@puku_auth_token'),
+          AsyncStorage.getItem('@puku_user_profile'),
+          AsyncStorage.getItem('@puku_active_route'),
+          AsyncStorage.getItem('@puku_is_logged_out'),
+          AsyncStorage.getItem('@puku_app_settings'),
+          AsyncStorage.getItem('@puku_conversations'),
+          AsyncStorage.getItem('@puku_selected_model'),
+        ]);
+
+        if (
+          savedModelStr &&
+          (savedModelStr === 'opus-4.8' ||
+            savedModelStr === 'puku-ai-2.8' ||
+            savedModelStr === 'puku-ai-2.7')
+        ) {
+          setSelectedModelState(savedModelStr as ChatModelType);
+        }
+
+        if (savedSettingsStr) {
+          try {
+            const parsedSettings = JSON.parse(savedSettingsStr);
+            if (parsedSettings) {
+              setSettings(prev => ({
+                ...prev,
+                ...parsedSettings,
+                themeMode: parsedSettings.themeMode || 'dark',
+              }));
+            }
+          } catch {}
+        }
+
+        // Standard: Fresh install or logged out requires user to sign in
+        if (isLoggedOut === 'true' || !savedToken) {
+          pukuApi.setAuthToken(null);
+          setProfile(initialProfile);
+          setConversations([]);
+          setActiveConversationId(null);
+          setActiveRoute('login');
+          setRouteHistory(['login']);
+          return;
+        }
+
+        // User is authenticated: restore session
+        pukuApi.setAuthToken(savedToken);
+
+        if (savedProfileStr) {
+          try {
+            const parsedProfile = JSON.parse(savedProfileStr);
+            if (parsedProfile && parsedProfile.email) {
+              setProfile(prev => ({ ...prev, ...parsedProfile }));
+            }
+          } catch {}
+        } else {
+          const jwtData = extractJwtData(savedToken);
+          if (jwtData?.email) {
+            setProfile(prev => ({
+              ...prev,
+              email: jwtData.email!,
+              name: jwtData.name || jwtData.email!.split('@')[0],
+              userId: jwtData.sub || prev.userId,
+            }));
+          }
+        }
+
+        if (savedConvsStr) {
+          try {
+            const parsedConvs = JSON.parse(savedConvsStr);
+            if (Array.isArray(parsedConvs) && parsedConvs.length > 0) {
+              setConversations(parsedConvs);
+              setActiveConversationId(parsedConvs[0].id);
+            }
+          } catch {}
+        }
+
+        const targetRoute =
+          savedRoute && savedRoute !== 'login' ? (savedRoute as AppRoute) : 'chat';
+        setActiveRoute(targetRoute);
+        setRouteHistory([targetRoute]);
+      } catch (err) {
+        console.warn('Failed to restore session from AsyncStorage', err);
+        setActiveRoute('login');
+        setRouteHistory(['login']);
+      }
+    }
+
+    restoreSession();
+  }, []);
+
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ChatModelType>('puku-ai-2.7');
+
+  useEffect(() => {
+    if (conversations.length > 0) {
+      AsyncStorage.setItem('@puku_conversations', JSON.stringify(conversations)).catch(() => {});
+    }
+  }, [conversations]);
+
+  useEffect(() => {
+    AsyncStorage.setItem('@puku_app_settings', JSON.stringify(settings)).catch(() => {});
+  }, [settings]);
+  const [selectedModel, setSelectedModelState] = useState<ChatModelType>('puku-ai-2.7');
+
+  const setSelectedModel = (model: ChatModelType) => {
+    setSelectedModelState(model);
+    AsyncStorage.setItem('@puku_selected_model', model).catch(() => {});
+    if (activeConversationId) {
+      setConversations(prev =>
+        prev.map(c => (c.id === activeConversationId ? { ...c, model } : c))
+      );
+      if (!activeConversationId.startsWith('conv_')) {
+        pukuApi
+          .updateConversation(activeConversationId, {
+            model: mapModelToApi(model),
+          })
+          .catch(() => {});
+      }
+    }
+  };
   const [isIncognito, setIncognito] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -248,7 +261,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 
   const [codeSessions, setCodeSessions] = useState<CodeSession[]>(initialCodeSessions);
-  const [activeCodeSessionId, setActiveCodeSessionId] = useState<string | null>(initialCodeSessions[0].id);
+  const [activeCodeSessionId, setActiveCodeSessionId] = useState<string | null>(
+    initialCodeSessions[0]?.id || null
+  );
 
   const [remoteSession, setRemoteSession] = useState<RemoteSession>({
     sessionId: 'puku-relay-9281',
@@ -270,6 +285,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRouteParams(params);
     setRouteHistory(prev => [...prev, route]);
     setActiveRoute(route);
+    if (route !== 'login') {
+      AsyncStorage.setItem('@puku_active_route', route).catch(() => {});
+    }
   };
 
   const goBack = () => {
@@ -291,7 +309,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveConversationId(id);
     if (id) {
       const conv = conversations.find(c => c.id === id);
-      if (conv) setSelectedModel(conv.model);
+      if (conv && conv.model) {
+        setSelectedModelState(mapApiToModel(conv.model));
+      }
     }
     setActiveRoute('chat');
   };
@@ -338,7 +358,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setConversations(prev =>
         prev.map(c =>
           c.id === targetConvId
-            ? { ...c, messages: [...c.messages, userMsg], activityDate: 'Just now' }
+            ? {
+                ...c,
+                model: modelToUse,
+                messages: [...c.messages, userMsg],
+                activityDate: 'Just now',
+              }
             : c
         )
       );
@@ -348,45 +373,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const response = await pukuApi.generateResponse(text, modelToUse, targetConvId);
+      const serverConvId = response.conversationId;
       const aiMsg: ChatMessage = {
         id: 'msg_' + (Date.now() + 1),
         role: 'assistant',
         content: response.text,
         model: modelToUse,
         createdAt: 'Just now',
-        blocks: [
-          {
-            type: 'thinking',
-            text: response.thinking,
-            isExpanded: false,
-          },
-          {
-            type: 'text',
-            text: response.text,
-          },
-        ],
       };
 
       if (!isIncognito && targetConvId) {
         setConversations(prev =>
-          prev.map(c =>
-            c.id === targetConvId ? { ...c, messages: [...c.messages, aiMsg] } : c
-          )
+          prev.map(c => {
+            if (c.id === targetConvId) {
+              return {
+                ...c,
+                id: serverConvId || c.id,
+                model: modelToUse,
+                messages: [...c.messages, aiMsg],
+              };
+            }
+            return c;
+          })
         );
+        if (serverConvId && serverConvId !== targetConvId) {
+          setActiveConversationId(serverConvId);
+        }
       }
-    } catch {
-      // Fallback assistant response
+    } catch (err: any) {
+      const errorMsg =
+        err?.message ||
+        'Failed to get response from Puku AI. Please check your connection or sign in again.';
       const fallbackMsg: ChatMessage = {
         id: 'msg_' + (Date.now() + 1),
         role: 'assistant',
-        content: `Response from ${modelToUse} for: "${text}"`,
+        content: errorMsg,
         model: modelToUse,
         createdAt: 'Just now',
       };
       if (!isIncognito && targetConvId) {
         setConversations(prev =>
           prev.map(c =>
-            c.id === targetConvId ? { ...c, messages: [...c.messages, fallbackMsg] } : c
+            c.id === targetConvId
+              ? {
+                  ...c,
+                  model: modelToUse,
+                  messages: [...c.messages, fallbackMsg],
+                }
+              : c
           )
         );
       }
@@ -584,7 +618,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProfile = (updates: Partial<UserProfile>) => {
-    setProfile(prev => ({ ...prev, ...updates }));
+    setProfile(prev => {
+      const updated = { ...prev, ...updates };
+      AsyncStorage.setItem('@puku_user_profile', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
   };
 
   const updateSettings = (updates: Partial<AppSettings>) => {
@@ -593,7 +631,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     pukuApi.setAuthToken(null);
-    navigate('login');
+    AsyncStorage.setItem('@puku_is_logged_out', 'true').catch(() => {});
+    AsyncStorage.removeItem('@puku_auth_token').catch(() => {});
+    AsyncStorage.removeItem('@puku_user_profile').catch(() => {});
+    AsyncStorage.removeItem('@puku_conversations').catch(() => {});
+    AsyncStorage.removeItem('@puku_active_route').catch(() => {});
+    AsyncStorage.removeItem('@puku_is_logged_in').catch(() => {});
+    AsyncStorage.removeItem('@puku_selected_model').catch(() => {});
+    setSelectedModelState('puku-ai-2.7');
+    setProfile(initialProfile);
+    setConversations([]);
+    setActiveConversationId(null);
+    setActiveRoute('login');
+    setRouteHistory(['login']);
   };
 
   return (

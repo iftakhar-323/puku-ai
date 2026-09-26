@@ -1,13 +1,8 @@
-import React, { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { ChevronDownIcon } from '../../../components/common/Icons';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { ThemeColors } from '../../../theme/theme';
 import { ChatMessage } from '../../../types';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -16,120 +11,65 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, theme }: MessageBubbleProps) {
   const isUser = message.role === 'user';
-  const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
 
-  const thinkingBlock = message.blocks?.find(b => b.type === 'thinking');
+  if (isUser) {
+    return (
+      <View style={styles.userRow}>
+        <View
+          style={[
+            styles.userBubble,
+            { backgroundColor: theme.userBubble },
+          ]}>
+          <Text style={[styles.userText, { color: theme.onUserBubble }]}>
+            {message.content}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
-    <View
-      style={[
-        styles.row,
-        isUser ? styles.userRow : styles.assistantRow,
-      ]}>
+    <View style={styles.assistantRow}>
       <View
         style={[
-          styles.bubble,
-          isUser
-            ? [styles.userBubble, { backgroundColor: theme.userBubble }]
-            : [styles.assistantBubble, { backgroundColor: theme.assistantBubble, borderColor: theme.outline }],
+          styles.assistantCard,
+          { backgroundColor: theme.assistantBubble },
         ]}>
-        {/* Thinking Accordion for assistant */}
-        {!isUser && thinkingBlock && (
-          <View style={styles.thinkingContainer}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setIsThinkingExpanded(!isThinkingExpanded)}
-              style={styles.thinkingHeader}>
-              <Text style={[styles.thinkingTitle, { color: theme.accent }]}>
-                Thinking
-              </Text>
-              <View
-                style={{
-                  transform: [{ rotate: isThinkingExpanded ? '180deg' : '0deg' }],
-                }}>
-                <ChevronDownIcon size={14} color={theme.accent} />
-              </View>
-            </TouchableOpacity>
-
-            {isThinkingExpanded && (
-              <View
-                style={[
-                  styles.thinkingContent,
-                  { backgroundColor: theme.thinkingBackground, borderColor: theme.outline },
-                ]}>
-                <Text style={[styles.thinkingText, { color: theme.textMuted }]}>
-                  {thinkingBlock.text}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Message Content */}
-        <Text
-          style={[
-            styles.messageText,
-            { color: isUser ? '#FFFFFF' : theme.textPrimary },
-          ]}>
-          {message.content}
-        </Text>
+        <MarkdownRenderer content={message.content} theme={theme} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
+  userRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     marginVertical: 6,
     paddingHorizontal: 16,
-    flexDirection: 'row',
   },
-  userRow: {
-    justifyContent: 'flex-end',
-  },
-  assistantRow: {
-    justifyContent: 'flex-start',
-  },
-  bubble: {
+  userBubble: {
     maxWidth: '85%',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  userBubble: {
-    borderBottomRightRadius: 4,
-  },
-  assistantBubble: {
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-  },
-  messageText: {
+  userText: {
     fontSize: 15,
     lineHeight: 22,
     fontWeight: '400',
   },
-  thinkingContainer: {
-    marginBottom: 8,
-  },
-  thinkingHeader: {
+  assistantRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
+    justifyContent: 'flex-start',
+    marginVertical: 6,
+    paddingHorizontal: 16,
+    width: '100%',
   },
-  thinkingTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  thinkingContent: {
-    marginTop: 6,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  thinkingText: {
-    fontSize: 12,
-    lineHeight: 18,
-    fontFamily: 'monospace',
+  assistantCard: {
+    maxWidth: '88%',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
 });

@@ -45,17 +45,17 @@ export function ChatModelSelectionSheet({
     {
       id: 'opus-4.8',
       title: 'Opus 4.8',
-      description: 'Most capable model for complex reasoning and tasks',
+      description: 'For complex tasks',
     },
     {
       id: 'puku-ai-2.8',
       title: 'puku-ai-2.8',
-      description: 'Optimized for speed and efficiency',
+      description: 'Most efficient for everyday tasks',
     },
     {
       id: 'puku-ai-2.7',
       title: 'puku-ai-2.7',
-      description: 'Previous generation model',
+      description: 'Fastest for quick answers',
     },
   ];
 
