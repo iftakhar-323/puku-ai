@@ -25,7 +25,9 @@ export interface ThemeColors {
   codeBackground: string;
   thinkingBackground: string;
   userBubble: string;
+  onUserBubble: string;
   assistantBubble: string;
+  iconBackground: string;
   pumpkin: string;
   blue: string;
   blueLite: string;
@@ -57,7 +59,9 @@ export const darkTheme: ThemeColors = {
   codeBackground: AppColors.secondary, // #0B0817
   thinkingBackground: 'rgba(255, 255, 255, 0.04)',
   userBubble: AppColors.primary, // #201C59
-  assistantBubble: AppColors.secondaryBackground, // #151125
+  onUserBubble: '#FFFFFF',
+  assistantBubble: AppColors.black, // #000000 matching Flutter surfaceContainerHighest
+  iconBackground: AppColors.iconBackground, // #1C1732
   pumpkin: AppColors.pumpkin,
   blue: AppColors.blue,
   blueLite: AppColors.blueLite,
@@ -65,31 +69,33 @@ export const darkTheme: ThemeColors = {
 };
 
 export const lightTheme: ThemeColors = {
-  background: '#F8F7FF',
+  background: '#FBFBFE',
   secondaryBackground: '#FFFFFF',
   cardBackground: '#FFFFFF',
-  chatBarBackground: '#FFFFFF',
-  chatBarBorder: '#E6E3F5',
+  chatBarBackground: '#F0EEF8',
+  chatBarBorder: '#E4E0F2',
   primary: '#6C47EB',
   primaryLight: '#8B6BFF',
-  accent: '#A5A5FF',
-  textPrimary: '#151324',
-  textSecondary: '#6B6882',
+  accent: '#7B61FF',
+  textPrimary: '#1A1729',
+  textSecondary: '#6F6B85',
   textMuted: '#9B98AE',
-  placeholderText: '#7B7894',
-  border: '#E8E5F7',
-  outline: '#D9D5F0',
-  buttonBackground: '#EFEBFB',
-  pillBackground: '#E4DCF5',
+  placeholderText: '#8E8A9F',
+  border: '#EAE7F5',
+  outline: '#E0DCF0',
+  buttonBackground: '#FFFFFF',
+  pillBackground: '#E8E3FA',
   tagText: '#4A2EC7',
-  menuIcon: '#322F48',
+  menuIcon: '#1A1729',
   error: '#FF4D4F',
   success: '#52C41A',
   warning: '#FAAD14',
-  codeBackground: '#1C1732',
+  codeBackground: '#F2F0FA',
   thinkingBackground: '#F0ECFC',
-  userBubble: '#6C47EB',
-  assistantBubble: '#F2EFFC',
+  userBubble: '#EAE4F9',
+  onUserBubble: '#1E1B2E',
+  assistantBubble: '#FBFBFE',
+  iconBackground: '#E8E3FA',
   pumpkin: '#E07830',
   blue: '#2B7FFF',
   blueLite: '#51A2FF',

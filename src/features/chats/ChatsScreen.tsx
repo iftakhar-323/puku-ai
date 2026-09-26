@@ -18,6 +18,21 @@ import {
 import { useApp } from '../../store/AppContext';
 import { Conversation } from '../../types';
 
+function formatModelName(model?: string): string {
+  switch (model) {
+    case 'opus-4.8':
+    case 'opus':
+      return 'Opus 4.8';
+    case 'puku-ai-2.8':
+    case 'puku-2.8':
+      return 'puku-ai-2.8';
+    case 'puku-ai-2.7':
+    case 'puku-2.7':
+    default:
+      return 'puku-ai-2.7';
+  }
+}
+
 export function ChatsScreen() {
   const {
     theme,
@@ -183,7 +198,7 @@ export function ChatsScreen() {
                     {item.title}
                   </Text>
                   <Text style={[styles.chatDate, { color: theme.textMuted }]}>
-                    {item.activityDate} • {item.model}
+                    {item.activityDate} • {formatModelName(item.model)}
                   </Text>
                 </View>
               </TouchableOpacity>

@@ -15,25 +15,26 @@ export function ChatModelChip({ label, theme, onTap }: ChatModelChipProps) {
       activeOpacity={0.7}
       onPress={onTap}
       style={[styles.container, { backgroundColor: theme.pillBackground }]}>
-      <Text style={[styles.label, { color: theme.textSecondary }]}>
+      <Text style={[styles.label, { color: theme.textPrimary }]}>
         {label}
       </Text>
-      <ChevronDownIcon size={14} color={theme.textMuted} />
+      <ChevronDownIcon size={14} color={theme.textPrimary} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    height: 36,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    gap: 4,
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 18,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

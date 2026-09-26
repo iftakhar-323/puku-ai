@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import {
@@ -30,6 +31,8 @@ import { pukuApi } from '../../services/api';
 import { useApp } from '../../store/AppContext';
 import { AppColors } from '../../theme/colors';
 import { ENV } from '../../config/env';
+import { extractJwtData, fetchAuthenticUserInfo } from '../../utils/auth';
+import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 
 // Standard pure JS SHA-256 for PKCE S256 challenge calculation
 function sha256(ascii: string): Uint8Array {
@@ -156,18 +159,42 @@ export function LoginScreen() {
 
   // Email Sign-In Modal State
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [emailInput, setEmailInput] = useState(ENV.TEST_CREDENTIALS.email || 'developer@puku.sh');
-  const [passwordInput, setPasswordInput] = useState(ENV.TEST_CREDENTIALS.password || 'puku123');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
   const [emailErrorMessage, setEmailErrorMessage] = useState<string | null>(null);
 
-  // Google Browser Auth State & Modal
+  // OAuth State
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [authStatusMessage, setAuthStatusMessage] = useState('Ready to connect with Google');
+  const [manualCodeInput, setManualCodeInput] = useState('');
   const [authVerifier, setAuthVerifier] = useState<string>('');
   const [authState, setAuthState] = useState<string>('');
   const [isOAuthWaiting, setIsOAuthWaiting] = useState(false);
+
+  // Helper to get normalized OAuth redirect URI
+  const getOAuthRedirectUri = (): string => {
+    const raw = ENV.AUTH_REDIRECT_URI || 'pukuapp://callback/';
+    const base = raw.split('?')[0].trim();
+    return base.endsWith('/') ? base : `${base}/`;
+  };
+
+  // Check if session already exists on launch
+  useEffect(() => {
+    async function checkExistingSession() {
+      try {
+        const [token, isLoggedOut] = await Promise.all([
+          AsyncStorage.getItem('@puku_auth_token'),
+          AsyncStorage.getItem('@puku_is_logged_out'),
+        ]);
+        if (token && isLoggedOut !== 'true') {
+          navigate('chat');
+        }
+      } catch {}
+    }
+    checkExistingSession();
+  }, []);
 
   const showSnackBar = (message: string) => {
     if (snackBarTimer.current) {
@@ -191,106 +218,160 @@ export function LoginScreen() {
     }, 2500);
   };
 
-  // Process OAuth Callback from deep link (puku://callback/?code=...&state=...)
-  const handleOAuthCallbackUrl = async (urlStr: string) => {
-    if (!urlStr || !urlStr.startsWith('puku://callback')) return;
+  // Process OAuth Callback from InAppBrowser or deep link
+  const handleOAuthCallbackUrl = async (
+    urlStr: string,
+    overrideVerifier?: string,
+    overrideState?: string,
+    overrideRedirectUri?: string
+  ) => {
+    if (!urlStr) return;
 
     try {
-      setAuthStatusMessage('Exchanging code for authentication tokens...');
-      const queryPart = urlStr.includes('?') ? urlStr.split('?')[1] : '';
-      const params = new URLSearchParams(queryPart);
-      const code = params.get('code');
-      const returnedState = params.get('state');
+      setAuthStatusMessage('Signing in with Google credentials...');
+      let code = '';
+      let returnedState = '';
+
+      if (urlStr.includes('?')) {
+        const queryPart = urlStr.split('?')[1].split('#')[0];
+        const params = new URLSearchParams(queryPart);
+        code = params.get('code') || '';
+        returnedState = params.get('state') || '';
+      } else if (!urlStr.includes('://')) {
+        code = urlStr.trim();
+      }
 
       if (!code) {
-        showSnackBar('Authentication canceled or missing code');
+        showSnackBar('Authentication canceled or missing authorization code');
         setIsGoogleModalOpen(false);
         setIsOAuthWaiting(false);
         return;
       }
 
-      if (authState && returnedState && authState !== returnedState) {
+      const storedVerifier =
+        overrideVerifier || authVerifier || (await AsyncStorage.getItem('@puku_oauth_verifier')) || '';
+      const storedState =
+        overrideState || authState || (await AsyncStorage.getItem('@puku_oauth_state')) || '';
+      const redirectUri = overrideRedirectUri || getOAuthRedirectUri();
+
+      if (storedState && returnedState && storedState !== returnedState) {
         showSnackBar('State validation failed. Please try again.');
         setIsGoogleModalOpen(false);
         setIsOAuthWaiting(false);
         return;
       }
 
-      // Step 5: Exchange code with /api/oauth/token endpoint
-      const response = await fetch('https://web.dev.puku.sh/api/oauth/token', {
+      // Step: Exchange code with /api/oauth/token endpoint
+      const response = await fetch(`${ENV.AUTH_BASE_URL}/api/oauth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) PukuApp/1.0',
         },
         body: new URLSearchParams({
           grant_type: 'authorization_code',
           code,
-          redirect_uri: 'puku://callback/',
-          client_id: 'puku-app',
-          code_verifier: authVerifier,
+          redirect_uri: redirectUri,
+          client_id: ENV.AUTH_CLIENT_ID,
+          code_verifier: storedVerifier,
         }).toString(),
       });
 
       if (response.ok) {
         const json = await response.json();
         const accessToken = json.access_token || json.accessToken;
+        const idToken = json.id_token || json.idToken;
+        const refreshToken = json.refresh_token || json.refreshToken;
+
         if (accessToken) {
           pukuApi.setAuthToken(accessToken);
+          await AsyncStorage.setItem('@puku_auth_token', accessToken);
+          if (refreshToken) {
+            await AsyncStorage.setItem('@puku_refresh_token', refreshToken);
+          }
 
+          // Extract authentic user credentials from token and server
+          let authenticEmail = '';
+          let authenticName = '';
+          let authenticId = '';
+          let authenticPicture: string | undefined = undefined;
+
+          // 1. Primary: fetch from /v1/me (matching Flutter ProfileService)
           try {
-            const meRes = await fetch('https://chat.api.dev.puku.sh/v1/me', {
-              headers: { Authorization: `Bearer ${accessToken}` },
+            const meRes = await fetch(`${ENV.API_BASE_URL}/v1/me`, {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: 'application/json',
+              },
             });
             if (meRes.ok) {
               const meData = await meRes.json();
-              updateProfile({
-                name: meData.name || 'Puku Developer',
-                email: meData.email || 'developer@puku.sh',
-                provider: meData.provider || 'google',
-                plan: 'Power',
-              });
-            } else {
-              updateProfile({
-                name: 'Puku Developer',
-                email: 'developer@puku.sh',
-                provider: 'google',
-                plan: 'Power',
-              });
+              if (meData?.email) authenticEmail = meData.email;
+              if (meData?.name) authenticName = meData.name;
+              if (meData?.sub || meData?.id) authenticId = meData.sub || meData.id;
+              if (meData?.picture) authenticPicture = meData.picture;
             }
-          } catch {
-            updateProfile({
-              name: 'Puku Developer',
-              email: 'developer@puku.sh',
-              provider: 'google',
-              plan: 'Power',
-            });
+          } catch {}
+
+          // 2. Secondary: OAuth userinfo endpoint
+          if (!authenticEmail) {
+            try {
+              const userInfo = await fetchAuthenticUserInfo(accessToken, ENV.AUTH_BASE_URL, ENV.API_BASE_URL);
+              if (userInfo?.email) authenticEmail = userInfo.email;
+              if (userInfo?.name && !authenticName) authenticName = userInfo.name;
+              if (userInfo?.id && !authenticId) authenticId = userInfo.id;
+              if (userInfo?.picture && !authenticPicture) authenticPicture = userInfo.picture;
+            } catch {}
           }
+
+          // 3. Fallback: JWT payload
+          if (!authenticEmail && idToken) {
+            const idData = extractJwtData(idToken);
+            if (idData?.email) authenticEmail = idData.email;
+            if (idData?.name && !authenticName) authenticName = idData.name;
+            if (idData?.sub && !authenticId) authenticId = idData.sub;
+          }
+
+          if (!authenticEmail && accessToken.includes('.')) {
+            const accessData = extractJwtData(accessToken);
+            if (accessData?.email) authenticEmail = accessData.email;
+            if (accessData?.name && !authenticName) authenticName = accessData.name;
+            if (accessData?.sub && !authenticId) authenticId = accessData.sub;
+          }
+
+          const resolvedName = authenticName || (authenticEmail ? authenticEmail.split('@')[0] : 'Google User');
+
+          updateProfile({
+            name: resolvedName,
+            email: authenticEmail,
+            provider: 'google',
+            plan: 'Power',
+            userId: authenticId || undefined,
+            avatarUrl: authenticPicture,
+          });
+
+          await AsyncStorage.setItem('@puku_is_logged_in', 'true');
+          await AsyncStorage.removeItem('@puku_is_logged_out');
+          setIsGoogleModalOpen(false);
+          setIsOAuthWaiting(false);
+
+          showSnackBar(authenticEmail ? `Signed in as ${authenticEmail}` : 'Google Sign-In successful!');
+          navigate('chat');
+          return;
         }
-      } else {
-        pukuApi.setAuthToken('puku_oauth_token_' + Date.now());
-        updateProfile({
-          name: 'Google Authenticated User',
-          email: 'user@gmail.com',
-          provider: 'google',
-          plan: 'Power',
-        });
       }
 
+      // If token exchange failed on server
+      const errBody = await response.json().catch(() => null);
       setIsGoogleModalOpen(false);
       setIsOAuthWaiting(false);
-      showSnackBar('Google Sign-In successful!');
-      navigate('chat');
-    } catch {
-      pukuApi.setAuthToken('puku_oauth_token_' + Date.now());
-      updateProfile({
-        name: 'Google Authenticated User',
-        email: 'user@gmail.com',
-        provider: 'google',
-        plan: 'Power',
-      });
+      showSnackBar(
+        `Google Sign-In failed: ${errBody?.error_description || errBody?.error || 'Invalid authorization code'}`
+      );
+    } catch (err: any) {
       setIsGoogleModalOpen(false);
       setIsOAuthWaiting(false);
-      navigate('chat');
+      showSnackBar(`Sign-In error: ${err.message || 'Network error'}`);
     }
   };
 
@@ -311,106 +392,147 @@ export function LoginScreen() {
     };
   }, [authVerifier, authState]);
 
-  // Launches user's browser for Google OAuth
-  const handleOpenBrowserForGoogleLogin = async () => {
+  // Launches authentic Google OAuth (via In-App Custom Tabs matching Flutter, with browser fallback)
+  const handleGoogleSignIn = async () => {
     try {
       const verifier = generateRandomString(64);
       const challengeBytes = sha256(verifier);
       const challenge = toBase64Url(challengeBytes);
       const stateVal = generateRandomString(32);
+      const redirectUri = getOAuthRedirectUri();
 
       setAuthVerifier(verifier);
       setAuthState(stateVal);
-      setIsOAuthWaiting(true);
+
+      await AsyncStorage.setItem('@puku_oauth_verifier', verifier);
+      await AsyncStorage.setItem('@puku_oauth_state', stateVal);
 
       const authUrl =
-        `https://web.dev.puku.sh/api/oauth/authorize?response_type=code` +
-        `&client_id=puku-app` +
-        `&redirect_uri=${encodeURIComponent('puku://callback/')}` +
+        `${ENV.AUTH_BASE_URL}/api/oauth/authorize?response_type=code` +
+        `&client_id=${encodeURIComponent(ENV.AUTH_CLIENT_ID)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&scope=${encodeURIComponent('openid profile email')}` +
         `&code_challenge=${challenge}` +
         `&code_challenge_method=S256` +
         `&state=${stateVal}`;
 
-      setAuthStatusMessage('Signing in via Chrome / Browser...');
+      const isAvailable = await InAppBrowser.isAvailable();
 
-      const canOpen = await Linking.canOpenURL(authUrl);
-      if (canOpen) {
-        await Linking.openURL(authUrl);
+      if (isAvailable) {
+        const authResponse = await InAppBrowser.openAuth(authUrl, redirectUri, {
+          // iOS
+          ephemeralWebSession: false,
+          // Android Custom Tabs
+          showTitle: false,
+          enableUrlBarHiding: true,
+          enableDefaultShare: false,
+          forceCloseOnRedirection: true,
+          toolbarColor: '#100D1D',
+          secondaryToolbarColor: '#1A162B',
+          navigationBarColor: '#100D1D',
+          hasBackButton: true,
+        });
+
+        if (authResponse.type === 'success' && authResponse.url) {
+          await handleOAuthCallbackUrl(authResponse.url, verifier, stateVal, redirectUri);
+        } else if (authResponse.type === 'cancel') {
+          showSnackBar('Google Sign-In canceled');
+        }
       } else {
-        await Linking.openURL('https://web.dev.puku.sh/login');
+        // Fallback to external browser
+        setIsGoogleModalOpen(true);
+        setIsOAuthWaiting(true);
+        setAuthStatusMessage('Launching browser for Google Sign-In...');
+        await Linking.openURL(authUrl);
+        setAuthStatusMessage('Complete Google login in your browser. Puku AI will return automatically.');
       }
+    } catch (err: any) {
+      // In case InAppBrowser fails, open system browser
+      try {
+        const verifier = authVerifier || generateRandomString(64);
+        const challenge = toBase64Url(sha256(verifier));
+        const stateVal = authState || generateRandomString(32);
+        const redirectUri = getOAuthRedirectUri();
+        const fallbackUrl =
+          `${ENV.AUTH_BASE_URL}/api/oauth/authorize?response_type=code` +
+          `&client_id=${encodeURIComponent(ENV.AUTH_CLIENT_ID)}` +
+          `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+          `&scope=${encodeURIComponent('openid profile email')}` +
+          `&code_challenge=${challenge}` +
+          `&code_challenge_method=S256` +
+          `&state=${stateVal}`;
 
-      setAuthStatusMessage('Browser opened. Complete login in browser or tap Instant Sign-In below.');
-    } catch {
-      Linking.openURL('https://web.dev.puku.sh/login').catch(() => {});
-      setAuthStatusMessage('Could not launch browser automatically.');
+        setIsGoogleModalOpen(true);
+        setIsOAuthWaiting(true);
+        setAuthStatusMessage('Complete Google login in your browser. Puku AI will return automatically.');
+        await Linking.openURL(fallbackUrl);
+      } catch (linkErr: any) {
+        showSnackBar(`Failed to open Google Sign-In: ${err.message || linkErr.message}`);
+      }
     }
   };
 
-  // Instant Google Sign-In (Never gets user blocked)
-  const handleInstantGoogleSignIn = () => {
-    pukuApi.setAuthToken(`puku_google_token_${Date.now()}`);
-    updateProfile({
-      name: 'Google User',
-      email: 'user@gmail.com',
-      organization: 'puku',
-      plan: 'Power',
-      provider: 'google',
-    });
-    setIsGoogleModalOpen(false);
-    showSnackBar('Signed in with Google!');
-    navigate('chat');
-  };
+  // Direct In-App Email & Authentic Token Sign-In
+  const handleEmailSignIn = async () => {
+    const trimmedEmail = emailInput.trim();
+    const trimmedCredential = passwordInput.trim();
 
-  // Direct In-App Email Sign-In
-  const handleEmailSignIn = () => {
-    const trimmed = emailInput.trim();
-    if (!trimmed) {
-      setEmailErrorMessage('Please enter your email address');
+    if (!trimmedEmail) {
+      setEmailErrorMessage('Please enter your exact email address');
       return;
     }
-    if (!trimmed.includes('@') || !trimmed.includes('.')) {
-      setEmailErrorMessage('Please enter a valid email address (e.g. user@puku.sh)');
+    if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
+      setEmailErrorMessage('Please enter a valid email address');
       return;
     }
 
     setIsEmailSubmitting(true);
     setEmailErrorMessage(null);
 
-    setTimeout(() => {
-      const namePart = trimmed.split('@')[0];
-      const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    try {
+      let activeToken = trimmedCredential;
+      let finalEmail = trimmedEmail;
+      let finalName = trimmedEmail.split('@')[0];
+      let userId: string | undefined = undefined;
 
-      pukuApi.setAuthToken(`puku_session_token_${Date.now()}`);
+      // If user pasted a Bearer token
+      if (trimmedCredential && trimmedCredential.length > 20) {
+        const jwtData = extractJwtData(trimmedCredential);
+        if (jwtData?.email) {
+          finalEmail = jwtData.email;
+        }
+        if (jwtData?.name) {
+          finalName = jwtData.name;
+        }
+        if (jwtData?.sub) {
+          userId = jwtData.sub;
+        }
+      } else if (!trimmedCredential) {
+        // If password/token is completely empty
+        setEmailErrorMessage('Please enter your password or authentic Puku Bearer token');
+        setIsEmailSubmitting(false);
+        return;
+      }
+
+      pukuApi.setAuthToken(activeToken);
       updateProfile({
-        name: displayName || 'Puku Developer',
-        email: trimmed,
-        provider: 'email',
+        name: finalName,
+        email: finalEmail,
+        provider: finalEmail.endsWith('@gmail.com') ? 'google' : 'email',
         plan: 'Power',
-        organization: 'puku',
+        userId,
       });
 
+      await AsyncStorage.setItem('@puku_is_logged_in', 'true');
+      await AsyncStorage.removeItem('@puku_is_logged_out');
       setIsEmailSubmitting(false);
       setIsEmailModalOpen(false);
-      showSnackBar(`Welcome! Signed in as ${trimmed}`);
+      showSnackBar(`Signed in as ${finalEmail}`);
       navigate('chat');
-    }, 350);
-  };
-
-  // 1-Tap Quick Dev Login
-  const handleQuickDevLogin = () => {
-    pukuApi.setAuthToken(`puku_dev_session_token_${Date.now()}`);
-    updateProfile({
-      name: 'Puku Developer',
-      email: 'developer@puku.sh',
-      provider: 'email',
-      plan: 'Power',
-      organization: 'puku',
-    });
-    setIsEmailModalOpen(false);
-    showSnackBar('Welcome Developer! Signed in with developer@puku.sh');
-    navigate('chat');
+    } catch (e: any) {
+      setIsEmailSubmitting(false);
+      setEmailErrorMessage(e.message || 'Login failed. Please verify credentials.');
+    }
   };
 
   return (
@@ -447,10 +569,10 @@ export function LoginScreen() {
             </Text>
           </View>
 
-          {/* 3. LoginGoogleCta (Opens interactive Google Sign-In modal) */}
+          {/* 3. LoginGoogleCta (Directly launches authentic Google OAuth) */}
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => setIsGoogleModalOpen(true)}
+            onPress={handleGoogleSignIn}
             style={styles.googleCtaBtn}>
             <GoogleIcon size={24} color={AppColors.black} />
             <Text style={styles.googleCtaText}>Continue with Google</Text>
@@ -463,7 +585,7 @@ export function LoginScreen() {
             <View style={styles.orLine} />
           </View>
 
-          {/* 5. LoginEmailCta (Opens in-app Email Sign-In modal) */}
+          {/* 5. LoginEmailCta (Opens in-app Authentic Token / Email modal) */}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => {
@@ -471,7 +593,7 @@ export function LoginScreen() {
               setIsEmailModalOpen(true);
             }}
             style={styles.emailCtaBtn}>
-            <Text style={styles.emailCtaText}>Enter your email</Text>
+            <Text style={styles.emailCtaText}>Sign in with Puku Token or Email</Text>
           </TouchableOpacity>
 
           {/* 6. LoginLegalText (Matching Flutter LoginLegalText) */}
@@ -581,7 +703,7 @@ export function LoginScreen() {
                     setEmailInput(t);
                     if (emailErrorMessage) setEmailErrorMessage(null);
                   }}
-                  placeholder="developer@puku.sh"
+                  placeholder="you@domain.com"
                   placeholderTextColor={AppColors.coolGrey}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -599,7 +721,7 @@ export function LoginScreen() {
                   style={[styles.textInputField, { flex: 1 }]}
                   value={passwordInput}
                   onChangeText={setPasswordInput}
-                  placeholder="Enter password (e.g. puku123)"
+                  placeholder="Enter password or token"
                   placeholderTextColor={AppColors.coolGrey}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
@@ -629,21 +751,11 @@ export function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* 1-Tap Quick Dev Login Shortcut */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleQuickDevLogin}
-              style={styles.quickDevBtn}>
-              <Text style={styles.quickDevBtnText}>
-                ⚡ Quick Dev Login (developer@puku.sh)
-              </Text>
-            </TouchableOpacity>
-
             {/* Web Magic Link Fallback */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
-                Linking.openURL('https://web.dev.puku.sh/email-login').catch(() => {});
+                Linking.openURL(`${ENV.AUTH_BASE_URL}/email-login`).catch(() => {});
               }}
               style={styles.webEmailLinkBtn}>
               <Text style={styles.webEmailLinkText}>
@@ -654,64 +766,85 @@ export function LoginScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Google Sign-In Options Modal */}
+      {/* Google Browser Sign-In Modal */}
       <Modal
         visible={isGoogleModalOpen}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setIsGoogleModalOpen(false)}>
+        onRequestClose={() => {
+          setIsGoogleModalOpen(false);
+          setIsOAuthWaiting(false);
+        }}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <View style={styles.googleCircle}>
               <GoogleIcon size={32} color={AppColors.black} />
             </View>
 
-            <Text style={styles.browserDialogTitle}>Continue with Google</Text>
+            <Text style={styles.browserDialogTitle}>Google Sign-In</Text>
 
-            <Text style={styles.browserDialogDesc}>{authStatusMessage}</Text>
+            <Text style={styles.browserDialogDesc}>
+              {authStatusMessage}
+            </Text>
 
             {isOAuthWaiting && (
               <ActivityIndicator
-                size="small"
+                size="large"
                 color={AppColors.blue}
-                style={{ marginVertical: 12 }}
+                style={{ marginVertical: 14 }}
               />
             )}
 
-            {/* Option 1: Open Google OAuth in Browser */}
+            {/* Direct manual paste fallback in case browser does not auto-redirect */}
+            <View style={{ width: '100%', marginTop: 6, marginBottom: 12 }}>
+              <Text style={styles.inputLabel}>OR PASTE REDIRECT URL / AUTH CODE</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.textInputField}
+                  value={manualCodeInput}
+                  onChangeText={setManualCodeInput}
+                  placeholder="Paste callback URL or code here"
+                  placeholderTextColor={AppColors.coolGrey}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+              {manualCodeInput.trim().length > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    const inputVal = manualCodeInput.trim();
+                    setManualCodeInput('');
+                    handleOAuthCallbackUrl(inputVal);
+                  }}
+                  style={[styles.primaryModalBtn, { marginTop: 8, height: 42 }]}>
+                  <Text style={styles.primaryModalBtnText}>Verify & Sign In</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={handleOpenBrowserForGoogleLogin}
+              onPress={handleGoogleSignIn}
               style={styles.openBrowserBtn}>
               <Text style={styles.openBrowserBtnText}>
-                🌐 Open Browser for Google OAuth
+                🌐 Re-open Google OAuth
               </Text>
             </TouchableOpacity>
 
-            {/* Option 2: Instant Google Sign-In */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleInstantGoogleSignIn}
-              style={styles.primaryModalBtn}>
-              <Text style={styles.primaryModalBtnText}>
-                ✓ Instant Sign-In as Google User
-              </Text>
-            </TouchableOpacity>
-
-            {/* Option 3: Switch to Email */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
                 setIsGoogleModalOpen(false);
+                setIsOAuthWaiting(false);
                 setIsEmailModalOpen(true);
               }}
               style={styles.switchModalBtn}>
               <Text style={styles.switchModalText}>
-                Prefer email? Sign in with Email instead
+                Prefer Token or Email? Sign in manually instead
               </Text>
             </TouchableOpacity>
 
-            {/* Cancel Button */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {

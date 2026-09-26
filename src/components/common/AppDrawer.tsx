@@ -34,7 +34,11 @@ export function AppDrawer() {
 
   if (!isDrawerOpen) return null;
 
-  const userInitial = profile.name ? profile.name[0].toUpperCase() : 'P';
+  const userInitial = profile.name
+    ? profile.name[0].toUpperCase()
+    : profile.email
+    ? profile.email[0].toUpperCase()
+    : '?';
 
   return (
     <Modal visible={isDrawerOpen} transparent animationType="fade">
@@ -59,7 +63,7 @@ export function AppDrawer() {
             showsVerticalScrollIndicator={false}>
             {/* Header */}
             <Text style={[styles.drawerTitle, { color: theme.textPrimary }]}>
-              Puku AI
+              Puku
             </Text>
 
             {/* Menu Items */}
@@ -124,8 +128,7 @@ export function AppDrawer() {
                   RECENTS
                 </Text>
 
-                {conversations.slice(0, 15).map(conv => {
-                  const isActive = conv.id === activeConversationId;
+                {conversations.slice(0, 20).map(conv => {
                   return (
                     <TouchableOpacity
                       key={conv.id}
@@ -134,18 +137,12 @@ export function AppDrawer() {
                         selectConversation(conv.id);
                         setDrawerOpen(false);
                       }}
-                      style={[
-                        styles.recentItem,
-                        isActive && { backgroundColor: theme.buttonBackground },
-                      ]}>
+                      style={styles.recentItem}>
                       <Text
                         numberOfLines={1}
                         style={[
                           styles.recentText,
-                          {
-                            color: isActive ? theme.blue : theme.textPrimary,
-                            fontWeight: isActive ? '600' : '400',
-                          },
+                          { color: theme.textPrimary },
                         ]}>
                         {conv.title}
                       </Text>
@@ -157,7 +154,7 @@ export function AppDrawer() {
           </ScrollView>
 
           {/* Drawer Footer */}
-          <View style={[styles.footer, { borderTopColor: theme.outline }]}>
+          <View style={styles.footer}>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -175,8 +172,8 @@ export function AppDrawer() {
                 setDrawerOpen(false);
               }}
               style={styles.newChatBtn}>
-              <PlusIcon size={18} color="#000000" />
-              <Text style={styles.newChatText}>New Chat</Text>
+              <PlusIcon size={20} color="#000000" />
+              <Text style={styles.newChatText}>New chat</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -199,8 +196,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   drawerContent: {
-    width: '80%',
-    maxWidth: 320,
+    width: '84%',
     height: '100%',
     paddingHorizontal: 20,
     zIndex: 10,
@@ -211,53 +207,52 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   drawerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
-    marginBottom: 28,
+    marginBottom: 32,
     letterSpacing: -0.5,
   },
   menuGroup: {
-    gap: 18,
-    marginBottom: 28,
+    gap: 20,
+    marginBottom: 20,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+    paddingVertical: 4,
   },
   menuLabel: {
     fontSize: 16,
     fontWeight: '500',
   },
   recentsSection: {
-    marginTop: 8,
+    marginTop: 20,
   },
   recentsHeader: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.6,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   recentItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 4,
+    paddingVertical: 12,
   },
   recentText: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 8,
   },
   avatarBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -269,15 +264,15 @@ const styles = StyleSheet.create({
   newChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
     borderRadius: 999,
   },
   newChatText: {
     color: '#000000',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
 });

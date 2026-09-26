@@ -118,7 +118,7 @@ export function ChatComposer({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
+    borderRadius: 24,
     borderWidth: 1,
     padding: 14,
     marginHorizontal: 16,
