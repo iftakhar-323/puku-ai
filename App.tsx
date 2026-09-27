@@ -22,6 +22,7 @@ import { RemoteSessionScreen } from './src/features/remote_session/RemoteSession
 import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { TranscribeScreen } from './src/features/transcribe/TranscribeScreen';
 import { AppProvider, useApp } from './src/store/AppContext';
+import { ToastProvider } from './src/components/ui/Toast';
 
 function MainNavigator(): React.JSX.Element {
   const { activeRoute, isDark } = useApp();
@@ -108,7 +109,9 @@ function App(): React.JSX.Element {
     <ErrorBoundary>
       <SafeAreaProvider>
         <AppProvider>
-          <MainNavigator />
+          <ToastProvider>
+            <MainNavigator />
+          </ToastProvider>
         </AppProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
