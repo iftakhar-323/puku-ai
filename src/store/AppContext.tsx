@@ -39,6 +39,7 @@ interface AppContextValue {
   refreshConversations: () => Promise<void>;
   sendMessage: (text: string, modelOverride?: ChatModelType) => void;
   isGenerating: boolean;
+  isLoadingConversation: boolean;
   selectedModel: ChatModelType;
   setSelectedModel: (m: ChatModelType) => void;
   isIncognito: boolean;
@@ -130,6 +131,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<ChatMessage[]>([]);
   const [incognitoConversationId, setIncognitoConversationId] = useState<string | null>(null);
+  const incognitoConversationIdRef = useRef<string | null>(null);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const logoutRef = useRef<() => void>(() => {});
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -387,13 +390,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isIncognito, setIsIncognito] = useState(false);
 
   const clearIncognitoChat = useCallback(() => {
-    if (incognitoConversationId) {
+    const idToDelete = incognitoConversationIdRef.current || incognitoConversationId;
+    if (idToDelete && !idToDelete.startsWith('incog_')) {
       try {
-        pukuApi.deleteConversation?.(incognitoConversationId)?.catch?.(() => {});
+        pukuApi.deleteConversation(idToDelete).catch(() => {});
       } catch {}
-      setIncognitoConversationId(null);
     }
+    incognitoConversationIdRef.current = null;
+    setIncognitoConversationId(null);
     setIncognitoMessages([]);
+
+    setConversations(prev => {
+      const filtered = prev.filter(
+        c =>
+          c.id !== idToDelete &&
+          !c.id.startsWith('incog_') &&
+          c.title?.toLowerCase() !== 'incognito'
+      );
+      if (filtered.length !== prev.length) {
+        AsyncStorage.setItem('@puku_conversations', JSON.stringify(filtered)).catch(() => {});
+      }
+      return filtered;
+    });
   }, [incognitoConversationId]);
 
   const setIncognito = useCallback(
@@ -440,6 +458,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const theme = isDark ? darkTheme : lightTheme;
 
   const navigate = (route: AppRoute, params?: any) => {
+    if (isIncognito && route !== 'chat') {
+      setIsIncognito(false);
+      clearIncognitoChat();
+    }
     setDrawerOpen(false);
     setRouteParams(params);
     setRouteHistory(prev => [...prev, route]);
@@ -450,6 +472,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const goBack = useCallback(() => {
+    if (isIncognito) {
+      setIsIncognito(false);
+      clearIncognitoChat();
+    }
     if (routeHistory.length > 1) {
       const nextHistory = [...routeHistory];
       nextHistory.pop();
@@ -464,7 +490,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } else {
       setActiveRoute('chat');
     }
-  }, [routeHistory]);
+  }, [routeHistory, isIncognito, clearIncognitoChat]);
 
   useEffect(() => {
     const onBackPress = () => {
@@ -504,10 +530,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshConversations = async () => {
     try {
       const cloudConvs = await pukuApi.fetchConversations();
-      if (Array.isArray(cloudConvs) && cloudConvs.length > 0) {
+      if (Array.isArray(cloudConvs)) {
+        // Automatically delete any incognito conversation from server so it never shows in history
+        const incognitoOnServer = cloudConvs.filter(
+          (raw: any) =>
+            raw.title?.toLowerCase() === 'incognito' ||
+            raw.id === incognitoConversationIdRef.current
+        );
+        incognitoOnServer.forEach((raw: any) => {
+          pukuApi.deleteConversation(raw.id).catch(() => {});
+        });
+
+        const validCloudConvs = cloudConvs.filter(
+          (raw: any) =>
+            raw.title?.toLowerCase() !== 'incognito' &&
+            raw.id !== incognitoConversationIdRef.current
+        );
+
         setConversations(prev => {
           const prevMap = new Map(prev.map(c => [c.id, c]));
-          const merged: Conversation[] = cloudConvs.map((raw: any) => {
+          const merged: Conversation[] = validCloudConvs.map((raw: any) => {
             const existing = prevMap.get(raw.id);
             const rawMessages = Array.isArray(raw.messages) ? raw.messages : [];
             const messages =
@@ -515,7 +557,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 ? rawMessages.map((m: any) => ({
                     id: m.id || String(Date.now() + Math.random()),
                     role: m.role || 'assistant',
-                    content: m.content || '',
+                    content: m.content || m.text || m.blocks?.[0]?.text || '',
                     model: m.model,
                     createdAt: formatActivityDate(m.createdAt),
                     blocks: m.blocks,
@@ -543,7 +585,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           });
 
           for (const localConv of prev) {
-            if (!merged.some(m => m.id === localConv.id)) {
+            if (
+              !merged.some(m => m.id === localConv.id) &&
+              localConv.title?.toLowerCase() !== 'incognito' &&
+              !localConv.id.startsWith('incog_')
+            ) {
               merged.push(localConv);
             }
           }
@@ -558,56 +604,88 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const selectConversation = async (id: string | null) => {
+    if (isIncognito) {
+      setIsIncognito(false);
+      clearIncognitoChat();
+    }
     setActiveConversationId(id);
-    if (id) {
-      const conv = conversations.find(c => c.id === id);
-      if (conv && conv.model) {
-        setSelectedModelState(mapApiToModel(conv.model));
-      }
-      // If thread messages are not yet loaded and it's a remote conversation
-      if (conv && (!conv.messages || conv.messages.length === 0) && !id.startsWith('conv_')) {
-        try {
-          const detail = await pukuApi.fetchConversation(id);
-          const rawMsgs = Array.isArray(detail?.messages)
-            ? detail.messages
-            : Array.isArray(detail)
-            ? detail
-            : [];
-          if (rawMsgs.length > 0) {
-            const loadedMessages: ChatMessage[] = rawMsgs.map((m: any) => ({
-              id: m.id || String(Date.now() + Math.random()),
-              role: m.role || 'assistant',
-              content: m.content || '',
-              model: m.model,
-              createdAt: formatActivityDate(m.createdAt),
-              blocks: m.blocks,
-              attachments: m.attachments,
-            }));
-            setConversations(prev =>
-              prev.map(c =>
+    setActiveRoute('chat');
+    setDrawerOpen(false);
+
+    if (!id) return;
+
+    const conv = conversations.find(c => c.id === id);
+    if (conv && conv.model) {
+      setSelectedModelState(mapApiToModel(conv.model));
+    }
+
+    // Always fetch full message history for remote conversations to ensure ALL messages are visible
+    if (!id.startsWith('conv_') && !id.startsWith('incog_')) {
+      setIsLoadingConversation(true);
+      try {
+        const detail = await pukuApi.fetchConversation(id);
+        const rawMsgs = Array.isArray(detail?.messages)
+          ? detail.messages
+          : Array.isArray(detail?.data?.messages)
+          ? detail.data.messages
+          : Array.isArray(detail)
+          ? detail
+          : [];
+
+        if (rawMsgs.length > 0) {
+          const loadedMessages: ChatMessage[] = rawMsgs.map((m: any) => ({
+            id: m.id || String(Date.now() + Math.random()),
+            role: m.role || 'assistant',
+            content: m.content || m.text || m.blocks?.[0]?.text || '',
+            model: m.model,
+            createdAt: formatActivityDate(m.createdAt),
+            blocks: m.blocks,
+            attachments: m.attachments,
+          }));
+
+          const detailConv = detail?.conversation || detail?.data?.conversation;
+
+          setConversations(prev => {
+            const exists = prev.some(c => c.id === id);
+            let updated: Conversation[];
+            if (exists) {
+              updated = prev.map(c =>
                 c.id === id
                   ? {
                       ...c,
-                      title: detail?.conversation?.title || c.title,
-                      model: detail?.conversation?.model
-                        ? mapApiToModel(detail.conversation.model)
-                        : c.model,
+                      title: detailConv?.title || c.title,
+                      model: detailConv?.model ? mapApiToModel(detailConv.model) : c.model,
                       messages: loadedMessages,
                     }
                   : c
-              )
-            );
-          }
-        } catch {}
+              );
+            } else {
+              const newConv: Conversation = {
+                id,
+                title: detailConv?.title || 'Chat',
+                activityDate: formatActivityDate(detailConv?.updatedAt || detailConv?.createdAt),
+                projectId: detailConv?.projectId,
+                messages: loadedMessages,
+                model: detailConv?.model ? mapApiToModel(detailConv.model) : 'puku-ai-2.7',
+                updatedAtTimestamp: getConversationTimestamp(detailConv),
+              };
+              updated = [newConv, ...prev];
+            }
+            AsyncStorage.setItem('@puku_conversations', JSON.stringify(updated)).catch(() => {});
+            return updated;
+          });
+        }
+      } catch {
+      } finally {
+        setIsLoadingConversation(false);
       }
     }
-    setActiveRoute('chat');
   };
 
   const startNewChat = (projectId?: string) => {
     if (isIncognito) {
+      setIsIncognito(false);
       clearIncognitoChat();
-      return;
     }
     setActiveConversationId(null);
     setActiveProjectId(projectId || null);
@@ -673,14 +751,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const response = await pukuApi.generateResponse(
           text,
           modelToUse,
-          incognitoConversationId,
+          incognitoConversationIdRef.current || incognitoConversationId,
           handleDelta,
           true
         );
         accumulatedText = response.text;
         flushIncog();
 
-        if (response.conversationId && response.conversationId !== incognitoConversationId) {
+        if (response.conversationId) {
+          incognitoConversationIdRef.current = response.conversationId;
           setIncognitoConversationId(response.conversationId);
         }
       } catch (err: any) {
@@ -1235,6 +1314,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshConversations,
         sendMessage,
         isGenerating,
+        isLoadingConversation,
         selectedModel,
         setSelectedModel,
         isIncognito,

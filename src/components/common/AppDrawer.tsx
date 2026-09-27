@@ -133,13 +133,18 @@ export function AppDrawer() {
             </View>
 
             {/* Recents Section */}
-            {conversations.length > 0 && (
-              <View style={styles.recentsSection}>
-                <Text style={[styles.recentsHeader, { color: theme.textMuted }]}>
-                  RECENTS
-                </Text>
+            {(() => {
+              const recentConversations = conversations.filter(
+                c => c.title?.toLowerCase() !== 'incognito' && !c.id.startsWith('incog_')
+              );
+              if (recentConversations.length === 0) return null;
+              return (
+                <View style={styles.recentsSection}>
+                  <Text style={[styles.recentsHeader, { color: theme.textMuted }]}>
+                    RECENTS
+                  </Text>
 
-                {conversations.slice(0, 20).map(conv => {
+                  {recentConversations.slice(0, 20).map(conv => {
                   return (
                     <TouchableOpacity
                       key={conv.id}
@@ -162,7 +167,8 @@ export function AppDrawer() {
                   );
                 })}
               </View>
-            )}
+            );
+          })()}
           </ScrollView>
 
           {/* Drawer Footer */}

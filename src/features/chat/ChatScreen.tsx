@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +40,7 @@ export function ChatScreen() {
     activeConversation,
     sendMessage,
     isGenerating,
+    isLoadingConversation,
     selectedModel,
     setSelectedModel,
     isIncognito,
@@ -107,7 +110,14 @@ export function ChatScreen() {
 
       {/* Main Body */}
       <View style={styles.body}>
-        {isIncognito && messages.length === 0 ? (
+        {isLoadingConversation && messages.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+              Loading conversation...
+            </Text>
+          </View>
+        ) : isIncognito && messages.length === 0 ? (
           <ChatIncognitoView
             theme={theme}
             onLearnMoreTap={() => setIncognito(false)}
@@ -194,6 +204,16 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   listContent: {
     paddingVertical: 12,

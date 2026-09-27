@@ -65,8 +65,11 @@ export function ChatsScreen() {
   };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
+  const nonIncognito = conversations.filter(
+    c => c.title?.toLowerCase() !== 'incognito' && !c.id.startsWith('incog_')
+  );
   const filteredConversations = normalizedQuery
-    ? conversations.filter(c => {
+    ? nonIncognito.filter(c => {
         if (c.title && c.title.toLowerCase().includes(normalizedQuery)) return true;
         if (
           Array.isArray(c.messages) &&
@@ -78,7 +81,7 @@ export function ChatsScreen() {
         }
         return false;
       })
-    : conversations;
+    : nonIncognito;
 
   const toggleSelection = (id: string) => {
     if (selectedIds.includes(id)) {
