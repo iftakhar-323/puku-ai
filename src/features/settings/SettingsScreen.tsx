@@ -4,13 +4,13 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Badge, Switch } from '../../components/ui';
 import {
   BackIcon,
   BarChartIcon,
@@ -122,10 +122,10 @@ export function SettingsScreen() {
               {displayEmail}
             </Text>
 
-            <View style={styles.planBadge}>
+            <Badge variant="default" style={styles.planBadge}>
               <Text style={styles.planBadgeText}>{displayPlan}</Text>
               <ChevronDownIcon size={14} color="#000000" />
-            </View>
+            </Badge>
           </View>
 
           <View style={styles.accountBottomRow}>

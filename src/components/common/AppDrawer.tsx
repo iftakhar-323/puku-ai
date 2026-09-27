@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Modal,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,6 +16,18 @@ import {
   PlusIcon,
   SourceCodeIcon,
 } from './Icons';
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  Sidebar,
+  SidebarFooter,
+  SidebarNavItem,
+  SidebarNavTop,
+  SidebarSessionGroup,
+  SidebarSessionRow,
+  SidebarSessions,
+} from '../ui';
 
 export function AppDrawer() {
   const insets = useSafeAreaInsets();
@@ -47,6 +58,10 @@ export function AppDrawer() {
     ? profile.email[0].toUpperCase()
     : '?';
 
+  const recentConversations = conversations.filter(
+    c => c.title?.toLowerCase() !== 'incognito' && !c.id.startsWith('incog_')
+  );
+
   return (
     <Modal
       visible={isDrawerOpen}
@@ -66,134 +81,105 @@ export function AppDrawer() {
             {
               backgroundColor: theme.background,
               paddingTop: Math.max(insets.top, 24),
-              paddingBottom: Math.max(insets.bottom, 20),
+              paddingBottom: Math.max(insets.bottom, 16),
             },
           ]}>
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            showsVerticalScrollIndicator={false}>
-            {/* Header */}
-            <Text style={[styles.drawerTitle, { color: theme.textPrimary }]}>
-              Puku
-            </Text>
+          <Sidebar style={styles.sidebar}>
+            {/* Header Brand */}
+            <View style={styles.brandHeader}>
+              <Text style={[styles.drawerTitle, { color: theme.textPrimary }]}>
+                Puku
+              </Text>
+            </View>
 
-            {/* Menu Items */}
-            <View style={styles.menuGroup}>
-              <TouchableOpacity
-                activeOpacity={0.7}
+            {/* Top Navigation */}
+            <SidebarNavTop style={styles.navTop}>
+              <SidebarNavItem
+                icon={<MessageIcon size={20} color={theme.textPrimary} />}
                 onPress={() => {
                   setDrawerOpen(false);
                   navigate('chats');
-                }}
-                style={styles.menuItem}>
-                <MessageIcon size={22} color={theme.textPrimary} />
-                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>
-                  Chats
-                </Text>
-              </TouchableOpacity>
+                }}>
+                Chats
+              </SidebarNavItem>
 
-              <TouchableOpacity
-                activeOpacity={0.7}
+              <SidebarNavItem
+                icon={<FolderLibraryIcon size={20} color={theme.textPrimary} />}
                 onPress={() => {
                   setDrawerOpen(false);
                   navigate('projects');
-                }}
-                style={styles.menuItem}>
-                <FolderLibraryIcon size={22} color={theme.textPrimary} />
-                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>
-                  Projects
-                </Text>
-              </TouchableOpacity>
+                }}>
+                Projects
+              </SidebarNavItem>
 
-              <TouchableOpacity
-                activeOpacity={0.7}
+              <SidebarNavItem
+                icon={<ArtboardIcon size={20} color={theme.textPrimary} />}
                 onPress={() => {
                   setDrawerOpen(false);
                   navigate('artifacts');
-                }}
-                style={styles.menuItem}>
-                <ArtboardIcon size={22} color={theme.textPrimary} />
-                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>
-                  Artifacts
-                </Text>
-              </TouchableOpacity>
+                }}>
+                Artifacts
+              </SidebarNavItem>
 
-              <TouchableOpacity
-                activeOpacity={0.7}
+              <SidebarNavItem
+                icon={<SourceCodeIcon size={20} color={theme.textPrimary} />}
                 onPress={() => {
                   setDrawerOpen(false);
                   navigate('code');
-                }}
-                style={styles.menuItem}>
-                <SourceCodeIcon size={22} color={theme.textPrimary} />
-                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>
-                  Code
-                </Text>
-              </TouchableOpacity>
-            </View>
+                }}>
+                Code
+              </SidebarNavItem>
+            </SidebarNavTop>
 
-            {/* Recents Section */}
-            {(() => {
-              const recentConversations = conversations.filter(
-                c => c.title?.toLowerCase() !== 'incognito' && !c.id.startsWith('incog_')
-              );
-              if (recentConversations.length === 0) return null;
-              return (
-                <View style={styles.recentsSection}>
-                  <Text style={[styles.recentsHeader, { color: theme.textMuted }]}>
-                    RECENTS
-                  </Text>
-
-                  {recentConversations.slice(0, 20).map(conv => {
-                  return (
-                    <TouchableOpacity
+            {/* Sessions / Recents Section */}
+            <SidebarSessions style={styles.sessions}>
+              {recentConversations.length > 0 && (
+                <SidebarSessionGroup label="RECENTS">
+                  {recentConversations.slice(0, 25).map(conv => (
+                    <SidebarSessionRow
                       key={conv.id}
-                      activeOpacity={0.7}
+                      iconVariant="diff"
+                      active={conv.id === activeConversationId}
+                      label={conv.title}
                       onPress={() => {
                         selectConversation(conv.id);
                         setDrawerOpen(false);
                         navigate('chat');
                       }}
-                      style={styles.recentItem}>
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.recentText,
-                          { color: theme.textPrimary },
-                        ]}>
-                        {conv.title}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            );
-          })()}
-          </ScrollView>
+                    />
+                  ))}
+                </SidebarSessionGroup>
+              )}
+            </SidebarSessions>
 
-          {/* Drawer Footer */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setDrawerOpen(false);
-                navigate('settings');
-              }}
-              style={[styles.avatarBtn, { backgroundColor: theme.primary }]}>
-              <Text style={styles.avatarText}>{userInitial}</Text>
-            </TouchableOpacity>
+            {/* Sidebar Footer */}
+            <SidebarFooter style={styles.footer}>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => {
+                  setDrawerOpen(false);
+                  navigate('settings');
+                }}>
+                <Avatar size={42}>
+                  <AvatarFallback>{userInitial}</AvatarFallback>
+                </Avatar>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                startNewChat();
-                setDrawerOpen(false);
-              }}
-              style={styles.newChatBtn}>
-              <PlusIcon size={20} color="#000000" />
-              <Text style={styles.newChatText}>New chat</Text>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.footerSpacer} />
+
+              <Button
+                variant="default"
+                size="md"
+                onPress={() => {
+                  startNewChat();
+                  setDrawerOpen(false);
+                }}
+                style={styles.newChatBtn}>
+                <PlusIcon size={18} color="#000000" />
+                <Text style={styles.newChatText}>New chat</Text>
+              </Button>
+            </SidebarFooter>
+          </Sidebar>
         </View>
       </View>
     </Modal>
@@ -216,81 +202,52 @@ const styles = StyleSheet.create({
   drawerContent: {
     width: '84%',
     height: '100%',
-    paddingHorizontal: 20,
     zIndex: 10,
     elevation: 16,
   },
-  scroll: {
-    flexGrow: 1,
-    paddingTop: 16,
+  sidebar: {
+    flex: 1,
+  },
+  brandHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   drawerTitle: {
     fontSize: 26,
     fontWeight: '800',
-    marginBottom: 32,
     letterSpacing: -0.5,
   },
-  menuGroup: {
-    gap: 20,
-    marginBottom: 20,
+  navTop: {
+    paddingHorizontal: 12,
+    gap: 4,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingVertical: 4,
-  },
-  menuLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  recentsSection: {
-    marginTop: 20,
-  },
-  recentsHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    marginBottom: 16,
-  },
-  recentItem: {
-    paddingVertical: 12,
-  },
-  recentText: {
-    fontSize: 15,
-    fontWeight: '500',
+  sessions: {
+    flex: 1,
+    paddingHorizontal: 12,
+    marginTop: 8,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  avatarBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
+  footerSpacer: {
+    flex: 1,
   },
   newChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 22,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 999,
   },
   newChatText: {
     color: '#000000',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
