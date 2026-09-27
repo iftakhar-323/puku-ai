@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -39,12 +40,23 @@ export function ChatsScreen() {
     conversations,
     selectConversation,
     deleteConversations,
+    refreshConversations,
     navigate,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshConversations();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const filteredConversations = conversations.filter(c =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -162,6 +174,14 @@ export function ChatsScreen() {
           data={filteredConversations}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.primary}
+              colors={[theme.primary]}
+            />
+          }
           renderItem={({ item }) => {
             const isSelected = selectedIds.includes(item.id);
             return (

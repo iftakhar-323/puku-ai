@@ -258,6 +258,114 @@ export class PukuApiService {
     }
   }
 
+  // Fetch projects from server
+  async fetchProjects(): Promise<any[]> {
+    try {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/projects`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return [];
+      const json = await response.json();
+      return json.projects || (Array.isArray(json) ? json : []);
+    } catch {
+      return [];
+    }
+  }
+
+  // Create project on server
+  async createProject(params: {
+    name: string;
+    description?: string;
+    instructions?: string;
+    color?: string;
+    scope?: string;
+  }): Promise<any | null> {
+    try {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) return null;
+      const json = await response.json();
+      return json.project || json;
+    } catch {
+      return null;
+    }
+  }
+
+  // Update project on server
+  async updateProject(
+    id: string,
+    updates: Partial<{
+      name: string;
+      description: string;
+      instructions: string;
+      color: string;
+      scope: string;
+    }>
+  ): Promise<boolean> {
+    try {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/projects/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // Delete project from server
+  async deleteProject(id: string): Promise<boolean> {
+    try {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/projects/${id}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // Transcribe audio using Puku AI Whisper/audio endpoint
+  async transcribeAudio(audioData: string | FormData, language = 'en'): Promise<string | null> {
+    try {
+      let body: any;
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      };
+
+      if (typeof audioData === 'string') {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify({ audio: audioData, language });
+      } else {
+        body = audioData;
+      }
+
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/audio/transcriptions`, {
+        method: 'POST',
+        headers,
+        body,
+      });
+
+      if (!response.ok) return null;
+      const json = await response.json();
+      return json.text || json.transcript || null;
+    } catch {
+      return null;
+    }
+  }
+
   // Generate model response via authentic Puku AI cloud endpoints with 401 recovery
   async generateResponse(
     prompt: string,

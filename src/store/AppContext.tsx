@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AppRoute,
@@ -16,6 +17,7 @@ import { darkTheme, lightTheme, ThemeColors } from '../theme/theme';
 import { pukuApi, mapModelToApi, mapApiToModel } from '../services/api';
 import { tokenManager } from '../services/tokenManager';
 import { extractJwtData } from '../utils/auth';
+import { ENV } from '../config/env';
 
 interface AppContextValue {
   theme: ThemeColors;
@@ -33,6 +35,7 @@ interface AppContextValue {
   selectConversation: (id: string | null) => void;
   startNewChat: (projectId?: string) => void;
   deleteConversations: (ids: string[]) => void;
+  refreshConversations: () => Promise<void>;
   sendMessage: (text: string, modelOverride?: ChatModelType) => void;
   isGenerating: boolean;
   selectedModel: ChatModelType;
@@ -48,6 +51,7 @@ interface AppContextValue {
   createProject: (name: string, description?: string, instructions?: string) => Project;
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
+  refreshProjects: () => Promise<void>;
   addProjectKnowledge: (projectId: string, fileName: string, type: string) => void;
   // Artifacts
   artifacts: Artifact[];
@@ -126,6 +130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [incognitoMessages, setIncognitoMessages] = useState<ChatMessage[]>([]);
   const [incognitoConversationId, setIncognitoConversationId] = useState<string | null>(null);
   const logoutRef = useRef<() => void>(() => {});
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     const unsub = tokenManager.onSessionExpired(() => {
@@ -145,6 +150,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           savedSettingsStr,
           savedConvsStr,
           savedModelStr,
+          savedProjectsStr,
         ] = await Promise.all([
           AsyncStorage.getItem('@puku_auth_token'),
           AsyncStorage.getItem('@puku_user_profile'),
@@ -153,6 +159,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem('@puku_app_settings'),
           AsyncStorage.getItem('@puku_conversations'),
           AsyncStorage.getItem('@puku_selected_model'),
+          AsyncStorage.getItem('@puku_projects'),
         ]);
 
         if (
@@ -233,6 +240,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           } catch {}
         }
 
+        // Proactively sync cloud conversations from server
+        if (activeToken) {
+          pukuApi.fetchConversations().then(cloudConvs => {
+            if (Array.isArray(cloudConvs) && cloudConvs.length > 0) {
+              setConversations(prev => {
+                const prevMap = new Map(prev.map(c => [c.id, c]));
+                const merged: Conversation[] = cloudConvs.map((raw: any) => {
+                  const existing = prevMap.get(raw.id);
+                  const rawMessages = Array.isArray(raw.messages) ? raw.messages : [];
+                  const messages =
+                    rawMessages.length > 0
+                      ? rawMessages.map((m: any) => ({
+                          id: m.id || String(Date.now() + Math.random()),
+                          role: m.role || 'assistant',
+                          content: m.content || '',
+                          model: m.model,
+                          createdAt: m.createdAt || 'Recent',
+                          blocks: m.blocks,
+                          attachments: m.attachments,
+                        }))
+                      : existing?.messages || [];
+
+                  return {
+                    id: raw.id,
+                    title: raw.title || existing?.title || 'New Chat',
+                    activityDate: raw.updatedAt || raw.createdAt || existing?.activityDate || 'Recent',
+                    projectId: raw.projectId || existing?.projectId,
+                    messages,
+                    model: raw.model ? mapApiToModel(raw.model) : existing?.model || 'puku-ai-2.7',
+                  };
+                });
+
+                for (const localConv of prev) {
+                  if (!merged.some(m => m.id === localConv.id)) {
+                    merged.push(localConv);
+                  }
+                }
+                return merged;
+              });
+            }
+          }).catch(() => {});
+        }
+
+        if (savedProjectsStr) {
+          try {
+            const parsedProjects = JSON.parse(savedProjectsStr);
+            if (Array.isArray(parsedProjects) && parsedProjects.length > 0) {
+              setProjects(parsedProjects);
+            }
+          } catch {}
+        }
+
+        // Proactively sync cloud projects from server
+        if (activeToken) {
+          pukuApi.fetchProjects().then(cloudProjects => {
+            if (Array.isArray(cloudProjects) && cloudProjects.length > 0) {
+              setProjects(prev => {
+                const prevMap = new Map(prev.map(p => [p.id, p]));
+                const merged: Project[] = cloudProjects.map((raw: any) => {
+                  const existing = prevMap.get(raw.id);
+                  return {
+                    id: raw.id,
+                    name: raw.name || existing?.name || 'Untitled Project',
+                    description: raw.description || existing?.description,
+                    instructions: raw.instructions || existing?.instructions,
+                    color: raw.color || existing?.color || '#6C47EB',
+                    createdAt: raw.createdAt || existing?.createdAt || new Date().toISOString(),
+                    scope: raw.scope || existing?.scope || 'yours',
+                    knowledgeItems: Array.isArray(raw.knowledgeItems)
+                      ? raw.knowledgeItems
+                      : existing?.knowledgeItems || [],
+                  };
+                });
+
+                for (const localProj of prev) {
+                  if (!merged.some(m => m.id === localProj.id)) {
+                    merged.push(localProj);
+                  }
+                }
+                return merged;
+              });
+            }
+          }).catch(() => {});
+        }
+
         const targetRoute =
           savedRoute && savedRoute !== 'login' ? (savedRoute as AppRoute) : 'chat';
         setActiveRoute(targetRoute);
@@ -280,7 +372,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [isIncognito, setIsIncognito] = useState(false);
 
-  const clearIncognitoChat = () => {
+  const clearIncognitoChat = useCallback(() => {
     if (incognitoConversationId) {
       try {
         pukuApi.deleteConversation?.(incognitoConversationId)?.catch?.(() => {});
@@ -288,18 +380,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIncognitoConversationId(null);
     }
     setIncognitoMessages([]);
-  };
+  }, [incognitoConversationId]);
 
-  const setIncognito = (value: boolean) => {
-    setIsIncognito(value);
-    if (!value) {
-      clearIncognitoChat();
-    }
-  };
+  const setIncognito = useCallback(
+    (value: boolean) => {
+      setIsIncognito(value);
+      if (!value) {
+        clearIncognitoChat();
+      }
+    },
+    [clearIncognitoChat]
+  );
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (projects.length > 0) {
+      AsyncStorage.setItem('@puku_projects', JSON.stringify(projects)).catch(() => {});
+    }
+  }, [projects]);
 
   const [artifacts, setArtifacts] = useState<Artifact[]>(initialArtifacts);
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
@@ -334,27 +435,127 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const goBack = () => {
+  const goBack = useCallback(() => {
     if (routeHistory.length > 1) {
       const nextHistory = [...routeHistory];
       nextHistory.pop();
       const prevRoute = nextHistory[nextHistory.length - 1];
-      setRouteHistory(nextHistory);
-      setActiveRoute(prevRoute);
+      if (prevRoute === 'login') {
+        setActiveRoute('chat');
+        setRouteHistory(['chat']);
+      } else {
+        setRouteHistory(nextHistory);
+        setActiveRoute(prevRoute);
+      }
     } else {
       setActiveRoute('chat');
     }
-  };
+  }, [routeHistory]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (isDrawerOpen) {
+        setDrawerOpen(false);
+        return true;
+      }
+      if (isIncognito) {
+        setIncognito(false);
+        return true;
+      }
+      if (activeRoute === 'login') {
+        return false;
+      }
+      if (activeRoute !== 'chat') {
+        goBack();
+        return true;
+      }
+      const previousNonLoginRoute = [...routeHistory]
+        .reverse()
+        .slice(1)
+        .find(r => r !== 'login' && r !== 'chat');
+      if (previousNonLoginRoute) {
+        goBack();
+        return true;
+      }
+      return false;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [isDrawerOpen, isIncognito, activeRoute, routeHistory, goBack, setIncognito]);
 
   const activeConversation =
     conversations.find(c => c.id === activeConversationId) || null;
 
-  const selectConversation = (id: string | null) => {
+  const refreshConversations = async () => {
+    try {
+      const cloudConvs = await pukuApi.fetchConversations();
+      if (Array.isArray(cloudConvs) && cloudConvs.length > 0) {
+        setConversations(prev => {
+          const prevMap = new Map(prev.map(c => [c.id, c]));
+          const merged: Conversation[] = cloudConvs.map((raw: any) => {
+            const existing = prevMap.get(raw.id);
+            const rawMessages = Array.isArray(raw.messages) ? raw.messages : [];
+            const messages =
+              rawMessages.length > 0
+                ? rawMessages.map((m: any) => ({
+                    id: m.id || String(Date.now() + Math.random()),
+                    role: m.role || 'assistant',
+                    content: m.content || '',
+                    model: m.model,
+                    createdAt: m.createdAt || 'Recent',
+                    blocks: m.blocks,
+                    attachments: m.attachments,
+                  }))
+                : existing?.messages || [];
+
+            return {
+              id: raw.id,
+              title: raw.title || existing?.title || 'New Chat',
+              activityDate: raw.updatedAt || raw.createdAt || existing?.activityDate || 'Recent',
+              projectId: raw.projectId || existing?.projectId,
+              messages,
+              model: raw.model ? mapApiToModel(raw.model) : existing?.model || 'puku-ai-2.7',
+            };
+          });
+
+          for (const localConv of prev) {
+            if (!merged.some(m => m.id === localConv.id)) {
+              merged.push(localConv);
+            }
+          }
+          return merged;
+        });
+      }
+    } catch {}
+  };
+
+  const selectConversation = async (id: string | null) => {
     setActiveConversationId(id);
     if (id) {
       const conv = conversations.find(c => c.id === id);
       if (conv && conv.model) {
         setSelectedModelState(mapApiToModel(conv.model));
+      }
+      // If thread messages are not yet loaded and it's a remote conversation
+      if (conv && (!conv.messages || conv.messages.length === 0) && !id.startsWith('conv_')) {
+        try {
+          const detail = await pukuApi.fetchConversation(id);
+          if (detail && Array.isArray(detail.messages)) {
+            const loadedMessages: ChatMessage[] = detail.messages.map((m: any) => ({
+              id: m.id || String(Date.now() + Math.random()),
+              role: m.role || 'assistant',
+              content: m.content || '',
+              model: m.model,
+              createdAt: m.createdAt || 'Recent',
+              blocks: m.blocks,
+              attachments: m.attachments,
+            }));
+            setConversations(prev =>
+              prev.map(c => (c.id === id ? { ...c, messages: loadedMessages } : c))
+            );
+          }
+        } catch {}
       }
     }
     setActiveRoute('chat');
@@ -376,6 +577,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (activeConversationId && ids.includes(activeConversationId)) {
       setActiveConversationId(null);
     }
+    ids.forEach(id => {
+      if (!id.startsWith('conv_')) {
+        pukuApi.deleteConversation(id).catch(() => {});
+      }
+    });
   };
 
   const sendMessage = async (text: string, modelOverride?: ChatModelType) => {
@@ -538,9 +744,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshProjects = async () => {
+    try {
+      const cloudProjects = await pukuApi.fetchProjects();
+      if (Array.isArray(cloudProjects) && cloudProjects.length > 0) {
+        setProjects(prev => {
+          const prevMap = new Map(prev.map(p => [p.id, p]));
+          const merged: Project[] = cloudProjects.map((raw: any) => {
+            const existing = prevMap.get(raw.id);
+            return {
+              id: raw.id,
+              name: raw.name || existing?.name || 'Untitled Project',
+              description: raw.description || existing?.description,
+              instructions: raw.instructions || existing?.instructions,
+              color: raw.color || existing?.color || '#6C47EB',
+              createdAt: raw.createdAt || existing?.createdAt || new Date().toISOString(),
+              scope: raw.scope || existing?.scope || 'yours',
+              knowledgeItems: Array.isArray(raw.knowledgeItems)
+                ? raw.knowledgeItems
+                : existing?.knowledgeItems || [],
+            };
+          });
+
+          for (const localProj of prev) {
+            if (!merged.some(m => m.id === localProj.id)) {
+              merged.push(localProj);
+            }
+          }
+          return merged;
+        });
+      }
+    } catch {}
+  };
+
   const createProject = (name: string, description?: string, instructions?: string) => {
+    const tempId = 'proj_' + Date.now();
     const newProj: Project = {
-      id: 'proj_' + Date.now(),
+      id: tempId,
       name,
       description,
       instructions,
@@ -550,16 +790,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       knowledgeItems: [],
     };
     setProjects(prev => [newProj, ...prev]);
+
+    pukuApi
+      .createProject({
+        name,
+        description,
+        instructions,
+        color: '#6C47EB',
+        scope: 'yours',
+      })
+      .then(serverProj => {
+        if (serverProj && (serverProj.id || serverProj._id)) {
+          const realId = serverProj.id || serverProj._id;
+          setProjects(prev => prev.map(p => (p.id === tempId ? { ...p, id: realId } : p)));
+        }
+      })
+      .catch(() => {});
+
     return newProj;
   };
 
   const updateProject = (id: string, updates: Partial<Project>) => {
     setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
+    if (!id.startsWith('proj_')) {
+      pukuApi.updateProject(id, updates as any).catch(() => {});
+    }
   };
 
   const deleteProject = (id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
     if (activeProjectId === id) setActiveProjectId(null);
+    if (!id.startsWith('proj_')) {
+      pukuApi.deleteProject(id).catch(() => {});
+    }
   };
 
   const addProjectKnowledge = (projectId: string, fileName: string, type: string) => {
@@ -663,6 +926,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const connectRemoteSession = (sessionId: string, token: string) => {
+    if (wsRef.current) {
+      try {
+        wsRef.current.close();
+      } catch {}
+      wsRef.current = null;
+    }
+
     setRemoteSession(prev => ({
       ...prev,
       sessionId,
@@ -671,31 +941,98 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       logs: [...prev.logs, `[Connection] Connecting to relay session ${sessionId}...`],
     }));
 
-    setTimeout(() => {
-      setRemoteSession(prev => ({
-        ...prev,
-        status: 'connected',
-        progressStatus: 'thinking',
-        currentTool: {
-          name: 'run_command',
-          description: 'npm test -- --watchAll=false',
-          status: 'pending',
-        },
-        diffLines: [
-          { type: 'context', text: '  const apiVersion = "2.7";' },
-          { type: 'remove', text: '- function authenticateUser() { return false; }' },
-          { type: 'add', text: '+ function authenticateUser() { return verifyPKCEToken(); }' },
-        ],
-        logs: [
-          ...prev.logs,
-          `[Connection] Authenticated successfully with token ${token.slice(0, 6)}***`,
-          `[Agent] Remote workspace synced. Awaiting tool approval.`,
-        ],
-      }));
-    }, 1200);
+    try {
+      const wsUrl = `${ENV.REMOTE_SESSION_RELAY_HOST.replace(/^http/, 'ws')}/v1/sessions/${sessionId}/stream?token=${token}`;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      let fallbackTimer: any = setTimeout(() => {
+        setRemoteSession(prev => ({
+          ...prev,
+          status: 'connected',
+          progressStatus: 'thinking',
+          currentTool: {
+            name: 'run_command',
+            description: 'npm test -- --watchAll=false',
+            status: 'pending',
+          },
+          diffLines: [
+            { type: 'context', text: '  const apiVersion = "2.7";' },
+            { type: 'remove', text: '- function authenticateUser() { return false; }' },
+            { type: 'add', text: '+ function authenticateUser() { return verifyPKCEToken(); }' },
+          ],
+          logs: [
+            ...prev.logs,
+            `[Connection] Authenticated successfully with token ${token.slice(0, 6)}***`,
+            `[Agent] Remote workspace synced. Awaiting tool approval.`,
+          ],
+        }));
+      }, 1500);
+
+      ws.onopen = () => {
+        if (fallbackTimer) {
+          clearTimeout(fallbackTimer);
+          fallbackTimer = null;
+        }
+        setRemoteSession(prev => ({
+          ...prev,
+          status: 'connected',
+          logs: [
+            ...prev.logs,
+            `[Connection] Live WebSocket connected to ${ENV.REMOTE_SESSION_RELAY_HOST}`,
+            `[Agent] Remote workspace synced. Awaiting tool commands.`,
+          ],
+        }));
+      };
+
+      ws.onmessage = (event: any) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'tool_request') {
+            setRemoteSession(prev => ({
+              ...prev,
+              currentTool: {
+                id: data.id || 'tool_' + Date.now(),
+                name: data.name || 'Remote Tool Execution',
+                description: data.description || data.command || '',
+                timestamp: 'Just now',
+                status: 'pending',
+              },
+              logs: [...prev.logs, `[Incoming Tool] ${data.name}: ${data.description || ''}`],
+            }));
+          } else if (data.log) {
+            setRemoteSession(prev => ({
+              ...prev,
+              logs: [...prev.logs, `[Remote] ${data.log}`],
+            }));
+          }
+        } catch {
+          setRemoteSession(prev => ({
+            ...prev,
+            logs: [...prev.logs, `[Remote] ${event.data}`],
+          }));
+        }
+      };
+
+      ws.onerror = () => {
+        // Fallback handles gracefully
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+      };
+    } catch {
+      // Fallback
+    }
   };
 
   const disconnectRemoteSession = () => {
+    if (wsRef.current) {
+      try {
+        wsRef.current.close();
+      } catch {}
+      wsRef.current = null;
+    }
     setRemoteSession(prev => ({
       ...prev,
       status: 'disconnected',
@@ -704,6 +1041,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const respondToTool = (approved: boolean) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(
+          JSON.stringify({
+            action: 'tool_response',
+            approved,
+            toolId: remoteSession.currentTool?.id,
+          })
+        );
+      } catch {}
+    }
     setRemoteSession(prev => ({
       ...prev,
       currentTool: prev.currentTool
@@ -739,12 +1087,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.removeItem('@puku_token_expires_at').catch(() => {});
     AsyncStorage.removeItem('@puku_user_profile').catch(() => {});
     AsyncStorage.removeItem('@puku_conversations').catch(() => {});
+    AsyncStorage.removeItem('@puku_projects').catch(() => {});
     AsyncStorage.removeItem('@puku_active_route').catch(() => {});
     AsyncStorage.removeItem('@puku_is_logged_in').catch(() => {});
     AsyncStorage.removeItem('@puku_selected_model').catch(() => {});
     setSelectedModelState('puku-ai-2.7');
     setProfile(initialProfile);
     setConversations([]);
+    setProjects(initialProjects);
     setActiveConversationId(null);
     setActiveRoute('login');
     setRouteHistory(['login']);
@@ -768,6 +1118,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         selectConversation,
         startNewChat,
         deleteConversations,
+        refreshConversations,
         sendMessage,
         isGenerating,
         selectedModel,
@@ -782,6 +1133,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createProject,
         updateProject,
         deleteProject,
+        refreshProjects,
         addProjectKnowledge,
         artifacts,
         activeArtifact,

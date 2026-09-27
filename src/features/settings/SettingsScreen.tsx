@@ -24,8 +24,10 @@ import {
   InfoIcon,
   LockIcon,
   LogoutIcon,
+  MoonIcon,
   ProfileIcon,
   SlidersIcon,
+  SunIcon,
   VibrateIcon,
   VoiceIcon,
 } from '../../components/common/Icons';
@@ -275,12 +277,48 @@ export function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 5. Section Card 3: Haptic feedback, Notifications, Shared links */}
+        {/* 5. Section Card 3: Theme mode, Haptic feedback, Notifications, Shared links */}
         <View
           style={[
             styles.sectionCard,
             { backgroundColor: theme.secondaryBackground },
           ]}>
+          {/* Theme Mode */}
+          <View style={styles.sectionRow}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: theme.iconBackground },
+              ]}>
+              {settings.themeMode === 'dark' ? (
+                <MoonIcon size={20} color="#FFFFFF" />
+              ) : (
+                <SunIcon size={20} color="#FFFFFF" />
+              )}
+            </View>
+            <View style={styles.labelCol}>
+              <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
+                Dark Theme
+              </Text>
+              <Text style={[styles.rowSubLabel, { color: theme.textSecondary }]}>
+                {settings.themeMode === 'dark' ? 'Dark theme active' : 'Light theme active'}
+              </Text>
+            </View>
+            <Switch
+              value={settings.themeMode === 'dark'}
+              onValueChange={isDark =>
+                updateSettings({ themeMode: isDark ? 'dark' : 'light' })
+              }
+              trackColor={{
+                false: '#342F50',
+                true: theme.primary,
+              }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+
           {/* Haptic feedback */}
           <View style={styles.sectionRow}>
             <View

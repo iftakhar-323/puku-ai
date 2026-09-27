@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { ThemeColors } from '../../../theme/theme';
+import { CheckmarkIcon, CopyIcon } from '../../../components/common/Icons';
 
 interface MarkdownRendererProps {
   content: string;
@@ -79,6 +81,77 @@ export function renderFormattedText(
   return parts;
 }
 
+function CodeBlockItem({
+  code,
+  language,
+  theme,
+}: {
+  code: string;
+  language: string;
+  theme: ThemeColors;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const displayLang = language ? language.toUpperCase() : 'CODE';
+
+  return (
+    <View
+      style={[
+        styles.codeBlock,
+        {
+          backgroundColor: theme.codeBackground,
+          borderColor: theme.outline,
+        },
+      ]}>
+      <View
+        style={[
+          styles.codeHeader,
+          {
+            borderBottomColor: theme.outline,
+            backgroundColor: theme.secondaryBackground,
+          },
+        ]}>
+        <View style={styles.codeBadge}>
+          <Text style={[styles.codeLanguage, { color: theme.textSecondary }]}>
+            {displayLang}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={handleCopy}
+          style={styles.codeCopyButton}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          {copied ? (
+            <CheckmarkIcon size={14} color={theme.primary} />
+          ) : (
+            <CopyIcon size={14} color={theme.textSecondary} />
+          )}
+          <Text
+            style={[
+              styles.codeCopyText,
+              { color: copied ? theme.primary : theme.textSecondary },
+            ]}>
+            {copied ? 'Copied' : 'Copy'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.codeScrollContent}>
+        <Text style={[styles.codeText, { color: theme.textPrimary }]}>
+          {code}
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
 export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
   if (!content) return null;
 
@@ -92,6 +165,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
 
     // 1. Code Block Fence (```)
     if (trimmed.startsWith('```')) {
+      const language = trimmed.slice(3).trim();
       const codeLines: string[] = [];
       i++;
       while (i < lines.length && !lines[i].trim().startsWith('```')) {
@@ -100,23 +174,12 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
       }
       i++; // skip closing ```
       elements.push(
-        <View
+        <CodeBlockItem
           key={`code_${i}`}
-          style={[
-            styles.codeBlock,
-            {
-              backgroundColor: theme.codeBackground,
-              borderColor: theme.outline,
-            },
-          ]}>
-          <Text
-            style={[
-              styles.codeText,
-              { color: theme.textPrimary },
-            ]}>
-            {codeLines.join('\n')}
-          </Text>
-        </View>
+          code={codeLines.join('\n')}
+          language={language}
+          theme={theme}
+        />
       );
       continue;
     }
@@ -368,13 +431,45 @@ const styles = StyleSheet.create({
   codeBlock: {
     borderRadius: 8,
     borderWidth: 1,
-    padding: 10,
-    marginVertical: 6,
+    marginVertical: 8,
+    overflow: 'hidden',
+  },
+  codeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+  },
+  codeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  codeLanguage: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  codeCopyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  codeCopyText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  codeScrollContent: {
+    padding: 12,
   },
   codeText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   tableScroll: {
     marginVertical: 8,

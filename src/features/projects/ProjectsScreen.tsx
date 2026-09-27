@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   FlatList,
   Modal,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -14,15 +15,14 @@ import { AppHeader } from '../../components/common/AppHeader';
 import {
   CloseIcon,
   PlusIcon,
-  ProjectsIcon,
   SearchIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
-import { Project, ProjectScope } from '../../types';
+import { ProjectScope } from '../../types';
 
 export function ProjectsScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, projects, createProject, selectProject } = useApp();
+  const { theme, projects, createProject, selectProject, refreshProjects } = useApp();
 
   const [activeTab, setActiveTab] = useState<ProjectScope>('yours');
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,6 +30,16 @@ export function ProjectsScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshProjects();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const filteredProjects = projects.filter(
     p =>
@@ -124,6 +134,14 @@ export function ProjectsScreen() {
           data={filteredProjects}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.primary}
+              colors={[theme.primary]}
+            />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               activeOpacity={0.7}

@@ -94,6 +94,7 @@ export interface RemoteSession {
   host?: string;
   status: 'connecting' | 'connected' | 'idle' | 'executing' | 'disconnected';
   currentTool?: {
+    id?: string;
     name: string;
     description: string;
     params?: Record<string, any>;

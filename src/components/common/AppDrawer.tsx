@@ -41,7 +41,11 @@ export function AppDrawer() {
     : '?';
 
   return (
-    <Modal visible={isDrawerOpen} transparent animationType="fade">
+    <Modal
+      visible={isDrawerOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setDrawerOpen(false)}>
       <View style={styles.overlay}>
         {/* Backdrop */}
         <TouchableWithoutFeedback onPress={() => setDrawerOpen(false)}>

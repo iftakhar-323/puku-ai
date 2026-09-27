@@ -43,7 +43,11 @@ export function ChatAttachmentSheet({
   const [researchEnabled, setResearchEnabled] = useState(false);
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop} />
       </TouchableWithoutFeedback>
