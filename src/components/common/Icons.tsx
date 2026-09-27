@@ -462,18 +462,22 @@ export const DeleteIcon = TrashIcon;
 export const LiveVoiceIcon = SoundWaveIcon;
 export const RemoteIcon = ConnectIcon;
 
-export function CopyIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
+export function CopyIcon({ size = 18, color = '#FFFFFF' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M8 4V16C8 17.1 8.9 18 10 18H18C19.1 18 20 17.1 20 16V4C20 2.9 19.1 2 18 2H10C8.9 2 8 2.9 8 4Z"
+        d="M8.5 4.5C8.5 3.67 9.17 3 10 3H17C17.83 3 18.5 3.67 18.5 4.5V11.5C18.5 12.33 17.83 13 17 13H16"
         stroke={color}
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <Path
-        d="M4 8H3C2.45 8 2 8.45 2 9V21C2 21.55 2.45 22 3 22H15C15.55 22 16 21.55 16 21V20"
+      <Rect
+        x="4.5"
+        y="7.5"
+        width="12"
+        height="12"
+        rx="3"
         stroke={color}
         strokeWidth="1.8"
         strokeLinecap="round"

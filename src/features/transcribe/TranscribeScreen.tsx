@@ -15,6 +15,7 @@ import {
   SendIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
+import { NativeClipboard, NativeSpeech } from '../../services/nativeModules';
 
 export function TranscribeScreen() {
   const insets = useSafeAreaInsets();
@@ -24,7 +25,7 @@ export function TranscribeScreen() {
   const [seconds, setSeconds] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
   const [transcript, setTranscript] = useState(
-    'Welcome to Puku AI audio transcription. Press the microphone below to record speech and transcribe it to formatted text in real-time.'
+    'Press the microphone below to speak and transcribe your voice to text in real-time.'
   );
 
   useEffect(() => {
@@ -39,15 +40,49 @@ export function TranscribeScreen() {
     return () => clearInterval(interval);
   }, [isRecording]);
 
-  const toggleRecording = () => {
-    if (!isRecording) {
-      setIsRecording(true);
-      setSeconds(0);
-    } else {
+  useEffect(() => {
+    const unsubResults = NativeSpeech.onSpeechResults(text => {
+      if (text) {
+        setTranscript(prev =>
+          prev && !prev.startsWith('Press the microphone') ? `${prev} ${text}` : text
+        );
+      }
       setIsRecording(false);
-      setTranscript(
-        'In today’s project review, we finalized the migration from Flutter to React Native. All screens including Chats, Projects, Artifacts, Code sessions, and Remote agent pairing are now fully functioning on Android and iOS.'
-      );
+    });
+
+    const unsubPartial = NativeSpeech.onSpeechPartialResults(text => {
+      if (text) {
+        setTranscript(text);
+      }
+    });
+
+    const unsubEnd = NativeSpeech.onSpeechEnd(() => {
+      setIsRecording(false);
+    });
+
+    const unsubError = NativeSpeech.onSpeechError(() => {
+      setIsRecording(false);
+    });
+
+    return () => {
+      unsubResults();
+      unsubPartial();
+      unsubEnd();
+      unsubError();
+    };
+  }, []);
+
+  const toggleRecording = async () => {
+    if (!isRecording) {
+      const started = await NativeSpeech.startListening();
+      if (started) {
+        setIsRecording(true);
+        setSeconds(0);
+        setTranscript('Listening... Speak now...');
+      }
+    } else {
+      await NativeSpeech.stopListening();
+      setIsRecording(false);
     }
   };
 
@@ -65,6 +100,7 @@ export function TranscribeScreen() {
     .filter(Boolean).length;
 
   const handleCopy = () => {
+    NativeClipboard.setString(transcript).catch(() => {});
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 1500);
   };

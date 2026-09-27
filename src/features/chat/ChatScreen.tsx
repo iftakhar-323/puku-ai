@@ -20,6 +20,7 @@ import { ChatIncognitoView } from './components/ChatIncognitoView';
 import { ChatModelSelectionSheet } from './components/ChatModelSelectionSheet';
 import { MessageBubble } from './components/MessageBubble';
 import { TypingIndicator } from './components/TypingIndicator';
+import { NativeSpeech } from '../../services/nativeModules';
 
 function getModelLabel(model: ChatModelType): string {
   switch (model) {
@@ -54,10 +55,73 @@ export function ChatScreen() {
   const [showModelSheet, setShowModelSheet] = useState(false);
   const [showAttachmentSheet, setShowAttachmentSheet] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const activeMessages = activeConversation?.messages || [];
   const messages = isIncognito ? incognitoMessages : activeMessages;
+
+  // Automatically scroll to the latest message whenever entering/loading a chat
+  useEffect(() => {
+    if (messages.length > 0) {
+      flatListRef.current?.scrollToEnd({ animated: false });
+      const t1 = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 50);
+      const t2 = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 250);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [activeConversation?.id, isLoadingConversation]);
+
+  // Handle native speech recognition for microphone
+  useEffect(() => {
+    const unsubResults = NativeSpeech.onSpeechResults(text => {
+      if (text) {
+        setInputVal(prev => (prev ? `${prev} ${text}` : text));
+      }
+      setIsListening(false);
+    });
+
+    const unsubPartial = NativeSpeech.onSpeechPartialResults(text => {
+      if (text) {
+        setInputVal(text);
+      }
+    });
+
+    const unsubEnd = NativeSpeech.onSpeechEnd(() => {
+      setIsListening(false);
+    });
+
+    const unsubError = NativeSpeech.onSpeechError(() => {
+      setIsListening(false);
+    });
+
+    return () => {
+      unsubResults();
+      unsubPartial();
+      unsubEnd();
+      unsubError();
+    };
+  }, []);
+
+  const handleToggleMic = async () => {
+    if (isListening) {
+      await NativeSpeech.stopListening();
+      setIsListening(false);
+    } else {
+      const started = await NativeSpeech.startListening();
+      if (started) {
+        setIsListening(true);
+      } else {
+        navigate('transcribe');
+      }
+    }
+  };
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -131,8 +195,13 @@ export function ChatScreen() {
             keyExtractor={item => item.id}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.listContent}
+            onLayout={() => {
+              if (messages.length > 0) {
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
             onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: true })
+              flatListRef.current?.scrollToEnd({ animated: isGenerating })
             }
             renderItem={({ item }) => (
               <MessageBubble message={item} theme={theme} />
@@ -155,6 +224,7 @@ export function ChatScreen() {
         onChangeText={setInputVal}
         selectedModelLabel={getModelLabel(selectedModel)}
         isSending={isGenerating}
+        isListening={isListening}
         onFocus={() => {
           setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
@@ -164,7 +234,7 @@ export function ChatScreen() {
         onModelTap={() => setShowModelSheet(true)}
         onSubmitTap={handleSend}
         onVoiceConversationTap={() => navigate('liveVoice')}
-        onMicrophoneTap={() => navigate('transcribe')}
+        onMicrophoneTap={handleToggleMic}
       />
 
       {/* 1:1 Model Selection Bottom Sheet */}

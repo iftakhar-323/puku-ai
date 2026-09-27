@@ -223,9 +223,9 @@ export class TokenManager {
     this.ongoingRefresh = (async () => {
       const storedRefreshToken = await this.getRefreshToken();
       if (!storedRefreshToken) {
-        // No refresh token available to perform OAuth refresh
-        await this.handleAuthFailure();
-        return null;
+        // No refresh token available: continue using existing accessToken safely
+        // Do NOT log out the user!
+        return this.accessToken;
       }
 
       try {

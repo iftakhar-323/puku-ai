@@ -150,6 +150,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           savedToken,
           savedProfileStr,
           savedRoute,
+          savedActiveConvId,
           isLoggedOut,
           savedSettingsStr,
           savedConvsStr,
@@ -159,6 +160,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem('@puku_auth_token'),
           AsyncStorage.getItem('@puku_user_profile'),
           AsyncStorage.getItem('@puku_active_route'),
+          AsyncStorage.getItem('@puku_active_conversation_id'),
           AsyncStorage.getItem('@puku_is_logged_out'),
           AsyncStorage.getItem('@puku_app_settings'),
           AsyncStorage.getItem('@puku_conversations'),
@@ -188,7 +190,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           } catch {}
         }
 
-        // Standard: Fresh install or logged out requires user to sign in
+        // Fresh install vs logged in:
+        // Only if user explicitly logged out (via Settings -> Logout), require sign in
         if (isLoggedOut === 'true') {
           pukuApi.setAuthToken(null);
           setProfile(initialProfile);
@@ -199,10 +202,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Validate or proactively refresh token
-        const validToken = await tokenManager.ensureValidToken();
+        // Validate or proactively refresh token without kicking user out on network glitches
+        const validToken = await tokenManager.ensureValidToken().catch(() => null);
         const activeToken = validToken || savedToken;
-        if (!activeToken) {
+
+        // Only on a fresh install where neither token nor profile exists, ask for login
+        if (!activeToken && !savedProfileStr) {
           pukuApi.setAuthToken(null);
           setProfile(initialProfile);
           setConversations([]);
@@ -212,8 +217,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // User is authenticated: restore session
-        pukuApi.setAuthToken(activeToken);
+        // User is authenticated: maintain permanent session
+        if (activeToken) {
+          pukuApi.setAuthToken(activeToken);
+        }
 
         if (savedProfileStr) {
           try {
@@ -222,7 +229,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               setProfile(prev => ({ ...prev, ...parsedProfile }));
             }
           } catch {}
-        } else {
+        } else if (activeToken) {
           const jwtData = extractJwtData(activeToken);
           if (jwtData?.email) {
             setProfile(prev => ({
@@ -234,14 +241,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        let restoredConvId: string | null = null;
         if (savedConvsStr) {
           try {
             const parsedConvs = JSON.parse(savedConvsStr);
             if (Array.isArray(parsedConvs) && parsedConvs.length > 0) {
               setConversations(parsedConvs);
-              setActiveConversationId(parsedConvs[0].id);
+              if (savedActiveConvId && parsedConvs.some(c => c.id === savedActiveConvId)) {
+                restoredConvId = savedActiveConvId;
+              } else if (savedActiveConvId) {
+                restoredConvId = savedActiveConvId;
+              } else {
+                restoredConvId = parsedConvs[0].id;
+              }
+              setActiveConversationId(restoredConvId);
             }
           } catch {}
+        }
+
+        // If active conversation restored is a cloud thread, ensure its messages are loaded
+        if (
+          restoredConvId &&
+          !restoredConvId.startsWith('conv_') &&
+          !restoredConvId.startsWith('incog_')
+        ) {
+          pukuApi
+            .fetchConversation(restoredConvId)
+            .then(detail => {
+              const rawMsgs = Array.isArray(detail?.messages)
+                ? detail.messages
+                : Array.isArray(detail?.data?.messages)
+                ? detail.data.messages
+                : Array.isArray(detail)
+                ? detail
+                : [];
+              if (rawMsgs.length > 0) {
+                const loadedMessages: ChatMessage[] = rawMsgs.map((m: any) => ({
+                  id: m.id || String(Date.now() + Math.random()),
+                  role: m.role || 'assistant',
+                  content: m.content || m.text || m.blocks?.[0]?.text || '',
+                  model: m.model,
+                  createdAt: formatActivityDate(m.createdAt),
+                  blocks: m.blocks,
+                  attachments: m.attachments,
+                }));
+                setConversations(prev =>
+                  prev.map(c =>
+                    c.id === restoredConvId ? { ...c, messages: loadedMessages } : c
+                  )
+                );
+              }
+            })
+            .catch(() => {});
         }
 
         // Proactively sync cloud conversations from server
@@ -368,6 +419,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     AsyncStorage.setItem('@puku_app_settings', JSON.stringify(settings)).catch(() => {});
   }, [settings]);
+
+  useEffect(() => {
+    if (activeRoute && activeRoute !== 'login') {
+      AsyncStorage.setItem('@puku_active_route', activeRoute).catch(() => {});
+    }
+  }, [activeRoute]);
+
+  useEffect(() => {
+    if (activeConversationId && !activeConversationId.startsWith('incog_')) {
+      AsyncStorage.setItem('@puku_active_conversation_id', activeConversationId).catch(() => {});
+    } else if (!activeConversationId) {
+      AsyncStorage.removeItem('@puku_active_conversation_id').catch(() => {});
+    }
+  }, [activeConversationId]);
+
   const [selectedModel, setSelectedModelState] = useState<ChatModelType>('puku-ai-2.7');
 
   const setSelectedModel = (model: ChatModelType) => {
@@ -1282,6 +1348,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.removeItem('@puku_conversations').catch(() => {});
     AsyncStorage.removeItem('@puku_projects').catch(() => {});
     AsyncStorage.removeItem('@puku_active_route').catch(() => {});
+    AsyncStorage.removeItem('@puku_active_conversation_id').catch(() => {});
     AsyncStorage.removeItem('@puku_is_logged_in').catch(() => {});
     AsyncStorage.removeItem('@puku_selected_model').catch(() => {});
     setSelectedModelState('puku-ai-2.7');

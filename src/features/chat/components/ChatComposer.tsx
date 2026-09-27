@@ -21,6 +21,7 @@ interface ChatComposerProps {
   onChangeText: (text: string) => void;
   selectedModelLabel: string;
   isSending?: boolean;
+  isListening?: boolean;
   onFocus?: () => void;
   onPlusTap: () => void;
   onModelTap: () => void;
@@ -35,6 +36,7 @@ export function ChatComposer({
   onChangeText,
   selectedModelLabel,
   isSending = false,
+  isListening = false,
   onFocus,
   onPlusTap,
   onModelTap,
@@ -100,8 +102,11 @@ export function ChatComposer({
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={onMicrophoneTap}
-            style={styles.iconBtn}>
-            <MicIcon size={20} color={theme.textPrimary} />
+            style={[
+              styles.iconBtn,
+              isListening && { backgroundColor: 'rgba(255, 77, 79, 0.2)', borderRadius: 16 },
+            ]}>
+            <MicIcon size={20} color={isListening ? '#FF4D4F' : theme.textPrimary} />
           </TouchableOpacity>
 
           <TouchableOpacity

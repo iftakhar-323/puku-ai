@@ -20,6 +20,7 @@ import {
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { Artifact } from '../../types';
+import { NativeClipboard } from '../../services/nativeModules';
 
 export function ArtifactsScreen() {
   const insets = useSafeAreaInsets();
@@ -39,6 +40,7 @@ export function ArtifactsScreen() {
   });
 
   const handleCopy = (content: string) => {
+    NativeClipboard.setString(content).catch(() => {});
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 1500);
   };
