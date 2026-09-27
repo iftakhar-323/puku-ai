@@ -42,6 +42,7 @@ export interface Conversation {
   projectId?: string;
   messages: ChatMessage[];
   model: ChatModelType;
+  updatedAtTimestamp?: number;
 }
 
 export type ProjectScope = 'yours' | 'power' | 'shared' | 'archived';

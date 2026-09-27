@@ -177,7 +177,10 @@ export class PukuApiService {
       });
       if (!response.ok) return [];
       const json = await response.json();
-      return json.conversations || [];
+      if (Array.isArray(json)) return json;
+      if (Array.isArray(json.conversations)) return json.conversations;
+      if (Array.isArray(json.data)) return json.data;
+      return [];
     } catch {
       return [];
     }
@@ -405,46 +408,31 @@ export class PukuApiService {
       throw new Error('Failed to create or access conversation on server.');
     }
 
-    // Helper to send message request with a specific bearer token
-    const sendMessageRequest = async (bearerToken: string) => {
-      return fetch(
-        `${this.baseUrl}/v1/chat/conversations/${realConvId}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${bearerToken}`,
-            'Content-Type': 'application/json',
-            Accept: 'text/event-stream, application/json',
-          },
-          body: JSON.stringify({
-            action: 'send',
-            content: prompt,
-            model: apiModel,
-            attachments: [],
-          }),
-        }
-      );
+    const streamPayload = {
+      action: 'send',
+      content: prompt,
+      model: apiModel,
+      attachments: [],
     };
+    const streamUrl = `${this.baseUrl}/v1/chat/conversations/${realConvId}/messages`;
 
-    let response = await sendMessageRequest(token);
-
-    // 401 / Token Expired recovery
-    if (!response.ok) {
-      let isTokenExpired = response.status === 401;
-      let errBody: any = null;
-
-      try {
-        const cloned = response.clone();
-        errBody = await cloned.json().catch(() => null);
-        const errMsg = (errBody?.error?.message || errBody?.message || '').toLowerCase();
-        if (
-          errMsg.includes('invalid or expired') ||
-          errMsg.includes('expired token') ||
-          errBody?.error?.code === 'invalid_token'
-        ) {
-          isTokenExpired = true;
-        }
-      } catch {}
+    try {
+      const streamRes = await this.executeStreamRequest(
+        streamUrl,
+        token,
+        streamPayload,
+        onDelta
+      );
+      return {
+        text: streamRes.text,
+        model,
+        conversationId: realConvId,
+      };
+    } catch (err: any) {
+      const isTokenExpired =
+        err?.status === 401 ||
+        err?.message?.toLowerCase().includes('token') ||
+        err?.message?.toLowerCase().includes('expired');
 
       if (isTokenExpired) {
         try {
@@ -452,68 +440,165 @@ export class PukuApiService {
           if (refreshedToken) {
             token = refreshedToken;
             this.authToken = refreshedToken;
-            // Retry the message request immediately with the refreshed access token
-            response = await sendMessageRequest(refreshedToken);
+            const retryRes = await this.executeStreamRequest(
+              streamUrl,
+              refreshedToken,
+              streamPayload,
+              onDelta
+            );
+            return {
+              text: retryRes.text,
+              model,
+              conversationId: realConvId,
+            };
           }
-        } catch {
-          // If refresh permanently failed, tokenManager notified session expired
-        }
+        } catch {}
       }
+      throw err;
     }
+  }
 
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => null);
-      const errMsg =
-        errJson?.error?.message ||
-        errJson?.message ||
-        `Puku AI server error (${response.status})`;
-      throw new Error(errMsg);
-    }
+  // Real-time progressive streaming engine supporting SSE chunks and fallback progressive typing
+  private executeStreamRequest(
+    url: string,
+    bearerToken: string,
+    payload: any,
+    onDelta?: (chunk: string) => void
+  ): Promise<{ text: string; status: number }> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${bearerToken}`);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Accept', 'text/event-stream, application/json');
 
-    const bodyText = await response.text();
-    let accumulatedText = '';
+      let lastIndex = 0;
+      let buffer = '';
+      let accumulatedText = '';
 
-    const lines = bodyText.split('\n');
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line.startsWith('data: ')) continue;
-      const payload = line.slice(6).trim();
-      if (payload === '[DONE]') break;
+      const processTextChunk = (newText: string) => {
+        const slice = newText.substring(lastIndex);
+        lastIndex = newText.length;
+        if (!slice) return;
 
-      try {
-        const json = JSON.parse(payload);
-        const choices = json.choices as any[];
-        if (choices && choices.length > 0) {
-          const delta = choices[0]?.delta?.content;
-          if (delta) {
-            accumulatedText += delta;
-            onDelta?.(delta);
-          }
+        buffer += slice;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line.startsWith('data: ')) continue;
+          const payloadStr = line.slice(6).trim();
+          if (payloadStr === '[DONE]') continue;
+          try {
+            const json = JSON.parse(payloadStr);
+            const choices = json.choices as any[];
+            if (choices && choices.length > 0) {
+              const delta = choices[0]?.delta?.content;
+              if (delta) {
+                accumulatedText += delta;
+                onDelta?.(delta);
+              }
+            }
+          } catch {}
         }
-      } catch {}
-    }
+      };
 
-    // If not SSE, check if standard JSON
-    if (!accumulatedText.trim() && bodyText.trim().startsWith('{')) {
+      xhr.onprogress = () => {
+        try {
+          if (xhr.status === 200 || xhr.status === 0) {
+            processTextChunk(xhr.responseText || '');
+          }
+        } catch {}
+      };
+
+      xhr.onload = async () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            processTextChunk(xhr.responseText || '');
+
+            if (buffer.trim().startsWith('data: ')) {
+              const payloadStr = buffer.trim().slice(6).trim();
+              if (payloadStr !== '[DONE]') {
+                try {
+                  const json = JSON.parse(payloadStr);
+                  const delta = json.choices?.[0]?.delta?.content;
+                  if (delta) {
+                    accumulatedText += delta;
+                    onDelta?.(delta);
+                  }
+                } catch {}
+              }
+            }
+
+            if (!accumulatedText.trim()) {
+              const raw = xhr.responseText || '';
+              if (raw.trim().startsWith('{')) {
+                try {
+                  const json = JSON.parse(raw);
+                  const fallbackContent =
+                    json.content ||
+                    json.message?.content ||
+                    json.choices?.[0]?.message?.content ||
+                    '';
+                  if (fallbackContent) {
+                    accumulatedText = fallbackContent;
+                    await emitProgressively(fallbackContent, onDelta);
+                  }
+                } catch {}
+              } else if (raw.trim()) {
+                accumulatedText = raw.trim();
+                await emitProgressively(accumulatedText, onDelta);
+              }
+            }
+
+            if (!accumulatedText.trim()) {
+              reject(new Error('No response content returned from Puku AI server.'));
+            } else {
+              resolve({ text: accumulatedText, status: xhr.status });
+            }
+          } else {
+            let errMsg = `Puku AI server error (${xhr.status})`;
+            try {
+              const errJson = JSON.parse(xhr.responseText || '');
+              errMsg = errJson?.error?.message || errJson?.message || errMsg;
+            } catch {}
+            const error: any = new Error(errMsg);
+            error.status = xhr.status;
+            reject(error);
+          }
+        } catch (e: any) {
+          reject(e);
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Network request failed. Please check your connection.'));
+      };
+
+      xhr.ontimeout = () => {
+        reject(new Error('Request timed out. Please try again.'));
+      };
+
       try {
-        const json = JSON.parse(bodyText);
-        accumulatedText =
-          json.content ||
-          json.message?.content ||
-          json.choices?.[0]?.message?.content ||
-          '';
-      } catch {}
-    }
+        xhr.send(JSON.stringify(payload));
+      } catch (err: any) {
+        reject(err);
+      }
+    });
+  }
+}
 
-    if (!accumulatedText.trim()) {
-      throw new Error('No response content returned from Puku AI server.');
-    }
-
-    return {
-      text: accumulatedText,
-      model,
-      conversationId: realConvId,
-    };
+// Progressive smooth token emitter for line-by-line / word-by-word streaming
+export async function emitProgressively(
+  fullText: string,
+  onDelta?: (chunk: string) => void
+): Promise<void> {
+  if (!onDelta || !fullText) return;
+  const tokens = fullText.match(/\S+\s*|\s+/g) || [fullText];
+  for (const token of tokens) {
+    onDelta(token);
+    await new Promise(resolve => setTimeout(() => resolve(undefined), 15));
   }
 }
 

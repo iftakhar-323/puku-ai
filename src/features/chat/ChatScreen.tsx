@@ -128,7 +128,11 @@ export function ChatScreen() {
               <MessageBubble message={item} theme={theme} />
             )}
             ListFooterComponent={
-              isGenerating ? <TypingIndicator theme={theme} /> : undefined
+              isGenerating &&
+              (!messages.length ||
+                messages[messages.length - 1]?.role !== 'assistant') ? (
+                <TypingIndicator theme={theme} />
+              ) : undefined
             }
           />
         )}

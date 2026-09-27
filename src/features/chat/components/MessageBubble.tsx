@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ThemeColors } from '../../../theme/theme';
 import { ChatMessage } from '../../../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { TypingIndicator } from './TypingIndicator';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -35,7 +36,11 @@ export function MessageBubble({ message, theme }: MessageBubbleProps) {
           styles.assistantCard,
           { backgroundColor: theme.assistantBubble },
         ]}>
-        <MarkdownRenderer content={message.content} theme={theme} />
+        {!message.content ? (
+          <TypingIndicator theme={theme} />
+        ) : (
+          <MarkdownRenderer content={message.content} theme={theme} />
+        )}
       </View>
     </View>
   );

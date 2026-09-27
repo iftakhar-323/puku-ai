@@ -17,6 +17,7 @@ import { darkTheme, lightTheme, ThemeColors } from '../theme/theme';
 import { pukuApi, mapModelToApi, mapApiToModel } from '../services/api';
 import { tokenManager } from '../services/tokenManager';
 import { extractJwtData } from '../utils/auth';
+import { formatActivityDate, getConversationTimestamp } from '../utils/date';
 import { ENV } from '../config/env';
 
 interface AppContextValue {
@@ -256,19 +257,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                           role: m.role || 'assistant',
                           content: m.content || '',
                           model: m.model,
-                          createdAt: m.createdAt || 'Recent',
+                          createdAt: formatActivityDate(m.createdAt),
                           blocks: m.blocks,
                           attachments: m.attachments,
                         }))
                       : existing?.messages || [];
 
+                  const ts =
+                    getConversationTimestamp(raw) ||
+                    existing?.updatedAtTimestamp ||
+                    Date.now();
+
                   return {
                     id: raw.id,
                     title: raw.title || existing?.title || 'New Chat',
-                    activityDate: raw.updatedAt || raw.createdAt || existing?.activityDate || 'Recent',
+                    activityDate:
+                      formatActivityDate(raw.updatedAt || raw.createdAt) ||
+                      existing?.activityDate ||
+                      'Recent',
                     projectId: raw.projectId || existing?.projectId,
                     messages,
                     model: raw.model ? mapApiToModel(raw.model) : existing?.model || 'puku-ai-2.7',
+                    updatedAtTimestamp: ts,
                   };
                 });
 
@@ -277,6 +287,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                     merged.push(localConv);
                   }
                 }
+
+                // Sort chronologically (newest first)
+                merged.sort((a, b) => (b.updatedAtTimestamp || 0) - (a.updatedAtTimestamp || 0));
+                AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(() => {});
                 return merged;
               });
             }
@@ -503,19 +517,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                     role: m.role || 'assistant',
                     content: m.content || '',
                     model: m.model,
-                    createdAt: m.createdAt || 'Recent',
+                    createdAt: formatActivityDate(m.createdAt),
                     blocks: m.blocks,
                     attachments: m.attachments,
                   }))
                 : existing?.messages || [];
 
+            const ts =
+              getConversationTimestamp(raw) ||
+              existing?.updatedAtTimestamp ||
+              Date.now();
+
             return {
               id: raw.id,
               title: raw.title || existing?.title || 'New Chat',
-              activityDate: raw.updatedAt || raw.createdAt || existing?.activityDate || 'Recent',
+              activityDate:
+                formatActivityDate(raw.updatedAt || raw.createdAt) ||
+                existing?.activityDate ||
+                'Recent',
               projectId: raw.projectId || existing?.projectId,
               messages,
               model: raw.model ? mapApiToModel(raw.model) : existing?.model || 'puku-ai-2.7',
+              updatedAtTimestamp: ts,
             };
           });
 
@@ -524,6 +547,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               merged.push(localConv);
             }
           }
+
+          // Sort chronologically (newest conversation first)
+          merged.sort((a, b) => (b.updatedAtTimestamp || 0) - (a.updatedAtTimestamp || 0));
+          AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(() => {});
           return merged;
         });
       }
@@ -541,18 +568,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (conv && (!conv.messages || conv.messages.length === 0) && !id.startsWith('conv_')) {
         try {
           const detail = await pukuApi.fetchConversation(id);
-          if (detail && Array.isArray(detail.messages)) {
-            const loadedMessages: ChatMessage[] = detail.messages.map((m: any) => ({
+          const rawMsgs = Array.isArray(detail?.messages)
+            ? detail.messages
+            : Array.isArray(detail)
+            ? detail
+            : [];
+          if (rawMsgs.length > 0) {
+            const loadedMessages: ChatMessage[] = rawMsgs.map((m: any) => ({
               id: m.id || String(Date.now() + Math.random()),
               role: m.role || 'assistant',
               content: m.content || '',
               model: m.model,
-              createdAt: m.createdAt || 'Recent',
+              createdAt: formatActivityDate(m.createdAt),
               blocks: m.blocks,
               attachments: m.attachments,
             }));
             setConversations(prev =>
-              prev.map(c => (c.id === id ? { ...c, messages: loadedMessages } : c))
+              prev.map(c =>
+                c.id === id
+                  ? {
+                      ...c,
+                      title: detail?.conversation?.title || c.title,
+                      model: detail?.conversation?.model
+                        ? mapApiToModel(detail.conversation.model)
+                        : c.model,
+                      messages: loadedMessages,
+                    }
+                  : c
+              )
             );
           }
         } catch {}
@@ -597,41 +640,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         model: modelToUse,
         createdAt: 'Just now',
       };
-      setIncognitoMessages(prev => [...prev, userMsg]);
+      const aiMsgId = 'incog_' + (Date.now() + 1);
+      const initialAiMsg: ChatMessage = {
+        id: aiMsgId,
+        role: 'assistant',
+        content: '',
+        model: modelToUse,
+        createdAt: 'Just now',
+      };
+      setIncognitoMessages(prev => [...prev, userMsg, initialAiMsg]);
       setIsGenerating(true);
+
+      let accumulatedText = '';
+      let rafPending = false;
+
+      const flushIncog = () => {
+        rafPending = false;
+        setIncognitoMessages(prev =>
+          prev.map(m => (m.id === aiMsgId ? { ...m, content: accumulatedText } : m))
+        );
+      };
+
+      const handleDelta = (delta: string) => {
+        accumulatedText += delta;
+        if (!rafPending) {
+          rafPending = true;
+          requestAnimationFrame(flushIncog);
+        }
+      };
 
       try {
         const response = await pukuApi.generateResponse(
           text,
           modelToUse,
           incognitoConversationId,
-          undefined,
+          handleDelta,
           true
         );
+        accumulatedText = response.text;
+        flushIncog();
+
         if (response.conversationId && response.conversationId !== incognitoConversationId) {
           setIncognitoConversationId(response.conversationId);
         }
-
-        const aiMsg: ChatMessage = {
-          id: 'incog_' + (Date.now() + 1),
-          role: 'assistant',
-          content: response.text,
-          model: modelToUse,
-          createdAt: 'Just now',
-        };
-        setIncognitoMessages(prev => [...prev, aiMsg]);
       } catch (err: any) {
         const errorMsg =
           err?.message ||
           'Failed to get response from Puku AI. Please check your connection or sign in again.';
-        const fallbackMsg: ChatMessage = {
-          id: 'incog_' + (Date.now() + 1),
-          role: 'assistant',
-          content: errorMsg,
-          model: modelToUse,
-          createdAt: 'Just now',
-        };
-        setIncognitoMessages(prev => [...prev, fallbackMsg]);
+        setIncognitoMessages(prev =>
+          prev.map(m =>
+            m.id === aiMsgId
+              ? {
+                  ...m,
+                  content: accumulatedText
+                    ? `${accumulatedText}\n\n[Error: ${errorMsg}]`
+                    : errorMsg,
+                }
+              : m
+          )
+        );
       } finally {
         setIsGenerating(false);
       }
@@ -646,6 +713,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: 'Just now',
     };
 
+    const aiMsgId = 'msg_' + (Date.now() + 1);
+    const initialAiMsg: ChatMessage = {
+      id: aiMsgId,
+      role: 'assistant',
+      content: '',
+      model: modelToUse,
+      createdAt: 'Just now',
+    };
+
     let targetConvId = activeConversationId;
 
     if (!targetConvId) {
@@ -655,7 +731,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activityDate: 'Just now',
         model: modelToUse,
         projectId: activeProjectId || undefined,
-        messages: [userMsg],
+        messages: [userMsg, initialAiMsg],
+        updatedAtTimestamp: Date.now(),
       };
       setConversations(prev => [newConv, ...prev]);
       targetConvId = newConv.id;
@@ -667,8 +744,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ? {
                 ...c,
                 model: modelToUse,
-                messages: [...c.messages, userMsg],
+                messages: [...c.messages, userMsg, initialAiMsg],
                 activityDate: 'Just now',
+                updatedAtTimestamp: Date.now(),
               }
             : c
         )
@@ -677,31 +755,66 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setIsGenerating(true);
 
-    try {
-      const response = await pukuApi.generateResponse(text, modelToUse, targetConvId);
-      const serverConvId = response.conversationId;
-      const aiMsg: ChatMessage = {
-        id: 'msg_' + (Date.now() + 1),
-        role: 'assistant',
-        content: response.text,
-        model: modelToUse,
-        createdAt: 'Just now',
-      };
+    let accumulatedText = '';
+    let rafPending = false;
 
+    const flushPersistent = () => {
+      rafPending = false;
+      setConversations(prev =>
+        prev.map(c => {
+          if (c.id === targetConvId) {
+            return {
+              ...c,
+              messages: c.messages.map(m =>
+                m.id === aiMsgId ? { ...m, content: accumulatedText } : m
+              ),
+            };
+          }
+          return c;
+        })
+      );
+    };
+
+    const handleDelta = (delta: string) => {
+      accumulatedText += delta;
+      if (!rafPending) {
+        rafPending = true;
+        requestAnimationFrame(flushPersistent);
+      }
+    };
+
+    try {
+      const response = await pukuApi.generateResponse(
+        text,
+        modelToUse,
+        targetConvId,
+        handleDelta
+      );
+      accumulatedText = response.text;
+      flushPersistent();
+
+      const serverConvId = response.conversationId;
       if (targetConvId) {
-        setConversations(prev =>
-          prev.map(c => {
+        setConversations(prev => {
+          const updated = prev.map(c => {
             if (c.id === targetConvId) {
               return {
                 ...c,
                 id: serverConvId || c.id,
                 model: modelToUse,
-                messages: [...c.messages, aiMsg],
+                activityDate: 'Just now',
+                updatedAtTimestamp: Date.now(),
+                messages: c.messages.map(m =>
+                  m.id === aiMsgId ? { ...m, content: response.text } : m
+                ),
               };
             }
             return c;
-          })
-        );
+          });
+          updated.sort((a, b) => (b.updatedAtTimestamp || 0) - (a.updatedAtTimestamp || 0));
+          return updated;
+        });
+
         if (serverConvId && serverConvId !== targetConvId) {
           setActiveConversationId(serverConvId);
         }
@@ -710,21 +823,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const errorMsg =
         err?.message ||
         'Failed to get response from Puku AI. Please check your connection or sign in again.';
-      const fallbackMsg: ChatMessage = {
-        id: 'msg_' + (Date.now() + 1),
-        role: 'assistant',
-        content: errorMsg,
-        model: modelToUse,
-        createdAt: 'Just now',
-      };
       if (targetConvId) {
         setConversations(prev =>
           prev.map(c =>
             c.id === targetConvId
               ? {
                   ...c,
-                  model: modelToUse,
-                  messages: [...c.messages, fallbackMsg],
+                  messages: c.messages.map(m =>
+                    m.id === aiMsgId
+                      ? {
+                          ...m,
+                          content: accumulatedText
+                            ? `${accumulatedText}\n\n[Error: ${errorMsg}]`
+                            : errorMsg,
+                        }
+                      : m
+                  ),
                 }
               : c
           )

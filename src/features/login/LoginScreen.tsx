@@ -151,7 +151,7 @@ function generateRandomString(length: number): string {
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { navigate, updateProfile } = useApp();
+  const { navigate, updateProfile, refreshConversations } = useApp();
 
   // SnackBar state matching Flutter's ScaffoldMessenger
   const [snackBarMessage, setSnackBarMessage] = useState<string | null>(null);
@@ -189,6 +189,7 @@ export function LoginScreen() {
         if (isLoggedOut === 'true') return;
         const validToken = await tokenManager.ensureValidToken();
         if (validToken) {
+          refreshConversations().catch(() => {});
           navigate('chat');
         }
       } catch {}
@@ -364,6 +365,7 @@ export function LoginScreen() {
           setIsOAuthWaiting(false);
 
           showSnackBar(authenticEmail ? `Signed in as ${authenticEmail}` : 'Google Sign-In successful!');
+          refreshConversations().catch(() => {});
           navigate('chat');
           return;
         }
@@ -539,6 +541,7 @@ export function LoginScreen() {
       setIsEmailSubmitting(false);
       setIsEmailModalOpen(false);
       showSnackBar(`Signed in as ${finalEmail}`);
+      refreshConversations().catch(() => {});
       navigate('chat');
     } catch (e: any) {
       setIsEmailSubmitting(false);

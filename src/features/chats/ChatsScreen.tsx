@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -18,6 +18,7 @@ import {
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { Conversation } from '../../types';
+import { formatActivityDate } from '../../utils/date';
 
 function formatModelName(model?: string): string {
   switch (model) {
@@ -49,6 +50,11 @@ export function ChatsScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Sync cloud conversations on screen mount so cross-device/past chats appear immediately
+  useEffect(() => {
+    refreshConversations().catch(() => {});
+  }, [refreshConversations]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -58,9 +64,21 @@ export function ChatsScreen() {
     }
   };
 
-  const filteredConversations = conversations.filter(c =>
-    c.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredConversations = normalizedQuery
+    ? conversations.filter(c => {
+        if (c.title && c.title.toLowerCase().includes(normalizedQuery)) return true;
+        if (
+          Array.isArray(c.messages) &&
+          c.messages.some(
+            m => m.content && m.content.toLowerCase().includes(normalizedQuery)
+          )
+        ) {
+          return true;
+        }
+        return false;
+      })
+    : conversations;
 
   const toggleSelection = (id: string) => {
     if (selectedIds.includes(id)) {
@@ -77,6 +95,7 @@ export function ChatsScreen() {
       toggleSelection(conv.id);
     } else {
       selectConversation(conv.id);
+      navigate('chat');
     }
   };
 
@@ -166,7 +185,9 @@ export function ChatsScreen() {
       {filteredConversations.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            No conversations yet
+            {searchQuery.trim().length > 0
+              ? 'No conversations found matching your search'
+              : 'No conversations yet'}
           </Text>
         </View>
       ) : (
@@ -218,7 +239,7 @@ export function ChatsScreen() {
                     {item.title}
                   </Text>
                   <Text style={[styles.chatDate, { color: theme.textMuted }]}>
-                    {item.activityDate} • {formatModelName(item.model)}
+                    {formatActivityDate(item.activityDate)} • {formatModelName(item.model)}
                   </Text>
                 </View>
               </TouchableOpacity>

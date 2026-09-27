@@ -30,7 +30,14 @@ export function AppDrawer() {
     navigate,
     selectConversation,
     startNewChat,
+    refreshConversations,
   } = useApp();
+
+  React.useEffect(() => {
+    if (isDrawerOpen && conversations.length === 0) {
+      refreshConversations().catch(() => {});
+    }
+  }, [isDrawerOpen, conversations.length, refreshConversations]);
 
   if (!isDrawerOpen) return null;
 
@@ -140,6 +147,7 @@ export function AppDrawer() {
                       onPress={() => {
                         selectConversation(conv.id);
                         setDrawerOpen(false);
+                        navigate('chat');
                       }}
                       style={styles.recentItem}>
                       <Text
