@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AppRoute,
@@ -14,6 +14,7 @@ import {
 } from '../types';
 import { darkTheme, lightTheme, ThemeColors } from '../theme/theme';
 import { pukuApi, mapModelToApi, mapApiToModel } from '../services/api';
+import { tokenManager } from '../services/tokenManager';
 import { extractJwtData } from '../utils/auth';
 
 interface AppContextValue {
@@ -38,6 +39,8 @@ interface AppContextValue {
   setSelectedModel: (m: ChatModelType) => void;
   isIncognito: boolean;
   setIncognito: (incognito: boolean) => void;
+  incognitoMessages: ChatMessage[];
+  clearIncognitoChat: () => void;
   // Projects
   projects: Project[];
   activeProject: Project | null;
@@ -120,6 +123,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [routeHistory, setRouteHistory] = useState<AppRoute[]>(['login']);
   const [routeParams, setRouteParams] = useState<any>(null);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
+  const [incognitoMessages, setIncognitoMessages] = useState<ChatMessage[]>([]);
+  const [incognitoConversationId, setIncognitoConversationId] = useState<string | null>(null);
+  const logoutRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    const unsub = tokenManager.onSessionExpired(() => {
+      logoutRef.current();
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     async function restoreSession() {
@@ -165,7 +178,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Standard: Fresh install or logged out requires user to sign in
-        if (isLoggedOut === 'true' || !savedToken) {
+        if (isLoggedOut === 'true') {
+          pukuApi.setAuthToken(null);
+          setProfile(initialProfile);
+          setConversations([]);
+          setActiveConversationId(null);
+          setActiveRoute('login');
+          setRouteHistory(['login']);
+          return;
+        }
+
+        // Validate or proactively refresh token
+        const validToken = await tokenManager.ensureValidToken();
+        const activeToken = validToken || savedToken;
+        if (!activeToken) {
           pukuApi.setAuthToken(null);
           setProfile(initialProfile);
           setConversations([]);
@@ -176,7 +202,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         // User is authenticated: restore session
-        pukuApi.setAuthToken(savedToken);
+        pukuApi.setAuthToken(activeToken);
 
         if (savedProfileStr) {
           try {
@@ -186,7 +212,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
           } catch {}
         } else {
-          const jwtData = extractJwtData(savedToken);
+          const jwtData = extractJwtData(activeToken);
           if (jwtData?.email) {
             setProfile(prev => ({
               ...prev,
@@ -251,7 +277,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }
   };
-  const [isIncognito, setIncognito] = useState(false);
+
+  const [isIncognito, setIsIncognito] = useState(false);
+
+  const clearIncognitoChat = () => {
+    if (incognitoConversationId) {
+      try {
+        pukuApi.deleteConversation?.(incognitoConversationId)?.catch?.(() => {});
+      } catch {}
+      setIncognitoConversationId(null);
+    }
+    setIncognitoMessages([]);
+  };
+
+  const setIncognito = (value: boolean) => {
+    setIsIncognito(value);
+    if (!value) {
+      clearIncognitoChat();
+    }
+  };
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [projects, setProjects] = useState<Project[]>(initialProjects);
@@ -317,6 +361,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const startNewChat = (projectId?: string) => {
+    if (isIncognito) {
+      clearIncognitoChat();
+      return;
+    }
     setActiveConversationId(null);
     setActiveProjectId(projectId || null);
     setActiveRoute('chat');
@@ -333,6 +381,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const sendMessage = async (text: string, modelOverride?: ChatModelType) => {
     if (!text.trim()) return;
     const modelToUse = modelOverride || selectedModel;
+
+    // Ephemeral Incognito / Temporary Chat handling
+    if (isIncognito) {
+      const userMsg: ChatMessage = {
+        id: 'incog_' + Date.now(),
+        role: 'user',
+        content: text,
+        model: modelToUse,
+        createdAt: 'Just now',
+      };
+      setIncognitoMessages(prev => [...prev, userMsg]);
+      setIsGenerating(true);
+
+      try {
+        const response = await pukuApi.generateResponse(
+          text,
+          modelToUse,
+          incognitoConversationId,
+          undefined,
+          true
+        );
+        if (response.conversationId && response.conversationId !== incognitoConversationId) {
+          setIncognitoConversationId(response.conversationId);
+        }
+
+        const aiMsg: ChatMessage = {
+          id: 'incog_' + (Date.now() + 1),
+          role: 'assistant',
+          content: response.text,
+          model: modelToUse,
+          createdAt: 'Just now',
+        };
+        setIncognitoMessages(prev => [...prev, aiMsg]);
+      } catch (err: any) {
+        const errorMsg =
+          err?.message ||
+          'Failed to get response from Puku AI. Please check your connection or sign in again.';
+        const fallbackMsg: ChatMessage = {
+          id: 'incog_' + (Date.now() + 1),
+          role: 'assistant',
+          content: errorMsg,
+          model: modelToUse,
+          createdAt: 'Just now',
+        };
+        setIncognitoMessages(prev => [...prev, fallbackMsg]);
+      } finally {
+        setIsGenerating(false);
+      }
+      return;
+    }
+
+    // Standard persistent conversation handling
     const userMsg: ChatMessage = {
       id: 'msg_' + Date.now(),
       role: 'user',
@@ -342,7 +442,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     let targetConvId = activeConversationId;
 
-    if (!targetConvId && !isIncognito) {
+    if (!targetConvId) {
       const newConv: Conversation = {
         id: 'conv_' + Date.now(),
         title: text.length > 30 ? text.slice(0, 30) + '...' : text,
@@ -354,7 +454,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setConversations(prev => [newConv, ...prev]);
       targetConvId = newConv.id;
       setActiveConversationId(targetConvId);
-    } else if (targetConvId && !isIncognito) {
+    } else {
       setConversations(prev =>
         prev.map(c =>
           c.id === targetConvId
@@ -382,7 +482,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createdAt: 'Just now',
       };
 
-      if (!isIncognito && targetConvId) {
+      if (targetConvId) {
         setConversations(prev =>
           prev.map(c => {
             if (c.id === targetConvId) {
@@ -411,7 +511,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         model: modelToUse,
         createdAt: 'Just now',
       };
-      if (!isIncognito && targetConvId) {
+      if (targetConvId) {
         setConversations(prev =>
           prev.map(c =>
             c.id === targetConvId
@@ -631,8 +731,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     pukuApi.setAuthToken(null);
+    tokenManager.clearTokens().catch(() => {});
+    clearIncognitoChat();
     AsyncStorage.setItem('@puku_is_logged_out', 'true').catch(() => {});
     AsyncStorage.removeItem('@puku_auth_token').catch(() => {});
+    AsyncStorage.removeItem('@puku_refresh_token').catch(() => {});
+    AsyncStorage.removeItem('@puku_token_expires_at').catch(() => {});
     AsyncStorage.removeItem('@puku_user_profile').catch(() => {});
     AsyncStorage.removeItem('@puku_conversations').catch(() => {});
     AsyncStorage.removeItem('@puku_active_route').catch(() => {});
@@ -645,6 +749,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveRoute('login');
     setRouteHistory(['login']);
   };
+  logoutRef.current = logout;
 
   return (
     <AppContext.Provider
@@ -669,6 +774,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSelectedModel,
         isIncognito,
         setIncognito,
+        incognitoMessages,
+        clearIncognitoChat,
         projects,
         activeProject,
         selectProject,

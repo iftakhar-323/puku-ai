@@ -1,12 +1,13 @@
 /**
  * Puku AI API Service
  * Handles live REST endpoints, SSE streaming, authentication headers,
- * and model routing for puku-ai-2.7, puku-ai-2.8, and opus-4.8.
+ * auto-refresh token recovery, and model routing for puku-ai-2.7, puku-ai-2.8, and opus-4.8.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatModelType } from '../types';
 import { ENV } from '../config/env';
+import { tokenManager, TOKEN_KEYS } from './tokenManager';
 
 export const API_CONFIG = {
   chatApiUrl: ENV.API_BASE_URL,
@@ -74,7 +75,12 @@ export class PukuApiService {
 
   async initAuthToken(): Promise<string | null> {
     try {
-      const stored = await AsyncStorage.getItem('@puku_auth_token');
+      const validToken = await tokenManager.ensureValidToken();
+      if (validToken) {
+        this.authToken = validToken;
+        return this.authToken;
+      }
+      const stored = await AsyncStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN);
       if (stored) {
         this.authToken = stored;
       }
@@ -87,9 +93,9 @@ export class PukuApiService {
   setAuthToken(token: string | null) {
     this.authToken = token;
     if (token) {
-      AsyncStorage.setItem('@puku_auth_token', token).catch(() => {});
+      tokenManager.saveTokens({ accessToken: token }).catch(() => {});
     } else {
-      AsyncStorage.removeItem('@puku_auth_token').catch(() => {});
+      tokenManager.clearTokens().catch(() => {});
     }
   }
 
@@ -101,7 +107,41 @@ export class PukuApiService {
     return this.baseUrl;
   }
 
-  // Check backend server health
+  getAuthToken(): string | null {
+    return this.authToken || tokenManager.getAccessTokenSync();
+  }
+
+  /**
+   * Authenticated fetch wrapper with automatic 401 token refresh & transparent retry.
+   */
+  async fetchWithAuth(url: string, options: RequestInit = {}, retryCount = 0): Promise<Response> {
+    let token = await tokenManager.ensureValidToken();
+    if (!token) {
+      token = this.authToken;
+    }
+
+    const headers = new Headers(options.headers || {});
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    const response = await fetch(url, { ...options, headers });
+
+    // If 401 Unauthorized, attempt refresh and retry once
+    if (response.status === 401 && retryCount === 0) {
+      try {
+        const refreshed = await tokenManager.refreshToken();
+        if (refreshed) {
+          this.authToken = refreshed;
+          return this.fetchWithAuth(url, options, retryCount + 1);
+        }
+      } catch {}
+    }
+
+    return response;
+  }
+
+  // Check backend server health (no auth required)
   async checkHealth(): Promise<HealthCheckResult | null> {
     try {
       const response = await fetch(`${this.baseUrl}/health`, {
@@ -117,14 +157,10 @@ export class PukuApiService {
 
   // Verify auth session
   async verifyAuth(): Promise<boolean> {
-    if (!this.authToken) return false;
     try {
-      const response = await fetch(`${this.baseUrl}/auth/verify`, {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/auth/verify`, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${this.authToken}`,
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
       });
       return response.ok;
     } catch {
@@ -134,14 +170,10 @@ export class PukuApiService {
 
   // Fetch conversations from server
   async fetchConversations(): Promise<any[]> {
-    if (!this.authToken) return [];
     try {
-      const response = await fetch(`${this.baseUrl}/v1/chat/conversations`, {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/conversations`, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${this.authToken}`,
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
       });
       if (!response.ok) return [];
       const json = await response.json();
@@ -153,15 +185,10 @@ export class PukuApiService {
 
   // Fetch single conversation details with messages
   async fetchConversation(id: string): Promise<any | null> {
-    const token = await this.initAuthToken();
-    if (!token) return null;
     try {
-      const response = await fetch(`${this.baseUrl}/v1/chat/conversations/${id}`, {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/conversations/${id}`, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
       });
       if (!response.ok) return null;
       return await response.json();
@@ -175,13 +202,10 @@ export class PukuApiService {
     id: string,
     updates: { model?: string; title?: string; projectId?: string | null; pinned?: boolean }
   ): Promise<boolean> {
-    const token = await this.initAuthToken();
-    if (!token) return false;
     try {
-      const response = await fetch(`${this.baseUrl}/v1/chat/conversations/${id}`, {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/conversations/${id}`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
@@ -199,14 +223,11 @@ export class PukuApiService {
     title?: string,
     projectId?: string
   ): Promise<string | null> {
-    const token = await this.initAuthToken();
-    if (!token) return null;
     try {
       const apiModel = mapModelToApi(model);
-      const response = await fetch(`${this.baseUrl}/v1/chat/conversations`, {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/conversations`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
@@ -224,23 +245,36 @@ export class PukuApiService {
     }
   }
 
-  getAuthToken(): string | null {
-    return this.authToken;
+  // Delete conversation from server
+  async deleteConversation(id: string): Promise<boolean> {
+    try {
+      const response = await this.fetchWithAuth(`${this.baseUrl}/v1/chat/conversations/${id}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
-  // Generate model response via authentic Puku AI cloud endpoints
+  // Generate model response via authentic Puku AI cloud endpoints with 401 recovery
   async generateResponse(
     prompt: string,
     model: ChatModelType,
     conversationId?: string | null,
-    onDelta?: (chunk: string) => void
+    onDelta?: (chunk: string) => void,
+    isIncognito?: boolean
   ): Promise<{
     text: string;
     thinking?: string;
     model: string;
     conversationId: string;
   }> {
-    const token = await this.initAuthToken();
+    let token = await tokenManager.ensureValidToken();
+    if (!token) {
+      token = await this.initAuthToken();
+    }
     if (!token) {
       throw new Error('Authentication required. Please sign in to chat with Puku AI.');
     }
@@ -248,9 +282,11 @@ export class PukuApiService {
     let realConvId = conversationId;
     const apiModel = mapModelToApi(model);
 
-    // If no conversationId or if it is a local client ID, create real conversation on server first
-    if (!realConvId || realConvId.startsWith('conv_')) {
-      const title = prompt.trim().slice(0, 40) || 'New chat';
+    // If no conversationId or if it is a local temporary ID, create conversation on server
+    if (!realConvId || realConvId.startsWith('conv_') || realConvId.startsWith('incog_')) {
+      const title = isIncognito
+        ? 'Incognito'
+        : prompt.trim().slice(0, 40) || 'New chat';
       realConvId = await this.createConversation(model, title);
     } else {
       // Ensure backend conversation model is updated to selected model before sending message
@@ -261,24 +297,61 @@ export class PukuApiService {
       throw new Error('Failed to create or access conversation on server.');
     }
 
-    // Call /v1/chat/conversations/{id}/messages with explicit model
-    const response = await fetch(
-      `${this.baseUrl}/v1/chat/conversations/${realConvId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream, application/json',
-        },
-        body: JSON.stringify({
-          action: 'send',
-          content: prompt,
-          model: apiModel,
-          attachments: [],
-        }),
+    // Helper to send message request with a specific bearer token
+    const sendMessageRequest = async (bearerToken: string) => {
+      return fetch(
+        `${this.baseUrl}/v1/chat/conversations/${realConvId}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${bearerToken}`,
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream, application/json',
+          },
+          body: JSON.stringify({
+            action: 'send',
+            content: prompt,
+            model: apiModel,
+            attachments: [],
+          }),
+        }
+      );
+    };
+
+    let response = await sendMessageRequest(token);
+
+    // 401 / Token Expired recovery
+    if (!response.ok) {
+      let isTokenExpired = response.status === 401;
+      let errBody: any = null;
+
+      try {
+        const cloned = response.clone();
+        errBody = await cloned.json().catch(() => null);
+        const errMsg = (errBody?.error?.message || errBody?.message || '').toLowerCase();
+        if (
+          errMsg.includes('invalid or expired') ||
+          errMsg.includes('expired token') ||
+          errBody?.error?.code === 'invalid_token'
+        ) {
+          isTokenExpired = true;
+        }
+      } catch {}
+
+      if (isTokenExpired) {
+        try {
+          const refreshedToken = await tokenManager.refreshToken();
+          if (refreshedToken) {
+            token = refreshedToken;
+            this.authToken = refreshedToken;
+            // Retry the message request immediately with the refreshed access token
+            response = await sendMessageRequest(refreshedToken);
+          }
+        } catch {
+          // If refresh permanently failed, tokenManager notified session expired
+        }
       }
-    );
+    }
 
     if (!response.ok) {
       const errJson = await response.json().catch(() => null);
@@ -337,4 +410,3 @@ export class PukuApiService {
 }
 
 export const pukuApi = new PukuApiService();
-

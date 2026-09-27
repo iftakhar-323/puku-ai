@@ -28,6 +28,7 @@ import {
   PukuLogoIcon,
 } from '../../components/common/Icons';
 import { pukuApi } from '../../services/api';
+import { tokenManager } from '../../services/tokenManager';
 import { useApp } from '../../store/AppContext';
 import { AppColors } from '../../theme/colors';
 import { ENV } from '../../config/env';
@@ -184,11 +185,10 @@ export function LoginScreen() {
   useEffect(() => {
     async function checkExistingSession() {
       try {
-        const [token, isLoggedOut] = await Promise.all([
-          AsyncStorage.getItem('@puku_auth_token'),
-          AsyncStorage.getItem('@puku_is_logged_out'),
-        ]);
-        if (token && isLoggedOut !== 'true') {
+        const isLoggedOut = await AsyncStorage.getItem('@puku_is_logged_out');
+        if (isLoggedOut === 'true') return;
+        const validToken = await tokenManager.ensureValidToken();
+        if (validToken) {
           navigate('chat');
         }
       } catch {}
@@ -282,13 +282,21 @@ export function LoginScreen() {
         const accessToken = json.access_token || json.accessToken;
         const idToken = json.id_token || json.idToken;
         const refreshToken = json.refresh_token || json.refreshToken;
+        const rawExpiresIn = json.expires_in || json.expiresIn;
+        const expiresIn =
+          typeof rawExpiresIn === 'number'
+            ? rawExpiresIn
+            : rawExpiresIn
+            ? parseInt(rawExpiresIn, 10)
+            : undefined;
 
         if (accessToken) {
+          await tokenManager.saveTokens({
+            accessToken,
+            refreshToken,
+            expiresIn,
+          });
           pukuApi.setAuthToken(accessToken);
-          await AsyncStorage.setItem('@puku_auth_token', accessToken);
-          if (refreshToken) {
-            await AsyncStorage.setItem('@puku_refresh_token', refreshToken);
-          }
 
           // Extract authentic user credentials from token and server
           let authenticEmail = '';
@@ -514,6 +522,9 @@ export function LoginScreen() {
         return;
       }
 
+      await tokenManager.saveTokens({
+        accessToken: activeToken,
+      });
       pukuApi.setAuthToken(activeToken);
       updateProfile({
         name: finalName,

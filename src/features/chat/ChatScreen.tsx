@@ -44,6 +44,7 @@ export function ChatScreen() {
     setIncognito,
     setDrawerOpen,
     navigate,
+    incognitoMessages,
   } = useApp();
 
   const [inputVal, setInputVal] = useState('');
@@ -52,7 +53,8 @@ export function ChatScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const messages = activeConversation?.messages || [];
+  const activeMessages = activeConversation?.messages || [];
+  const messages = isIncognito ? incognitoMessages : activeMessages;
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -105,12 +107,12 @@ export function ChatScreen() {
 
       {/* Main Body */}
       <View style={styles.body}>
-        {isIncognito ? (
+        {isIncognito && messages.length === 0 ? (
           <ChatIncognitoView
             theme={theme}
             onLearnMoreTap={() => setIncognito(false)}
           />
-        ) : messages.length === 0 ? (
+        ) : !isIncognito && messages.length === 0 ? (
           <ChatEmptyState theme={theme} />
         ) : (
           <FlatList
