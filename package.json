@@ -10,6 +10,7 @@
     "test": "jest",
     "type-check": "tsc --noEmit",
     "bundle:android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --reset-cache",
+    "bundle:ios": "react-native bundle --platform ios --dev false --entry-file index.js --bundle-output ios/main.jsbundle --assets-dest ios --reset-cache",
     "build:android": "npm run bundle:android && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {

@@ -1,0 +1,60 @@
+name: iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'ios/**'
+      - 'src/**'
+      - 'package.json'
+      - 'index.js'
+
+jobs:
+  build:
+    name: Build iOS App
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci || npm install
+
+      - name: Bundle iOS JavaScript
+        run: npm run bundle:ios
+
+      - name: Install CocoaPods
+        working-directory: ios
+        run: |
+          pod install
+
+      - name: Build iOS Application (Simulator & Device Archive)
+        working-directory: ios
+        run: |
+          xcodebuild -workspace PukuAI.xcworkspace \
+            -scheme PukuAI \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: Package iOS Simulator App (.app.zip)
+        run: |
+          cd ios/build/Build/Products/Release-iphonesimulator
+          zip -r PukuAI-iOS.app.zip PukuAI.app
+          mv PukuAI-iOS.app.zip $GITHUB_WORKSPACE/
+
+      - name: Upload iOS Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: puku-ai-ios-release
+          path: PukuAI-iOS.app.zip
