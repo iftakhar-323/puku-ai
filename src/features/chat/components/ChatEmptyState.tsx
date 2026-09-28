@@ -1,12 +1,13 @@
 import React from 'react';
 import {
+  Image,
   Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ArrowUpRightIcon, RetroPukuComputer } from '../../../components/common/Icons';
+import { ArrowUpRightIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import { Conversation } from '../../../types';
 import { formatActivityDate } from '../../../utils/date';
@@ -66,7 +67,7 @@ export function ChatEmptyState({
 
   return (
     <View style={styles.container}>
-      {/* Hero Header with Retro Computer Illustration */}
+      {/* Hero Header with Authentic Retro Computer & PUKU ASCII Screen */}
       <View style={styles.heroRow}>
         <View style={styles.headlineWrapper}>
           <Text style={[styles.headlineText, { color: theme.textPrimary }]}>
@@ -74,7 +75,11 @@ export function ChatEmptyState({
           </Text>
         </View>
         <View style={styles.computerWrapper}>
-          <RetroPukuComputer width={110} height={100} />
+          <Image
+            source={require('../../../../assets/images/retro_puku_computer.png')}
+            style={styles.computerImage}
+            resizeMode="contain"
+          />
         </View>
       </View>
 
@@ -144,6 +149,10 @@ const styles = StyleSheet.create({
   computerWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  computerImage: {
+    width: 120,
+    height: 112,
   },
   recentsSection: {
     marginTop: 8,
