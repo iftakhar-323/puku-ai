@@ -29,8 +29,13 @@ function MainNavigator(): React.JSX.Element {
   const { activeRoute, isDark } = useApp();
 
   useEffect(() => {
-    UpdateService.checkForUpdates();
+    try {
+      UpdateService.checkForUpdates().catch(() => {});
+    } catch {
+      // Ignored
+    }
   }, []);
+
 
 
   const renderScreen = () => {

@@ -1,18 +1,35 @@
-import * as Updates from 'expo-updates';
 import { Alert, Platform } from 'react-native';
+
+// Safe lazy loading of expo-updates to prevent native bridge crash on pure React Native launch
+function getUpdatesModule() {
+  try {
+    const mod = require('expo-updates');
+    if (mod && mod.checkForUpdateAsync) {
+      return mod;
+    }
+  } catch (e) {
+    // Native module not linked or not available
+  }
+  return null;
+}
 
 export class UpdateService {
   /**
    * Check for Over-The-Air (OTA) updates on app launch
    */
   static async checkForUpdates(autoReload = false): Promise<boolean> {
-    if (__DEV__ || Platform.OS === 'web') {
-      return false;
-    }
-
     try {
+      if (__DEV__ || Platform.OS === 'web') {
+        return false;
+      }
+
+      const Updates = getUpdatesModule();
+      if (!Updates) {
+        return false;
+      }
+
       const update = await Updates.checkForUpdateAsync();
-      if (update.isAvailable) {
+      if (update && update.isAvailable) {
         await Updates.fetchUpdateAsync();
 
         if (autoReload) {
@@ -39,7 +56,7 @@ export class UpdateService {
         return true;
       }
     } catch (error) {
-      console.log('[UpdateService] Update check bypassed (dev or unconfigured):', error);
+      console.log('[UpdateService] Update check bypassed:', error);
     }
     return false;
   }
@@ -49,8 +66,14 @@ export class UpdateService {
    */
   static async manualCheckForUpdate(): Promise<boolean> {
     try {
+      const Updates = getUpdatesModule();
+      if (!Updates) {
+        Alert.alert('Notice', 'Over-The-Air updates are only enabled in release builds.');
+        return false;
+      }
+
       const update = await Updates.checkForUpdateAsync();
-      if (update.isAvailable) {
+      if (update && update.isAvailable) {
         await Updates.fetchUpdateAsync();
         Alert.alert(
           'Update Ready',
@@ -74,6 +97,15 @@ export class UpdateService {
    * Get current update info
    */
   static getUpdateInfo() {
+    const Updates = getUpdatesModule();
+    if (!Updates) {
+      return {
+        channel: 'production',
+        updateId: null,
+        runtimeVersion: '1.0.0',
+        isEmbeddedLaunch: true,
+      };
+    }
     return {
       channel: Updates.channel,
       updateId: Updates.updateId,

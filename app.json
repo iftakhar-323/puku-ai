@@ -1,4 +1,6 @@
 {
+  "name": "PukuAI",
+  "displayName": "Puku AI",
   "expo": {
     "name": "Puku AI",
     "slug": "puku-ai",
