@@ -576,12 +576,19 @@ export function LoginScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      {/* 1. Top Header: Logo + 'puku' */}
+      {/* 1. Top Header: Logo + 'puku' + 'About Puku ↗' */}
       <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 12) }]}>
         <View style={styles.brandRow}>
           <PukuLogoIcon size={26} />
           <Text style={[styles.brandLogoText, { fontFamily: monoFont }]}>puku</Text>
         </View>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => Linking.openURL('https://puku.sh/')}
+          style={styles.aboutPukuBtn}>
+          <Text style={[styles.aboutPukuText, { fontFamily: monoFont }]}>About Puku ↗</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -612,10 +619,6 @@ export function LoginScreen() {
           activeOpacity={0.85}
           disabled={isGoogleLoading}
           onPress={handleGoogleSignIn}
-          onLongPress={() => {
-            setEmailErrorMessage(null);
-            setIsEmailModalOpen(true);
-          }}
           style={styles.primarySignInBtn}>
           {isGoogleLoading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
@@ -624,6 +627,41 @@ export function LoginScreen() {
               Sign in to Puku ↗
             </Text>
           )}
+        </TouchableOpacity>
+
+        {/* 5. Legal Notice matching screenshot */}
+        <Text style={[styles.legalBase, { fontFamily: monoFont }]}>
+          By continuing, you acknowledge Puku's{' '}
+          <Text
+            onPress={() => Linking.openURL('https://puku.sh/privacy')}
+            style={styles.legalLink}>
+            Privacy Policy
+          </Text>
+          .
+        </Text>
+
+        {/* 6. Developer Token or Email Option */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            setEmailErrorMessage(null);
+            setIsEmailModalOpen(true);
+          }}
+          style={styles.devTokenOptionBtn}>
+          <Text style={[styles.devTokenOptionText, { fontFamily: monoFont }]}>
+            Sign in with Puku Token or Email
+          </Text>
+        </TouchableOpacity>
+
+        {/* 7. Bottom Local Chat Link with Download Icon */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => showSnackBar('Puku local runtime ready')}
+          style={styles.getLocallyRow}>
+          <DownloadIcon size={16} color="#6F736D" />
+          <Text style={[styles.getLocallyText, { fontFamily: monoFont }]}>
+            Get Puku chat locally
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -902,8 +940,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retroComputerImage: {
-    width: 240,
-    height: 230,
+    width: 220,
+    height: 190,
   },
   heroSection: {
     marginBottom: 28,

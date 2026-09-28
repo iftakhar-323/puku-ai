@@ -31,9 +31,10 @@
     },
     "updates": {
       "enabled": true,
-      "checkAutomatically": "ON_LOAD",
+      "checkAutomatically": "ALWAYS",
       "fallbackToCacheTimeout": 5000,
-      "url": "https://u.expo.dev/4b79ef0a-57a2-4e38-8e45-a7faa9589749"
+      "url": "https://u.expo.dev/4b79ef0a-57a2-4e38-8e45-a7faa9589749",
+      "channel": "main"
     },
     "runtimeVersion": "1.0.0",
     "plugins": [
