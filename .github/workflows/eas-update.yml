@@ -37,5 +37,5 @@ jobs:
 
       - name: Publish EAS Update
         run: |
-          eas update --branch main --channel main --non-interactive --message "OTA instant release: keyboard, edit prompt & previous history fixes"
+          eas update --channel main --non-interactive --message "OTA instant release: keyboard, edit prompt & previous history fixes"
 
