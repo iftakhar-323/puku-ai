@@ -6,6 +6,9 @@ on:
     branches: [ main ]
     paths:
       - 'android/**'
+      - 'react-native.config.js'
+      - 'package.json'
+
 
 jobs:
   build:

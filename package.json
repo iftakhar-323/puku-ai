@@ -24,6 +24,7 @@
     "@react-native/new-app-screen": "0.87.1",
     "cmdk": "^1.1.1",
     "expo": "^57.0.25",
+    "expo-modules-core": "~57.0.19",
     "expo-updates": "~57.0.23",
     "react": "19.2.3",
     "react-dom": "19.2.3",
