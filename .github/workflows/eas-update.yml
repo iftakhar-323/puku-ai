@@ -4,16 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'app.json'
-      - 'eas.json'
-      - 'metro.config.js'
-      - 'patches/**'
-      - 'index.js'
-      - 'assets/**'
-      - '.github/workflows/eas-update.yml'
 
 jobs:
   update:
