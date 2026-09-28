@@ -1,0 +1,55 @@
+diff --git a/node_modules/react-native/.gradle/9.2.0/checksums/checksums.lock b/node_modules/react-native/.gradle/9.2.0/checksums/checksums.lock
+new file mode 100644
+index 0000000..7060887
+Binary files /dev/null and b/node_modules/react-native/.gradle/9.2.0/checksums/checksums.lock differ
+diff --git a/node_modules/react-native/.gradle/9.2.0/checksums/md5-checksums.bin b/node_modules/react-native/.gradle/9.2.0/checksums/md5-checksums.bin
+new file mode 100644
+index 0000000..d377d52
+Binary files /dev/null and b/node_modules/react-native/.gradle/9.2.0/checksums/md5-checksums.bin differ
+diff --git a/node_modules/react-native/.gradle/9.2.0/checksums/sha1-checksums.bin b/node_modules/react-native/.gradle/9.2.0/checksums/sha1-checksums.bin
+new file mode 100644
+index 0000000..a26f655
+Binary files /dev/null and b/node_modules/react-native/.gradle/9.2.0/checksums/sha1-checksums.bin differ
+diff --git a/node_modules/react-native/.gradle/9.2.0/fileChanges/last-build.bin b/node_modules/react-native/.gradle/9.2.0/fileChanges/last-build.bin
+new file mode 100644
+index 0000000..f76dd23
+Binary files /dev/null and b/node_modules/react-native/.gradle/9.2.0/fileChanges/last-build.bin differ
+diff --git a/node_modules/react-native/.gradle/9.2.0/fileHashes/fileHashes.bin b/node_modules/react-native/.gradle/9.2.0/fileHashes/fileHashes.bin
+new file mode 100644
+index 0000000..1cc35c8
+Binary files /dev/null and b/node_modules/react-native/.gradle/9.2.0/fileHashes/fileHashes.bin differ
+diff --git a/node_modules/react-native/.gradle/9.2.0/fileHashes/fileHashes.lock b/node_modules/react-native/.gradle/9.2.0/fileHashes/fileHashes.lock
+new file mode 100644
+index 0000000..c77d029
+Binary files /dev/null and b/node_modules/react-native/.gradle/9.2.0/fileHashes/fileHashes.lock differ
+diff --git a/node_modules/react-native/.gradle/9.2.0/gc.properties b/node_modules/react-native/.gradle/9.2.0/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native/.gradle/buildOutputCleanup/buildOutputCleanup.lock b/node_modules/react-native/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+new file mode 100644
+index 0000000..29b4c25
+Binary files /dev/null and b/node_modules/react-native/.gradle/buildOutputCleanup/buildOutputCleanup.lock differ
+diff --git a/node_modules/react-native/.gradle/buildOutputCleanup/cache.properties b/node_modules/react-native/.gradle/buildOutputCleanup/cache.properties
+new file mode 100644
+index 0000000..50b207c
+--- /dev/null
++++ b/node_modules/react-native/.gradle/buildOutputCleanup/cache.properties
+@@ -0,0 +1,2 @@
++#Mon Sep 28 10:29:25 BDT 2026
++gradle.version=9.2.0
+diff --git a/node_modules/react-native/.gradle/vcs-1/gc.properties b/node_modules/react-native/.gradle/vcs-1/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native/rn-get-polyfills.js b/node_modules/react-native/rn-get-polyfills.js
+new file mode 100644
+index 0000000..75da6ec
+--- /dev/null
++++ b/node_modules/react-native/rn-get-polyfills.js
+@@ -0,0 +1,7 @@
++module.exports = () => {
++  try {
++    return require('@react-native/js-polyfills')();
++  } catch {
++    return [];
++  }
++};

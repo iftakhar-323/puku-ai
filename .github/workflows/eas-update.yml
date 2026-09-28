@@ -9,6 +9,8 @@ on:
       - 'package.json'
       - 'app.json'
       - 'eas.json'
+      - 'metro.config.js'
+      - 'patches/**'
       - 'index.js'
       - 'assets/**'
       - '.github/workflows/eas-update.yml'
@@ -17,6 +19,8 @@ jobs:
   update:
     name: Publish Instant App Update
     runs-on: ubuntu-latest
+    env:
+      CI: 1
 
     steps:
       - name: Checkout repository
