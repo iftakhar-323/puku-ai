@@ -4,10 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths:
-      - 'android/**'
-      - 'react-native.config.js'
-      - 'package.json'
 
 
 jobs:

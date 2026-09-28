@@ -31,6 +31,3 @@ export * from './Slider';
 export * from './Switch';
 export * from './Sidebar';
 
-// Puku Design System (@puku) exports
-export * from '../puku-ui/puku-tokens';
-export * from '../puku-ui/puku-theme';

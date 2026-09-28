@@ -1,16 +1,11 @@
-const { getDefaultConfig } = require('@expo/metro-config');
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
-const config = getDefaultConfig(__dirname);
+/**
+ * Metro configuration
+ * https://reactnative.dev/docs/metro
+ *
+ * @type {import('@react-native/metro-config').MetroConfig}
+ */
+const config = {};
 
-config.serializer = {
-  ...config.serializer,
-  getPolyfills: () => {
-    try {
-      return require('@react-native/js-polyfills')();
-    } catch {
-      return [];
-    }
-  },
-};
-
-module.exports = config;
+module.exports = mergeConfig(getDefaultConfig(__dirname), config);
