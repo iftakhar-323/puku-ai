@@ -37,9 +37,7 @@
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/4b79ef0a-57a2-4e38-8e45-a7faa9589749"
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "plugins": [
       "expo-updates"
     ],
