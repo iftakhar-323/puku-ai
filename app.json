@@ -9,7 +9,7 @@
     "newArchEnabled": true,
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#100D1D"
+      "backgroundColor": "#151614"
     },
     "ios": {
       "supportsTablet": true,
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#100D1D"
+        "backgroundColor": "#151614"
       },
       "package": "com.pukuai",
       "permissions": [
@@ -25,10 +25,20 @@
         "android.permission.INTERNET"
       ]
     },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "web": {
       "bundler": "metro"
     },
-    "plugins": []
+    "plugins": [
+      "expo-updates"
+    ]
   },
   "name": "PukuAI",
   "displayName": "Puku AI"
