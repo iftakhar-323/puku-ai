@@ -339,7 +339,7 @@ export function PukuBotScreen() {
                   Puku Bot is typing...
                 </Text>
               </View>
-            ) : null
+            ) : undefined
           }
         />
       )}

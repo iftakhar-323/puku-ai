@@ -25,11 +25,19 @@ import { UsageScreen } from './src/features/settings/UsageScreen';
 import { TranscribeScreen } from './src/features/transcribe/TranscribeScreen';
 import { AppProvider, useApp } from './src/store/AppContext';
 import { ToastProvider } from './src/components/ui/Toast';
-
-
+import { UpdateService } from './src/services/updateService';
 
 function MainNavigator(): React.JSX.Element {
   const { activeRoute, isDark } = useApp();
+
+  useEffect(() => {
+    try {
+      UpdateService.checkForUpdates().catch(() => {});
+    } catch {
+      // Ignored
+    }
+  }, []);
+
 
   const renderScreen = () => {
     switch (activeRoute) {

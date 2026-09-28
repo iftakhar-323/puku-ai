@@ -324,6 +324,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
                   return {
                     id: raw.id,
+                    title: raw.title || existing?.title || 'New Chat',
                     activityDate:
                       formatActivityDate(
                         raw.updated_at ||
@@ -642,6 +643,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
             return {
               id: raw.id,
+              title: raw.title || existing?.title || 'New Chat',
               activityDate:
                 formatActivityDate(
                   raw.updated_at ||

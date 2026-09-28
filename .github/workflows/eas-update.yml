@@ -1,0 +1,46 @@
+name: EAS Over-The-Air (OTA) Update
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'app.json'
+      - 'eas.json'
+      - 'index.js'
+      - 'assets/**'
+      - '.github/workflows/eas-update.yml'
+
+jobs:
+  update:
+    name: Publish Instant App Update
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Expo & EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Initialize EAS project if not linked
+        run: |
+          npx eas-cli init --account iftakhar-alam --non-interactive || true
+
+      - name: Publish EAS Update
+        run: |
+          npx eas-cli update --auto --non-interactive

@@ -1,0 +1,74 @@
+diff --git a/node_modules/expo-modules-core/android/cmake/main.cmake b/node_modules/expo-modules-core/android/cmake/main.cmake
+index 05fae2c..c80f980 100644
+--- a/node_modules/expo-modules-core/android/cmake/main.cmake
++++ b/node_modules/expo-modules-core/android/cmake/main.cmake
+@@ -35,6 +35,8 @@ target_include_directories(
+   ${REACT_NATIVE_INTERFACE_INCLUDE_DIRECTORIES}/react/fabric
+   # header only imports from jni, e.g. react/turbomodule/CallInvokerHolder.h
+   "${REACT_NATIVE_DIR}/ReactAndroid/src/main/jni"
++  "${REACT_NATIVE_DIR}/ReactCommon"
++  "${REACT_NATIVE_DIR}/ReactCommon/jserrorhandler"
+   "${ANDROID_SRC_DIR}/fabric"
+   "${COMMON_DIR}"
+   "${COMMON_DIR}/fabric"
+diff --git a/node_modules/expo-modules-core/common/cpp/EventEmitter.cpp b/node_modules/expo-modules-core/common/cpp/EventEmitter.cpp
+index a9d97d5..2e53d64 100644
+--- a/node_modules/expo-modules-core/common/cpp/EventEmitter.cpp
++++ b/node_modules/expo-modules-core/common/cpp/EventEmitter.cpp
+@@ -2,7 +2,10 @@
+ #include "EventEmitter.h"
+ #include "LazyObject.h"
+ 
+-#include <cxxreact/ErrorUtils.h>
++namespace facebook::react {
++void handleJSError(jsi::Runtime &runtime, const jsi::JSError &error, bool isFatal);
++}
++
+ 
+ namespace expo::EventEmitter {
+ 
+diff --git a/node_modules/expo-modules-core/expo-module-gradle-plugin/build.gradle.kts b/node_modules/expo-modules-core/expo-module-gradle-plugin/build.gradle.kts
+index 837bb4f..f1b07bc 100644
+--- a/node_modules/expo-modules-core/expo-module-gradle-plugin/build.gradle.kts
++++ b/node_modules/expo-modules-core/expo-module-gradle-plugin/build.gradle.kts
+@@ -3,10 +3,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+ 
+ plugins {
+-  kotlin("jvm") version "2.1.20"
++  kotlin("jvm") version "2.3.0"
+   id("java-gradle-plugin")
+ }
+ 
++
+ repositories {
+   google()
+   mavenCentral()
+diff --git a/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt b/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt
+index 9bfae8d..8245ab5 100644
+--- a/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt
++++ b/node_modules/expo-modules-core/expo-module-gradle-plugin/src/main/kotlin/expo/modules/plugin/android/AndroidLibraryExtension.kt
+@@ -6,18 +6,17 @@ internal fun LibraryExtension.applySDKVersions(compileSdk: Int, minSdk: Int, tar
+   this.compileSdk = compileSdk
+   defaultConfig {
+     this@defaultConfig.minSdk = minSdk
+-    this@defaultConfig.targetSdk = targetSdk
++  }
++  buildFeatures {
++    buildConfig = true
+   }
+ }
+ 
++
+ internal fun LibraryExtension.applyLinterOptions() {
+   lintOptions.isAbortOnError = false
+ }
+ 
+ internal fun LibraryExtension.applyPublishingVariant() {
+-  publishing { publishing ->
+-    publishing.singleVariant("release") {
+-      withSourcesJar()
+-    }
+-  }
++  // No-op for app builds
+ }
