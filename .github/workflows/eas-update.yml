@@ -8,8 +8,11 @@ on:
       - 'src/**'
       - 'package.json'
       - 'app.json'
+      - 'eas.json'
       - 'index.js'
       - 'assets/**'
+      - '.github/workflows/eas-update.yml'
+
 
 jobs:
   update:
