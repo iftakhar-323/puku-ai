@@ -32,7 +32,7 @@ function MainNavigator(): React.JSX.Element {
 
   useEffect(() => {
     try {
-      UpdateService.checkForUpdates().catch(() => {});
+      UpdateService.checkForUpdates(true).catch(() => {});
     } catch {
       // Ignored
     }
