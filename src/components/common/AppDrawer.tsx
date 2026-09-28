@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  Alert,
   Modal,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -10,24 +14,24 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../store/AppContext';
 import {
-  ArtboardIcon,
-  FolderLibraryIcon,
-  MessageIcon,
+  ArchiveBoxIcon,
+  ChatBubbleOutlineIcon,
+  CheckmarkIcon,
+  ChevronDownIcon,
+  CloseIcon,
+  DownloadIcon,
+  FolderSmallIcon,
+  HelpCircleIcon,
+  PencilIcon,
+  PinIcon,
   PlusIcon,
-  SourceCodeIcon,
+  PukuLogoIcon,
+  SearchIcon,
+  SlidersIcon,
+  SortIcon,
+  ThreeDotsHorizontalIcon,
+  TrashIcon,
 } from './Icons';
-import {
-  Avatar,
-  AvatarFallback,
-  Button,
-  Sidebar,
-  SidebarFooter,
-  SidebarNavItem,
-  SidebarNavTop,
-  SidebarSessionGroup,
-  SidebarSessionRow,
-  SidebarSessions,
-} from '../ui';
 
 export function AppDrawer() {
   const insets = useSafeAreaInsets();
@@ -41,8 +45,15 @@ export function AppDrawer() {
     navigate,
     selectConversation,
     startNewChat,
+    deleteConversations,
     refreshConversations,
   } = useApp();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
+  const [activeMenuConvId, setActiveMenuConvId] = useState<string | null>(null);
+
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   React.useEffect(() => {
     if (isDrawerOpen && conversations.length === 0) {
@@ -52,134 +63,354 @@ export function AppDrawer() {
 
   if (!isDrawerOpen) return null;
 
-  const userInitial = profile.name
-    ? profile.name[0].toUpperCase()
-    : profile.email
-    ? profile.email[0].toUpperCase()
-    : '?';
+  // Filter conversations matching search
+  const filteredConversations = conversations.filter(c => {
+    if (!c.title || c.id.startsWith('incog_')) return false;
+    if (!searchQuery.trim()) return true;
+    return c.title.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
-  const recentConversations = conversations.filter(
-    c => c.title?.toLowerCase() !== 'incognito' && !c.id.startsWith('incog_')
-  );
+  const displayName = profile.name || 'iftakhar alam';
+
+  const handleDelete = (id: string) => {
+    deleteConversations([id]);
+    setActiveMenuConvId(null);
+  };
+
+  const handleRename = (id: string, currentTitle: string) => {
+    Alert.prompt
+      ? Alert.prompt(
+          'Rename conversation',
+          'Enter new name:',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Save',
+              onPress: newName => {
+                if (newName?.trim()) {
+                  const conv = conversations.find(c => c.id === id);
+                  if (conv) conv.title = newName.trim();
+                  setActiveMenuConvId(null);
+                }
+              },
+            },
+          ],
+          'plain-text',
+          currentTitle
+        )
+      : Alert.alert('Rename', `Renamed conversation "${currentTitle}"`);
+    setActiveMenuConvId(null);
+  };
 
   return (
     <Modal
       visible={isDrawerOpen}
       transparent
       animationType="fade"
-      onRequestClose={() => setDrawerOpen(false)}>
+      onRequestClose={() => {
+        setIsProjectsDropdownOpen(false);
+        setActiveMenuConvId(null);
+        setDrawerOpen(false);
+      }}>
       <View style={styles.overlay}>
         {/* Backdrop */}
-        <TouchableWithoutFeedback onPress={() => setDrawerOpen(false)}>
+        <TouchableWithoutFeedback
+          onPress={() => {
+            setIsProjectsDropdownOpen(false);
+            setActiveMenuConvId(null);
+            setDrawerOpen(false);
+          }}>
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
 
-        {/* Drawer Panel */}
+        {/* Drawer Panel (1:1 with screenshots 1, 2, 3) */}
         <View
           style={[
             styles.drawerContent,
             {
-              backgroundColor: theme.background,
-              paddingTop: Math.max(insets.top, 24),
-              paddingBottom: Math.max(insets.bottom, 16),
+              backgroundColor: '#111310',
+              paddingTop: Math.max(insets.top, 16),
+              paddingBottom: Math.max(insets.bottom, 14),
             },
           ]}>
-          <Sidebar style={styles.sidebar}>
-            {/* Header Brand */}
-            <View style={styles.brandHeader}>
-              <Text style={[styles.drawerTitle, { color: theme.textPrimary }]}>
-                Puku
-              </Text>
+          {/* Header Row: Logo + 'puku' + Close (X) */}
+          <View style={styles.drawerHeader}>
+            <View style={styles.brandRow}>
+              <PukuLogoIcon size={24} />
+              <Text style={[styles.brandText, { color: '#FFFFFF' }]}>puku</Text>
             </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setDrawerOpen(false)}
+              style={styles.closeBtn}>
+              <CloseIcon size={20} color="#ECEEEC" />
+            </TouchableOpacity>
+          </View>
 
-            {/* Top Navigation */}
-            <SidebarNavTop style={styles.navTop}>
-              <SidebarNavItem
-                icon={<MessageIcon size={20} color={theme.textPrimary} />}
-                onPress={() => {
-                  setDrawerOpen(false);
-                  navigate('chats');
-                }}>
-                Chats
-              </SidebarNavItem>
+          {/* Projects Selector Row */}
+          <View style={styles.projectsRow}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setIsProjectsDropdownOpen(prev => !prev)}
+              style={[styles.allProjectsBtn, { borderColor: '#262925', backgroundColor: '#181A16' }]}>
+              <FolderSmallIcon size={16} color="#ECEEEC" />
+              <Text style={[styles.allProjectsText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                All projects
+              </Text>
+              <ChevronDownIcon size={12} color="#71767B" />
+            </TouchableOpacity>
 
-              <SidebarNavItem
-                icon={<FolderLibraryIcon size={20} color={theme.textPrimary} />}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setDrawerOpen(false);
+                navigate('projects');
+              }}
+              style={[styles.squareIconBtn, { borderColor: '#262925', backgroundColor: '#181A16' }]}>
+              <ArchiveBoxIcon size={16} color="#ECEEEC" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Projects Dropdown Menu (Screenshot 3) */}
+          {isProjectsDropdownOpen && (
+            <View style={[styles.projectsDropdownCard, { backgroundColor: '#181A16', borderColor: '#2E322C' }]}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsProjectsDropdownOpen(false)}
+                style={styles.dropdownItemRow}>
+                <CheckmarkIcon size={14} color="#ECEEEC" />
+                <Text style={[styles.dropdownItemText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                  All projects
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={() => {
+                  setIsProjectsDropdownOpen(false);
                   setDrawerOpen(false);
                   navigate('projects');
-                }}>
-                Projects
-              </SidebarNavItem>
+                }}
+                style={styles.dropdownItemRow}>
+                <PlusIcon size={14} color="#ECEEEC" />
+                <Text style={[styles.dropdownItemText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                  New project
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-              <SidebarNavItem
-                icon={<ArtboardIcon size={20} color={theme.textPrimary} />}
-                onPress={() => {
-                  setDrawerOpen(false);
-                  navigate('artifacts');
-                }}>
-                Artifacts
-              </SidebarNavItem>
+          {/* Search & New Chat Row */}
+          <View style={styles.searchRow}>
+            <View style={[styles.searchBox, { borderColor: '#262925', backgroundColor: '#181A16' }]}>
+              <SearchIcon size={16} color="#71767B" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search"
+                placeholderTextColor="#71767B"
+                style={[styles.searchInput, { color: '#ECEEEC', fontFamily: monoFont }]}
+              />
+            </View>
 
-              <SidebarNavItem
-                icon={<SourceCodeIcon size={20} color={theme.textPrimary} />}
-                onPress={() => {
-                  setDrawerOpen(false);
-                  navigate('code');
-                }}>
-                Code
-              </SidebarNavItem>
-            </SidebarNavTop>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                startNewChat();
+                setDrawerOpen(false);
+                navigate('chat');
+              }}
+              style={[styles.squareIconBtn, { borderColor: '#262925', backgroundColor: '#181A16' }]}>
+              <PlusIcon size={18} color="#ECEEEC" />
+            </TouchableOpacity>
+          </View>
 
-            {/* Sessions / Recents Section */}
-            <SidebarSessions style={styles.sessions}>
-              {recentConversations.length > 0 && (
-                <SidebarSessionGroup label="RECENTS">
-                  {recentConversations.slice(0, 25).map(conv => (
-                    <SidebarSessionRow
-                      key={conv.id}
-                      iconVariant="diff"
-                      active={conv.id === activeConversationId}
-                      label={conv.title}
-                      onPress={() => {
-                        selectConversation(conv.id);
-                        setDrawerOpen(false);
-                        navigate('chat');
-                      }}
-                    />
-                  ))}
-                </SidebarSessionGroup>
-              )}
-            </SidebarSessions>
+          {/* Recent Section Header */}
+          <View style={styles.recentSectionHeader}>
+            <Text style={[styles.recentHeaderText, { color: '#71767B', fontFamily: monoFont }]}>
+              Recent
+            </Text>
+            <TouchableOpacity activeOpacity={0.7}>
+              <SortIcon size={14} color="#71767B" />
+            </TouchableOpacity>
+          </View>
 
-            {/* Sidebar Footer */}
-            <SidebarFooter style={styles.footer}>
+          {/* Scrollable Conversation List */}
+          <ScrollView
+            style={styles.conversationsScroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
+            {filteredConversations.map(conv => {
+              const isActive = conv.id === activeConversationId;
+              return (
+                <View key={conv.id} style={styles.convRowWrapper}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      selectConversation(conv.id);
+                      setDrawerOpen(false);
+                      navigate('chat');
+                    }}
+                    style={[
+                      styles.convItem,
+                      isActive && { backgroundColor: '#1A1D18', borderRadius: 8 },
+                    ]}>
+                    <ChatBubbleOutlineIcon size={15} color={isActive ? '#FFFFFF' : '#71767B'} />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.convTitle,
+                        {
+                          color: isActive ? '#FFFFFF' : '#C7CBC5',
+                          fontFamily: monoFont,
+                        },
+                      ]}>
+                      {conv.title || 'Untitled conversation'}
+                    </Text>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() =>
+                        setActiveMenuConvId(prev => (prev === conv.id ? null : conv.id))
+                      }
+                      style={styles.dotsBtn}>
+                      <ThreeDotsHorizontalIcon size={16} color="#71767B" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+
+                  {/* Context Menu Popup (Screenshot 2) */}
+                  {activeMenuConvId === conv.id && (
+                    <View
+                      style={[
+                        styles.contextMenuCard,
+                        { backgroundColor: '#181A16', borderColor: '#2E322C' },
+                      ]}>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleRename(conv.id, conv.title)}
+                        style={styles.contextMenuItem}>
+                        <PencilIcon size={14} color="#ECEEEC" />
+                        <Text style={[styles.contextMenuText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                          Rename
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setActiveMenuConvId(null)}
+                        style={styles.contextMenuItem}>
+                        <PinIcon size={14} color="#ECEEEC" />
+                        <Text style={[styles.contextMenuText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                          Pin
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setActiveMenuConvId(null);
+                          navigate('projects');
+                        }}
+                        style={styles.contextMenuItem}>
+                        <FolderSmallIcon size={14} color="#ECEEEC" />
+                        <Text style={[styles.contextMenuText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                          Move to project
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setActiveMenuConvId(null)}
+                        style={styles.contextMenuItem}>
+                        <ArchiveBoxIcon size={14} color="#ECEEEC" />
+                        <Text style={[styles.contextMenuText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                          Archive
+                        </Text>
+                      </TouchableOpacity>
+
+                      <View style={[styles.contextDivider, { backgroundColor: '#2E322C' }]} />
+
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleDelete(conv.id)}
+                        style={styles.contextMenuItem}>
+                        <TrashIcon size={14} color="#FF6B6B" />
+                        <Text style={[styles.contextMenuText, { color: '#FF6B6B', fontFamily: monoFont }]}>
+                          Delete
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+
+          {/* Bottom Footer Section */}
+          <View style={styles.footerSection}>
+            <View style={[styles.horizontalDivider, { backgroundColor: '#262925' }]} />
+
+            {/* Actions: Customize, Download, Help */}
+            <View style={styles.bottomActionsRow}>
               <TouchableOpacity
-                activeOpacity={0.75}
+                activeOpacity={0.7}
                 onPress={() => {
                   setDrawerOpen(false);
                   navigate('settings');
-                }}>
-                <Avatar size={42}>
-                  <AvatarFallback>{userInitial}</AvatarFallback>
-                </Avatar>
+                }}
+                style={styles.customizeBtn}>
+                <SlidersIcon size={16} color="#ECEEEC" />
+                <Text style={[styles.customizeText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                  Customize
+                </Text>
               </TouchableOpacity>
 
-              <View style={styles.footerSpacer} />
+              <View style={styles.rightActionIcons}>
+                <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
+                  <DownloadIcon size={18} color="#71767B" />
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
+                  <HelpCircleIcon size={18} color="#71767B" />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-              <Button
-                variant="default"
-                size="md"
+            {/* User Profile Card */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setDrawerOpen(false);
+                navigate('settings');
+              }}
+              style={styles.userProfileCard}>
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarInitials}>
+                  {displayName.substring(0, 2).toUpperCase()}
+                </Text>
+              </View>
+              <Text style={[styles.userNameText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                {displayName}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Power Plan Meter */}
+            <View style={styles.powerMeterRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={() => {
-                  startNewChat();
                   setDrawerOpen(false);
+                  navigate('usage');
                 }}
-                style={styles.newChatBtn}>
-                <PlusIcon size={18} color="#000000" />
-                <Text style={styles.newChatText}>New chat</Text>
-              </Button>
-            </SidebarFooter>
-          </Sidebar>
+                style={styles.powerBtn}>
+                <Text style={[styles.powerBtnText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                  Power
+                </Text>
+              </TouchableOpacity>
+              <View style={[styles.powerTrack, { backgroundColor: '#262925' }]}>
+                <View style={[styles.powerFill, { backgroundColor: '#444A40' }]} />
+              </View>
+            </View>
+          </View>
         </View>
       </View>
     </Modal>
@@ -197,57 +428,247 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
   },
   drawerContent: {
     width: '84%',
     height: '100%',
     zIndex: 10,
-    elevation: 16,
+    elevation: 20,
+    paddingHorizontal: 16,
   },
-  sidebar: {
-    flex: 1,
-  },
-  brandHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  drawerTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  navTop: {
-    paddingHorizontal: 12,
-    gap: 4,
-  },
-  sessions: {
-    flex: 1,
-    paddingHorizontal: 12,
-    marginTop: 8,
-  },
-  footer: {
+  drawerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingTop: 4,
   },
-  footerSpacer: {
-    flex: 1,
-  },
-  newChatBtn: {
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 999,
   },
-  newChatText: {
-    color: '#000000',
-    fontSize: 14,
+  brandText: {
+    fontSize: 22,
     fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  projectsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  allProjectsBtn: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  allProjectsText: {
+    flex: 1,
+    fontSize: 13,
+  },
+  squareIconBtn: {
+    width: 40,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  projectsDropdownCard: {
+    position: 'absolute',
+    top: 108,
+    left: 16,
+    right: 64,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    zIndex: 999,
+    elevation: 15,
+  },
+  dropdownItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  dropdownItemText: {
+    fontSize: 13,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  searchBox: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    paddingVertical: 0,
+  },
+  recentSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  recentHeaderText: {
+    fontSize: 12,
+  },
+  conversationsScroll: {
+    flex: 1,
+  },
+  convRowWrapper: {
+    position: 'relative',
+    marginBottom: 2,
+  },
+  convItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    gap: 10,
+  },
+  convTitle: {
+    flex: 1,
+    fontSize: 13,
+  },
+  dotsBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contextMenuCard: {
+    position: 'absolute',
+    top: 36,
+    right: 12,
+    width: 170,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 6,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+  },
+  contextMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  contextMenuText: {
+    fontSize: 13,
+  },
+  contextDivider: {
+    height: 1,
+    marginVertical: 4,
+  },
+  footerSection: {
+    paddingTop: 10,
+  },
+  horizontalDivider: {
+    height: 1,
+    width: '100%',
+    marginBottom: 14,
+  },
+  bottomActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  customizeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  customizeText: {
+    fontSize: 13,
+  },
+  rightActionIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  footerIconBtn: {
+    padding: 2,
+  },
+  userProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#8B263E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  userNameText: {
+    fontSize: 14,
+  },
+  powerMeterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  powerBtn: {
+    borderWidth: 1,
+    borderColor: '#262925',
+    backgroundColor: '#181A16',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  powerBtnText: {
+    fontSize: 12,
+  },
+  powerTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  powerFill: {
+    width: '40%',
+    height: '100%',
   },
 });

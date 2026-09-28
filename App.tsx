@@ -20,6 +20,7 @@ import { ProjectDetailsScreen } from './src/features/projects/ProjectDetailsScre
 import { ProjectsScreen } from './src/features/projects/ProjectsScreen';
 import { RemoteSessionScreen } from './src/features/remote_session/RemoteSessionScreen';
 import { SettingsScreen } from './src/features/settings/SettingsScreen';
+import { UsageScreen } from './src/features/settings/UsageScreen';
 import { TranscribeScreen } from './src/features/transcribe/TranscribeScreen';
 import { AppProvider, useApp } from './src/store/AppContext';
 import { ToastProvider } from './src/components/ui/Toast';
@@ -50,9 +51,10 @@ function MainNavigator(): React.JSX.Element {
       case 'liveVoice':
         return <LiveVoiceScreen />;
       case 'settings':
-        return <SettingsScreen />;
       case 'profile':
         return <ProfileScreen />;
+      case 'usage':
+        return <UsageScreen />;
       case 'login':
         return <LoginScreen />;
       default:

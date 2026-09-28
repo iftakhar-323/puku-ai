@@ -138,4 +138,5 @@ export type AppRoute =
   | 'liveVoice'
   | 'settings'
   | 'profile'
+  | 'usage'
   | 'login';
