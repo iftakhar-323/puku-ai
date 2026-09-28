@@ -50,6 +50,8 @@ export function AppDrawer() {
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFindModalOpen, setIsFindModalOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
   const [activeMenuConvId, setActiveMenuConvId] = useState<string | null>(null);
 
@@ -68,6 +70,12 @@ export function AppDrawer() {
     if (!c.title || c.id.startsWith('incog_')) return false;
     if (!searchQuery.trim()) return true;
     return c.title.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const searchedConversations = conversations.filter(c => {
+    if (!c.title || c.id.startsWith('incog_')) return false;
+    if (!findQuery.trim()) return true;
+    return c.title.toLowerCase().includes(findQuery.toLowerCase());
   });
 
   const displayName = profile.name || 'iftakhar alam';
@@ -202,16 +210,18 @@ export function AppDrawer() {
 
           {/* Search & New Chat Row */}
           <View style={styles.searchRow}>
-            <View style={[styles.searchBox, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setFindQuery('');
+                setIsFindModalOpen(true);
+              }}
+              style={[styles.searchBox, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
               <SearchIcon size={16} color={theme.textMuted} />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search"
-                placeholderTextColor={theme.placeholderText}
-                style={[styles.searchInput, { color: theme.textPrimary, fontFamily: monoFont }]}
-              />
-            </View>
+              <Text style={[styles.searchInputPlaceholder, { color: theme.placeholderText, fontFamily: monoFont }]}>
+                Search
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.7}
@@ -413,6 +423,106 @@ export function AppDrawer() {
           </View>
         </View>
       </View>
+
+      {/* 1:1 Find a conversation Modal matching media_1790585790051.png */}
+      <Modal
+        visible={isFindModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsFindModalOpen(false)}>
+        <View style={styles.findModalBackdrop}>
+          <TouchableWithoutFeedback onPress={() => setIsFindModalOpen(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+
+          <View
+            style={[
+              styles.findModalCard,
+              {
+                backgroundColor: theme.cardBackground || '#FFFFFF',
+                borderColor: theme.border,
+              },
+            ]}>
+            {/* Header: Title + Close (X) */}
+            <View style={styles.findModalHeader}>
+              <Text
+                style={[
+                  styles.findModalTitle,
+                  { color: theme.textPrimary, fontFamily: monoFont },
+                ]}>
+                Find a conversation
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsFindModalOpen(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.findCloseBtn}>
+                <CloseIcon size={18} color={theme.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Indigo Outlined Search Input Box (highlighted in screenshot) */}
+            <View
+              style={[
+                styles.findInputWrapper,
+                { backgroundColor: theme.secondaryBackground },
+              ]}>
+              <SearchIcon size={16} color={theme.textMuted} />
+              <TextInput
+                value={findQuery}
+                onChangeText={setFindQuery}
+                placeholder="Search your thoughts..."
+                placeholderTextColor={theme.placeholderText}
+                autoFocus
+                style={[
+                  styles.findInputField,
+                  { color: theme.textPrimary, fontFamily: monoFont },
+                ]}
+              />
+            </View>
+
+            {/* Conversation List */}
+            <ScrollView
+              style={styles.findListScroll}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled">
+              {searchedConversations.length === 0 ? (
+                <View style={styles.findEmptyWrap}>
+                  <Text
+                    style={[
+                      styles.findEmptyText,
+                      { color: theme.textMuted, fontFamily: monoFont },
+                    ]}>
+                    No thoughts found
+                  </Text>
+                </View>
+              ) : (
+                searchedConversations.map(conv => (
+                  <TouchableOpacity
+                    key={conv.id}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      selectConversation(conv.id);
+                      setIsFindModalOpen(false);
+                      setDrawerOpen(false);
+                      navigate('chat');
+                    }}
+                    style={styles.findItemRow}>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.findItemText,
+                        { color: theme.textPrimary, fontFamily: monoFont },
+                      ]}>
+                      {conv.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -670,5 +780,76 @@ const styles = StyleSheet.create({
   powerFill: {
     width: '40%',
     height: '100%',
+  },
+  searchInputPlaceholder: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  findModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  findModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    maxHeight: '75%',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 12,
+  },
+  findModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  findModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  findCloseBtn: {
+    padding: 4,
+  },
+  findInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#4A54E8',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 10,
+    marginBottom: 14,
+  },
+  findInputField: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  findListScroll: {
+    maxHeight: 320,
+  },
+  findItemRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  findItemText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  findEmptyWrap: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  findEmptyText: {
+    fontSize: 13,
   },
 });

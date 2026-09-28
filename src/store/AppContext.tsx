@@ -29,6 +29,7 @@ interface AppContextValue {
   goBack: () => void;
   isDrawerOpen: boolean;
   setDrawerOpen: (open: boolean) => void;
+  isRestoringSession: boolean;
   // Chat
   conversations: Conversation[];
   activeConversation: Conversation | null;
@@ -133,6 +134,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [incognitoConversationId, setIncognitoConversationId] = useState<string | null>(null);
   const incognitoConversationIdRef = useRef<string | null>(null);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const logoutRef = useRef<() => void>(() => {});
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -406,6 +408,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to restore session from AsyncStorage', err);
         setActiveRoute('login');
         setRouteHistory(['login']);
+      } finally {
+        if (process.env.NODE_ENV === 'test') {
+          setIsRestoringSession(false);
+        } else {
+          setTimeout(() => {
+            setIsRestoringSession(false);
+          }, 350);
+        }
       }
     }
 
@@ -1382,6 +1392,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         goBack,
         isDrawerOpen,
         setDrawerOpen,
+        isRestoringSession,
         conversations,
         activeConversation,
         activeConversationId,

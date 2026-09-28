@@ -98,7 +98,7 @@ export function MessageBubble({
         <View
           style={[
             styles.assistantCard,
-            { backgroundColor: theme.assistantBubble },
+            { backgroundColor: !message.content ? 'transparent' : theme.assistantBubble },
           ]}>
           {!message.content ? (
             <TypingIndicator theme={theme} />

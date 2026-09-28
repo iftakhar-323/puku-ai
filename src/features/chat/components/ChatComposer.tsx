@@ -112,7 +112,7 @@ export function ChatComposer({
             setDropdownOpen(false);
             onFocus?.();
           }}
-          placeholder="A question, a thought, a wild idea..."
+          placeholder="Write a message..."
           placeholderTextColor={theme.placeholderText}
           multiline
           style={[
@@ -149,7 +149,7 @@ export function ChatComposer({
             </TouchableOpacity>
           </View>
 
-          {/* Right Group: Mic and Send ([↑]) */}
+          {/* Right Group: Mic and Send / Stop */}
           <View style={styles.rightGroup}>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -161,34 +161,42 @@ export function ChatComposer({
               <MicIcon size={18} color={isListening ? '#FF4D4F' : theme.textMuted} />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              disabled={isSending || !canSubmit}
-              onPress={() => {
-                setDropdownOpen(false);
-                onSubmitTap();
-              }}
-              style={[
-                styles.sendBtn,
-                {
-                  backgroundColor: canSubmit
-                    ? (theme.background === '#f1f0e9' ? '#D6D3C7' : '#363C34')
-                    : (theme.background === '#f1f0e9' ? '#E4E2D8' : '#222521'),
-                },
-              ]}>
-              {isSending ? (
-                <ActivityIndicator size="small" color={theme.textPrimary} />
-              ) : (
+            {isSending ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setDropdownOpen(false);
+                  onSubmitTap();
+                }}
+                style={styles.stopBtn}>
+                <View style={styles.stopSquare} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={!canSubmit}
+                onPress={() => {
+                  setDropdownOpen(false);
+                  onSubmitTap();
+                }}
+                style={[
+                  styles.sendBtn,
+                  {
+                    backgroundColor: canSubmit
+                      ? (theme.background === '#f1f0e9' || theme.background === '#F6F4EE' ? '#D6D3C7' : '#363C34')
+                      : (theme.background === '#f1f0e9' || theme.background === '#F6F4EE' ? '#E4E2D8' : '#222521'),
+                  },
+                ]}>
                 <UpArrowIcon
                   size={16}
                   color={
                     canSubmit
-                      ? (theme.background === '#f1f0e9' ? '#1A1D18' : '#FFFFFF')
-                      : (theme.background === '#f1f0e9' ? '#8E9287' : '#656A64')
+                      ? (theme.background === '#f1f0e9' || theme.background === '#F6F4EE' ? '#1A1D18' : '#FFFFFF')
+                      : (theme.background === '#f1f0e9' || theme.background === '#F6F4EE' ? '#8E9287' : '#656A64')
                   }
                 />
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -292,5 +300,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  stopBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#EED9D7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopSquare: {
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: '#9E2B2B',
   },
 });

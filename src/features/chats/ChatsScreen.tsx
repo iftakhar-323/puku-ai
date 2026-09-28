@@ -171,8 +171,8 @@ export function ChatsScreen() {
           ]}>
           <SearchIcon size={18} color={theme.placeholderText} />
           <TextInput
-            style={[styles.searchInput, { color: theme.textPrimary }]}
-            placeholder="Search Chats"
+            style={[styles.searchInput, { color: theme.textPrimary, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}
+            placeholder="Search your thoughts..."
             placeholderTextColor={theme.placeholderText}
             value={searchQuery}
             onChangeText={setSearchQuery}

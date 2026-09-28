@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { StatusBar } from 'react-native';
+import { Platform, StatusBar, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppDrawer } from './src/components/common/AppDrawer';
 import { ArtifactsScreen } from './src/features/artifacts/ArtifactsScreen';
@@ -28,7 +28,7 @@ import { ToastProvider } from './src/components/ui/Toast';
 import { UpdateService } from './src/services/updateService';
 
 function MainNavigator(): React.JSX.Element {
-  const { activeRoute, isDark } = useApp();
+  const { activeRoute, isDark, isRestoringSession } = useApp();
 
   useEffect(() => {
     try {
@@ -37,6 +37,29 @@ function MainNavigator(): React.JSX.Element {
       // Ignored
     }
   }, []);
+
+  if (isRestoringSession) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#F6F4EE',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F6F4EE" />
+        <Text
+          style={{
+            fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+            fontSize: 16,
+            color: '#1A1D18',
+            letterSpacing: -0.2,
+          }}>
+          Opening workspace...
+        </Text>
+      </View>
+    );
+  }
 
 
   const renderScreen = () => {

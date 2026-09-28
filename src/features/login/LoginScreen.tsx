@@ -20,7 +20,6 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'reac
 import {
   CheckmarkIcon,
   CloseIcon,
-  DownloadIcon,
   EmailIcon,
   EyeIcon,
   EyeOffIcon,
@@ -174,6 +173,9 @@ export function LoginScreen() {
   const [authVerifier, setAuthVerifier] = useState<string>('');
   const [authState, setAuthState] = useState<string>('');
   const [isOAuthWaiting, setIsOAuthWaiting] = useState(false);
+  const [isOpeningWorkspace, setIsOpeningWorkspace] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   // Helper to get normalized OAuth redirect URI
   const getOAuthRedirectUri = (): string => {
@@ -364,10 +366,14 @@ export function LoginScreen() {
           await AsyncStorage.removeItem('@puku_is_logged_out');
           setIsGoogleModalOpen(false);
           setIsOAuthWaiting(false);
+          setIsOpeningWorkspace(true);
 
           showSnackBar(authenticEmail ? `Signed in as ${authenticEmail}` : 'Google Sign-In successful!');
           refreshConversations().catch(() => {});
-          navigate('chat');
+          setTimeout(() => {
+            setIsOpeningWorkspace(false);
+            navigate('chat');
+          }, 1200);
           return;
         }
       }
@@ -541,21 +547,35 @@ export function LoginScreen() {
       await AsyncStorage.removeItem('@puku_is_logged_out');
       setIsEmailSubmitting(false);
       setIsEmailModalOpen(false);
+      setIsOpeningWorkspace(true);
       showSnackBar(`Signed in as ${finalEmail}`);
       refreshConversations().catch(() => {});
-      navigate('chat');
+      setTimeout(() => {
+        setIsOpeningWorkspace(false);
+        navigate('chat');
+      }, 1200);
     } catch (e: any) {
       setIsEmailSubmitting(false);
       setEmailErrorMessage(e.message || 'Login failed. Please verify credentials.');
     }
   };
 
-  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+  if (isOpeningWorkspace) {
+    return (
+      <View style={styles.workspaceLoadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F6F4EE" />
+        <Text style={[styles.workspaceLoadingText, { fontFamily: monoFont }]}>
+          Opening workspace...
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: '#F6F4EE' }]}>
-      {/* 1. Header Bar matching screenshot */}
-      <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 14) }]}>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F6F4EE" />
+      {/* 1. Top Header: Logo + 'puku' + 'About Puku ↗' */}
+      <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 12) }]}>
         <View style={styles.brandRow}>
           <PukuLogoIcon size={26} />
           <Text style={[styles.brandLogoText, { fontFamily: monoFont }]}>puku</Text>
@@ -563,18 +583,16 @@ export function LoginScreen() {
 
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => Linking.openURL('https://puku.ai')}
+          onPress={() => Linking.openURL('https://puku.sh/')}
           style={styles.aboutPukuBtn}>
-          <Text style={[styles.aboutPukuText, { fontFamily: monoFont }]}>
-            About Puku ↗
-          </Text>
+          <Text style={[styles.aboutPukuText, { fontFamily: monoFont }]}>About Puku ↗</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* 2. Retro Macintosh Computer Illustration */}
+        {/* 2. Retro Computer Illustration */}
         <View style={styles.retroComputerWrap}>
           <Image
             source={require('../../assets/images/retro_puku_computer.png')}
@@ -613,7 +631,7 @@ export function LoginScreen() {
         <Text style={[styles.legalBase, { fontFamily: monoFont }]}>
           By continuing, you acknowledge Puku's{' '}
           <Text
-            onPress={() => Linking.openURL('https://puku.ai/privacy')}
+            onPress={() => Linking.openURL('https://puku.sh/privacy')}
             style={styles.legalLink}>
             Privacy Policy
           </Text>
@@ -636,7 +654,7 @@ export function LoginScreen() {
         {/* 7. Bottom Local Chat Link with Download Icon */}
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => showSnackBar('Puku local runtime enabled')}
+          onPress={() => showSnackBar('Puku local runtime ready')}
           style={styles.getLocallyRow}>
           <DownloadIcon size={16} color="#6F736D" />
           <Text style={[styles.getLocallyText, { fontFamily: monoFont }]}>
@@ -867,6 +885,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F6F4EE',
+  },
+  workspaceLoadingContainer: {
+    flex: 1,
+    backgroundColor: '#F6F4EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workspaceLoadingText: {
+    fontSize: 16,
+    color: '#1A1D18',
+    letterSpacing: -0.2,
   },
   topHeader: {
     flexDirection: 'row',
