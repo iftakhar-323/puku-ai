@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,12 +13,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BotIcon,
+  CopyIcon,
   MoonIcon,
+  PencilIcon,
   SidebarToggleIcon,
   SunIcon,
   TerminalPromptIcon,
   UpArrowIcon,
 } from '../../components/common/Icons';
+import { NativeClipboard } from '../../services/nativeModules';
 import { useApp } from '../../store/AppContext';
 
 /**
@@ -60,9 +64,41 @@ export function PukuBotScreen() {
   const [messages, setMessages] = useState<BotMessage[]>([]);
   const [inputVal, setInputVal] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const inputRef = useRef<any>(null);
 
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setIsKeyboardVisible(true);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+      }
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const handleEditMessage = (text: string) => {
+    setInputVal(text);
+    inputRef.current?.focus();
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   const generatePukuBotResponse = (userPrompt: string, mode: BotMode): string => {
     const lower = userPrompt.toLowerCase();
@@ -135,7 +171,7 @@ export function PukuBotScreen() {
         {
           backgroundColor: theme.background,
           paddingTop: Math.max(insets.top, 12),
-          paddingBottom: Math.max(insets.bottom, 12),
+          paddingBottom: isKeyboardVisible ? 6 : Math.max(insets.bottom, 12),
         },
       ]}>
       {/* Authentic Header */}
@@ -296,52 +332,86 @@ export function PukuBotScreen() {
           </View>
         </View>
       ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => {
-            const isUser = item.role === 'user';
-            return (
-              <View
-                style={[
-                  styles.messageBubbleRow,
-                  isUser ? styles.userRow : styles.botRow,
-                ]}>
-                {!isUser && (
-                  <View style={[styles.botSmallAvatar, { backgroundColor: isDark ? '#262925' : '#E4E5DB' }]}>
-                    <BotIcon size={16} color={theme.textPrimary} />
-                  </View>
-                )}
+        <View style={styles.chatArea}>
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={item => item.id}
+            keyboardShouldPersistTaps="handled"
+            style={styles.flatList}
+            contentContainerStyle={[styles.listContent, { paddingBottom: 24 }]}
+            onLayout={() => {
+              if (messages.length > 0) {
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
+            onContentSizeChange={() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }}
+            renderItem={({ item }) => {
+              const isUser = item.role === 'user';
+              return (
                 <View
                   style={[
-                    styles.messageBubble,
-                    isUser
-                      ? [styles.userBubble, { backgroundColor: isDark ? '#22251F' : '#E8E7DF' }]
-                      : [styles.botBubble, { backgroundColor: theme.cardBackground, borderColor: theme.border }],
+                    styles.messageBubbleRow,
+                    isUser ? styles.userRow : styles.botRow,
                   ]}>
-                  <Text
-                    style={[
-                      styles.messageText,
-                      { color: theme.textPrimary, fontFamily: monoFont },
-                    ]}>
-                    {item.text}
+                  {!isUser && (
+                    <View style={[styles.botSmallAvatar, { backgroundColor: isDark ? '#262925' : '#E4E5DB' }]}>
+                      <BotIcon size={16} color={theme.textPrimary} />
+                    </View>
+                  )}
+                  <View style={{ maxWidth: '82%' }}>
+                    <TouchableOpacity
+                      activeOpacity={isUser ? 0.85 : 1}
+                      onLongPress={isUser ? () => handleEditMessage(item.text) : undefined}
+                      style={[
+                        styles.messageBubble,
+                        isUser
+                          ? [styles.userBubble, { backgroundColor: isDark ? '#22251F' : '#E8E7DF' }]
+                          : [styles.botBubble, { backgroundColor: theme.cardBackground, borderColor: theme.border }],
+                      ]}>
+                      <Text
+                        style={[
+                          styles.messageText,
+                          { color: theme.textPrimary, fontFamily: monoFont },
+                        ]}>
+                        {item.text}
+                      </Text>
+                    </TouchableOpacity>
+                    {isUser && (
+                      <View style={styles.botUserActionRow}>
+                        <TouchableOpacity
+                          activeOpacity={0.6}
+                          onPress={() => NativeClipboard.setString(item.text)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={styles.actionBtnSmall}>
+                          <CopyIcon size={14} color={theme.textMuted} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.6}
+                          onPress={() => handleEditMessage(item.text)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={[styles.actionBtnSmall, { marginLeft: 10 }]}>
+                          <PencilIcon size={14} color={theme.textMuted} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            }}
+            ListFooterComponent={
+              isTyping ? (
+                <View style={styles.typingIndicatorRow}>
+                  <Text style={[styles.typingText, { color: theme.textMuted, fontFamily: monoFont }]}>
+                    Puku Bot is typing...
                   </Text>
                 </View>
-              </View>
-            );
-          }}
-          ListFooterComponent={
-            isTyping ? (
-              <View style={styles.typingIndicatorRow}>
-                <Text style={[styles.typingText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                  Puku Bot is typing...
-                </Text>
-              </View>
-            ) : undefined
-          }
-        />
+              ) : undefined
+            }
+          />
+        </View>
       )}
 
       {/* Bottom Composer */}
@@ -354,6 +424,7 @@ export function PukuBotScreen() {
           },
         ]}>
         <TextInput
+          ref={inputRef}
           value={inputVal}
           onChangeText={setInputVal}
           placeholder="Ask Puku Bot anything (no filter)..."
@@ -561,13 +632,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
   },
+  chatArea: {
+    flex: 1,
+  },
+  flatList: {
+    flex: 1,
+  },
+  botUserActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  actionBtnSmall: {
+    padding: 4,
+  },
   composerCard: {
     marginHorizontal: 16,
-    marginTop: 8,
+    marginTop: 6,
+    marginBottom: 6,
     borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    flexShrink: 0,
   },
   composerInput: {
     fontSize: 14,

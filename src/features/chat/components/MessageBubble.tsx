@@ -19,6 +19,7 @@ interface MessageBubbleProps {
   onEditPrompt?: (text: string) => void;
   onRegenerate?: (messageId: string) => void;
   onBranch?: (messageId: string) => void;
+  isGenerating?: boolean;
 }
 
 export function MessageBubble({
@@ -27,6 +28,7 @@ export function MessageBubble({
   onEditPrompt,
   onRegenerate,
   onBranch,
+  isGenerating = false,
 }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isCopied, setIsCopied] = useState(false);
@@ -51,7 +53,9 @@ export function MessageBubble({
     return (
       <View style={styles.userWrapper}>
         <View style={styles.userRow}>
-          <View
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onLongPress={() => onEditPrompt?.(message.content)}
             style={[
               styles.userBubble,
               { backgroundColor: theme.userBubble },
@@ -59,7 +63,7 @@ export function MessageBubble({
             <Text style={[styles.userText, { color: theme.onUserBubble }]}>
               {message.content}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
         {!!message.content && (
           <View style={styles.userActionRow}>
@@ -76,7 +80,7 @@ export function MessageBubble({
               )}
             </TouchableOpacity>
 
-            {/* Edit button */}
+            {/* Edit and resend button */}
             {!!onEditPrompt && (
               <TouchableOpacity
                 activeOpacity={0.6}
@@ -92,19 +96,33 @@ export function MessageBubble({
     );
   }
 
+  // If assistant message has no content:
+  // ONLY show typing indicator ("Thinking...") if actively generating right now.
+  // Never show for past/historical messages.
+  if (!message.content || !message.content.trim()) {
+    if (isGenerating) {
+      return (
+        <View style={styles.assistantWrapper}>
+          <View style={styles.assistantRow}>
+            <View style={[styles.assistantCard, { backgroundColor: 'transparent' }]}>
+              <TypingIndicator theme={theme} />
+            </View>
+          </View>
+        </View>
+      );
+    }
+    return null;
+  }
+
   return (
     <View style={styles.assistantWrapper}>
       <View style={styles.assistantRow}>
         <View
           style={[
             styles.assistantCard,
-            { backgroundColor: !message.content ? 'transparent' : theme.assistantBubble },
+            { backgroundColor: theme.assistantBubble },
           ]}>
-          {!message.content ? (
-            <TypingIndicator theme={theme} />
-          ) : (
-            <MarkdownRenderer content={message.content} theme={theme} />
-          )}
+          <MarkdownRenderer content={message.content} theme={theme} />
         </View>
       </View>
       {!!message.content && (

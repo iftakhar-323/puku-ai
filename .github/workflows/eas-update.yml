@@ -33,8 +33,9 @@ jobs:
 
       - name: Initialize EAS project if not linked
         run: |
-          npx eas-cli init --account iftakhar-alam --non-interactive || true
+          eas init --account iftakhar-alam --non-interactive || true
 
       - name: Publish EAS Update
         run: |
-          npx eas-cli update --auto --non-interactive
+          eas update --branch main --channel main --non-interactive --message "OTA instant release: keyboard, edit prompt & previous history fixes"
+

@@ -635,15 +635,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             const rawMessages = Array.isArray(raw.messages) ? raw.messages : [];
             const messages =
               rawMessages.length > 0
-                ? rawMessages.map((m: any) => ({
-                    id: m.id || String(Date.now() + Math.random()),
-                    role: m.role || 'assistant',
-                    content: m.content || m.text || m.blocks?.[0]?.text || '',
-                    model: m.model,
-                    createdAt: formatActivityDate(m.createdAt),
-                    blocks: m.blocks,
-                    attachments: m.attachments,
-                  }))
+                ? rawMessages
+                    .map((m: any) => ({
+                      id: m.id || String(Date.now() + Math.random()),
+                      role: m.role || 'assistant',
+                      content: m.content || m.text || m.blocks?.[0]?.text || '',
+                      model: m.model,
+                      createdAt: formatActivityDate(m.createdAt),
+                      blocks: m.blocks,
+                      attachments: m.attachments,
+                    }))
+                    .filter((m: any) => m.role === 'user' || (m.content && m.content.trim().length > 0))
                 : existing?.messages || [];
 
             const ts =
@@ -719,15 +721,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : [];
 
         if (rawMsgs.length > 0) {
-          const loadedMessages: ChatMessage[] = rawMsgs.map((m: any) => ({
-            id: m.id || String(Date.now() + Math.random()),
-            role: m.role || 'assistant',
-            content: m.content || m.text || m.blocks?.[0]?.text || '',
-            model: m.model,
-            createdAt: formatActivityDate(m.createdAt),
-            blocks: m.blocks,
-            attachments: m.attachments,
-          }));
+          const loadedMessages: ChatMessage[] = rawMsgs
+            .map((m: any) => ({
+              id: m.id || String(Date.now() + Math.random()),
+              role: m.role || 'assistant',
+              content: m.content || m.text || m.blocks?.[0]?.text || '',
+              model: m.model,
+              createdAt: formatActivityDate(m.createdAt),
+              blocks: m.blocks,
+              attachments: m.attachments,
+            }))
+            .filter((m: any) => m.role === 'user' || (m.content && m.content.trim().length > 0));
 
           const detailConv = detail?.conversation || detail?.data?.conversation;
 

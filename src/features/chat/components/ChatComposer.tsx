@@ -32,6 +32,7 @@ interface ChatComposerProps {
   onPlusTap: () => void;
   onSubmitTap: () => void;
   onMicrophoneTap?: () => void;
+  inputRef?: any;
 }
 
 const AVAILABLE_MODELS: { id: ChatModelType; label: string; badge: string }[] = [
@@ -52,6 +53,7 @@ export function ChatComposer({
   onPlusTap,
   onSubmitTap,
   onMicrophoneTap,
+  inputRef,
 }: ChatComposerProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
@@ -106,6 +108,7 @@ export function ChatComposer({
         ]}>
         {/* Top Multiline Input */}
         <TextInput
+          ref={inputRef}
           value={inputVal}
           onChangeText={onChangeText}
           onFocus={() => {

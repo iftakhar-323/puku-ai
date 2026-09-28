@@ -7,6 +7,7 @@ import {
   Platform,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,9 +64,17 @@ export function ChatScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const inputRef = useRef<any>(null);
 
   const activeMessages = activeConversation?.messages || [];
-  const messages = isIncognito ? incognitoMessages : activeMessages;
+  const rawMessages = isIncognito ? incognitoMessages : activeMessages;
+  // Filter out any empty assistant messages from past/historical conversations
+  const messages = rawMessages.filter(
+    (m, idx) =>
+      m.role === 'user' ||
+      (m.content && m.content.trim().length > 0) ||
+      (isGenerating && idx === rawMessages.length - 1)
+  );
 
   // Automatically scroll to the latest message whenever entering/loading a chat
   useEffect(() => {
@@ -157,16 +166,35 @@ export function ChatScreen() {
     setInputVal('');
   };
 
+  const handleEditPrompt = (text: string) => {
+    setInputVal(text);
+    inputRef.current?.focus();
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
+  const handleRegenerate = (messageId: string) => {
+    if (isGenerating) return;
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index > 0) {
+      const userMsg = messages[index - 1];
+      if (userMsg && userMsg.role === 'user' && userMsg.content) {
+        sendMessage(userMsg.content);
+      }
+    }
+  };
+
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       style={[
         styles.container,
         {
           backgroundColor: theme.background,
           paddingTop: Math.max(insets.top, 12),
-          paddingBottom: isKeyboardVisible ? 4 : Math.max(insets.bottom, 12),
+          paddingBottom: isKeyboardVisible ? 6 : Math.max(insets.bottom, 12),
         },
       ]}>
       {/* 1:1 Authentic Header with SidebarToggle, Terminal, Bot, and Theme toggle */}
@@ -220,8 +248,14 @@ export function ChatScreen() {
             onContentSizeChange={() =>
               flatListRef.current?.scrollToEnd({ animated: isGenerating })
             }
-            renderItem={({ item }) => (
-              <MessageBubble message={item} theme={theme} />
+            renderItem={({ item, index }) => (
+              <MessageBubble
+                message={item}
+                theme={theme}
+                isGenerating={isGenerating && index === messages.length - 1}
+                onEditPrompt={handleEditPrompt}
+                onRegenerate={handleRegenerate}
+              />
             )}
             ListFooterComponent={
               isGenerating &&
@@ -236,6 +270,7 @@ export function ChatScreen() {
 
       {/* 1:1 Authentic Composer with Dropdown */}
       <ChatComposer
+        inputRef={inputRef}
         theme={theme}
         inputVal={inputVal}
         onChangeText={setInputVal}
@@ -302,6 +337,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContent: {
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 28,
   },
 });
