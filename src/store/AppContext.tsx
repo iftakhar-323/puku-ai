@@ -409,7 +409,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setActiveRoute('login');
         setRouteHistory(['login']);
       } finally {
-        if (process.env.NODE_ENV === 'test') {
+        if (typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test') {
           setIsRestoringSession(false);
         } else {
           setTimeout(() => {

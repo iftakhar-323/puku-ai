@@ -8,6 +8,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +21,7 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'reac
 import {
   CheckmarkIcon,
   CloseIcon,
+  DownloadIcon,
   EmailIcon,
   EyeIcon,
   EyeOffIcon,
@@ -563,7 +565,7 @@ export function LoginScreen() {
   if (isOpeningWorkspace) {
     return (
       <View style={styles.workspaceLoadingContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F6F4EE" />
+        <StatusBar barStyle="dark-content" />
         <Text style={[styles.workspaceLoadingText, { fontFamily: monoFont }]}>
           Opening workspace...
         </Text>
@@ -573,7 +575,7 @@ export function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F6F4EE" />
+      <StatusBar barStyle="dark-content" />
       {/* 1. Top Header: Logo + 'puku' + 'About Puku ↗' */}
       <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 12) }]}>
         <View style={styles.brandRow}>

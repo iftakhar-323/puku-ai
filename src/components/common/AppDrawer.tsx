@@ -424,105 +424,103 @@ export function AppDrawer() {
         </View>
       </View>
 
-      {/* 1:1 Find a conversation Modal matching media_1790585790051.png */}
-      <Modal
-        visible={isFindModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsFindModalOpen(false)}>
-        <View style={styles.findModalBackdrop}>
-          <TouchableWithoutFeedback onPress={() => setIsFindModalOpen(false)}>
-            <View style={StyleSheet.absoluteFill} />
-          </TouchableWithoutFeedback>
+      {/* 1:1 Find a conversation overlay matching media_1790585790051.png */}
+      {isFindModalOpen && (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
+          <View style={styles.findModalBackdrop}>
+            <TouchableWithoutFeedback onPress={() => setIsFindModalOpen(false)}>
+              <View style={StyleSheet.absoluteFill} />
+            </TouchableWithoutFeedback>
 
-          <View
-            style={[
-              styles.findModalCard,
-              {
-                backgroundColor: theme.cardBackground || '#FFFFFF',
-                borderColor: theme.border,
-              },
-            ]}>
-            {/* Header: Title + Close (X) */}
-            <View style={styles.findModalHeader}>
-              <Text
-                style={[
-                  styles.findModalTitle,
-                  { color: theme.textPrimary, fontFamily: monoFont },
-                ]}>
-                Find a conversation
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setIsFindModalOpen(false)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.findCloseBtn}>
-                <CloseIcon size={18} color={theme.textPrimary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Indigo Outlined Search Input Box (highlighted in screenshot) */}
             <View
               style={[
-                styles.findInputWrapper,
-                { backgroundColor: theme.secondaryBackground },
+                styles.findModalCard,
+                {
+                  backgroundColor: theme.cardBackground || '#FFFFFF',
+                  borderColor: theme.border,
+                },
               ]}>
-              <SearchIcon size={16} color={theme.textMuted} />
-              <TextInput
-                value={findQuery}
-                onChangeText={setFindQuery}
-                placeholder="Search your thoughts..."
-                placeholderTextColor={theme.placeholderText}
-                autoFocus
-                style={[
-                  styles.findInputField,
-                  { color: theme.textPrimary, fontFamily: monoFont },
-                ]}
-              />
-            </View>
+              {/* Header: Title + Close (X) */}
+              <View style={styles.findModalHeader}>
+                <Text
+                  style={[
+                    styles.findModalTitle,
+                    { color: theme.textPrimary, fontFamily: monoFont },
+                  ]}>
+                  Find a conversation
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setIsFindModalOpen(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.findCloseBtn}>
+                  <CloseIcon size={18} color={theme.textPrimary} />
+                </TouchableOpacity>
+              </View>
 
-            {/* Conversation List */}
-            <ScrollView
-              style={styles.findListScroll}
-              showsVerticalScrollIndicator={true}
-              keyboardShouldPersistTaps="handled">
-              {searchedConversations.length === 0 ? (
-                <View style={styles.findEmptyWrap}>
-                  <Text
-                    style={[
-                      styles.findEmptyText,
-                      { color: theme.textMuted, fontFamily: monoFont },
-                    ]}>
-                    No thoughts found
-                  </Text>
-                </View>
-              ) : (
-                searchedConversations.map(conv => (
-                  <TouchableOpacity
-                    key={conv.id}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      selectConversation(conv.id);
-                      setIsFindModalOpen(false);
-                      setDrawerOpen(false);
-                      navigate('chat');
-                    }}
-                    style={styles.findItemRow}>
+              {/* Indigo Outlined Search Input Box (highlighted in screenshot) */}
+              <View
+                style={[
+                  styles.findInputWrapper,
+                  { backgroundColor: theme.secondaryBackground },
+                ]}>
+                <SearchIcon size={16} color={theme.textMuted} />
+                <TextInput
+                  value={findQuery}
+                  onChangeText={setFindQuery}
+                  placeholder="Search your thoughts..."
+                  placeholderTextColor={theme.placeholderText}
+                  autoFocus
+                  style={[
+                    styles.findInputField,
+                    { color: theme.textPrimary, fontFamily: monoFont },
+                  ]}
+                />
+              </View>
+
+              {/* Conversation List */}
+              <ScrollView
+                style={styles.findListScroll}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled">
+                {searchedConversations.length === 0 ? (
+                  <View style={styles.findEmptyWrap}>
                     <Text
-                      numberOfLines={1}
                       style={[
-                        styles.findItemText,
-                        { color: theme.textPrimary, fontFamily: monoFont },
+                        styles.findEmptyText,
+                        { color: theme.textMuted, fontFamily: monoFont },
                       ]}>
-                      {conv.title}
+                      No thoughts found
                     </Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
+                  </View>
+                ) : (
+                  searchedConversations.map(conv => (
+                    <TouchableOpacity
+                      key={conv.id}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        selectConversation(conv.id);
+                        setIsFindModalOpen(false);
+                        setDrawerOpen(false);
+                        navigate('chat');
+                      }}
+                      style={styles.findItemRow}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.findItemText,
+                          { color: theme.textPrimary, fontFamily: monoFont },
+                        ]}>
+                        {conv.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            </View>
           </View>
         </View>
-      </Modal>
+      )}
     </Modal>
   );
 }

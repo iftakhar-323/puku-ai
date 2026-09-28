@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { Platform, StatusBar, Text, View } from 'react-native';
+import { Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppDrawer } from './src/components/common/AppDrawer';
 import { ArtifactsScreen } from './src/features/artifacts/ArtifactsScreen';
@@ -32,7 +32,7 @@ function MainNavigator(): React.JSX.Element {
 
   useEffect(() => {
     try {
-      UpdateService.checkForUpdates(true).catch(() => {});
+      UpdateService.checkForUpdates(false).catch(() => {});
     } catch {
       // Ignored
     }
@@ -47,7 +47,7 @@ function MainNavigator(): React.JSX.Element {
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F6F4EE" />
+        <StatusBar barStyle="dark-content" />
         <Text
           style={{
             fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
@@ -102,7 +102,7 @@ function MainNavigator(): React.JSX.Element {
         barStyle={isDark || activeRoute === 'liveVoice' ? 'light-content' : 'dark-content'}
       />
       {renderScreen()}
-      <AppDrawer />
+      {activeRoute !== 'login' && <AppDrawer />}
     </>
   );
 }
@@ -134,7 +134,53 @@ class ErrorBoundary extends React.Component<
       return (
         <SafeAreaProvider>
           <StatusBar barStyle="dark-content" />
-          <ChatScreen />
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: '#F6F4EE',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+            }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                color: '#1A1D18',
+                marginBottom: 8,
+                fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+              }}>
+              Something went wrong
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                color: '#6F736D',
+                textAlign: 'center',
+                marginBottom: 20,
+                fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+              }}>
+              {this.state.error?.message || 'An unexpected error occurred.'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => this.setState({ hasError: false, error: null })}
+              style={{
+                backgroundColor: '#1A1D18',
+                paddingHorizontal: 20,
+                paddingVertical: 12,
+                borderRadius: 8,
+              }}>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontWeight: '600',
+                  fontSize: 14,
+                  fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+                }}>
+                Reload Workspace
+              </Text>
+            </TouchableOpacity>
+          </View>
         </SafeAreaProvider>
       );
     }
