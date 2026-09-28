@@ -56,6 +56,7 @@ export function ProfileScreen() {
         isDark={isDark}
         onLeadingTap={() => setDrawerOpen(true)}
         onTerminalTap={() => navigate('code')}
+        onBotTap={() => navigate('pukuBot')}
         onThemeTap={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
       />
 
@@ -71,7 +72,7 @@ export function ProfileScreen() {
 
         {/* Name Block */}
         <View style={styles.fieldBlock}>
-          <Text style={[styles.fieldLabel, { color: '#71767B', fontFamily: monoFont }]}>
+          <Text style={[styles.fieldLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
             Name
           </Text>
           <Text style={[styles.fieldValue, { color: theme.textPrimary, fontFamily: monoFont }]}>
@@ -81,7 +82,7 @@ export function ProfileScreen() {
 
         {/* Email Block */}
         <View style={styles.fieldBlock}>
-          <Text style={[styles.fieldLabel, { color: '#71767B', fontFamily: monoFont }]}>
+          <Text style={[styles.fieldLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
             Email
           </Text>
           <Text style={[styles.fieldValue, { color: theme.textPrimary, fontFamily: monoFont }]}>
@@ -94,8 +95,8 @@ export function ProfileScreen() {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => navigate('usage')}
-            style={[styles.btn, { borderColor: '#2E322C', backgroundColor: '#161815' }]}>
-            <Text style={[styles.btnText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+            style={[styles.btn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+            <Text style={[styles.btnText, { color: theme.textPrimary, fontFamily: monoFont }]}>
               View usage
             </Text>
           </TouchableOpacity>
@@ -103,9 +104,9 @@ export function ProfileScreen() {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleSignOut}
-            style={[styles.btn, styles.signOutBtn, { borderColor: '#2E322C', backgroundColor: '#161815' }]}>
-            <LogoutIcon size={16} color="#ECEEEC" />
-            <Text style={[styles.btnText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+            style={[styles.btn, styles.signOutBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+            <LogoutIcon size={16} color={theme.textPrimary} />
+            <Text style={[styles.btnText, { color: theme.textPrimary, fontFamily: monoFont }]}>
               Sign out
             </Text>
           </TouchableOpacity>
