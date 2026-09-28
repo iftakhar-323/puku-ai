@@ -411,7 +411,13 @@ export function AppDrawer() {
                   setDrawerOpen(false);
                   navigate('usage');
                 }}
-                style={styles.powerBtn}>
+                style={[
+                  styles.powerBtn,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderColor: theme.border,
+                  },
+                ]}>
                 <Text style={[styles.powerBtnText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                   Power
                 </Text>
@@ -760,8 +766,6 @@ const styles = StyleSheet.create({
   },
   powerBtn: {
     borderWidth: 1,
-    borderColor: '#262925',
-    backgroundColor: '#181A16',
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
