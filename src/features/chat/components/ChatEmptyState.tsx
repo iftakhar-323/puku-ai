@@ -31,26 +31,26 @@ export function ChatEmptyState({
       ? conversations.slice(0, 3).map(c => ({
           id: c.id,
           title: c.title || 'Untitled conversation',
-          time: formatActivityDate(c.updatedAt || c.createdAt),
+          time: formatActivityDate((c as any).activityDate || c.updatedAtTimestamp || c.createdAt),
           isReal: true,
         }))
       : [
           {
             id: 'sample-1',
-            title: 'which model are you used?',
-            time: '21h ago',
+            title: 'df',
+            time: '20m ago',
             isReal: false,
           },
           {
             id: 'sample-2',
-            title: 'What is ai?',
+            title: 'which model are you used?',
             time: '21h ago',
             isReal: false,
           },
           {
             id: 'sample-3',
             title: 'What is ai?',
-            time: '1d ago',
+            time: '21h ago',
             isReal: false,
           },
         ];
@@ -88,7 +88,7 @@ export function ChatEmptyState({
         <Text style={[styles.sectionTitle, { color: theme.textMuted, fontFamily: monoFont }]}>
           Recent conversations
         </Text>
-        <View style={[styles.divider, { backgroundColor: '#262925' }]} />
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
         {displayItems.map((item, index) => (
           <View key={item.id || index}>
@@ -115,7 +115,7 @@ export function ChatEmptyState({
                 <ArrowUpRightIcon size={14} color={theme.textMuted} />
               </View>
             </TouchableOpacity>
-            <View style={[styles.divider, { backgroundColor: '#262925' }]} />
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
           </View>
         ))}
       </View>

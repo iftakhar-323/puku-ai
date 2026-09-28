@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   BackIcon,
+  BotIcon,
   CloseIcon,
   MoonIcon,
   SidebarToggleIcon,
@@ -19,6 +20,7 @@ interface ChatHeaderProps {
   onLeadingTap: () => void;
   onTrailingTap?: () => void;
   onTerminalTap?: () => void;
+  onBotTap?: () => void;
   onThemeTap?: () => void;
 }
 
@@ -31,6 +33,7 @@ export function ChatHeader({
   onLeadingTap,
   onTrailingTap,
   onTerminalTap,
+  onBotTap,
   onThemeTap,
 }: ChatHeaderProps) {
   return (
@@ -70,6 +73,15 @@ export function ChatHeader({
                 onPress={onTerminalTap}
                 style={styles.actionBtn}>
                 <TerminalPromptIcon size={20} color={theme.textPrimary} />
+              </TouchableOpacity>
+            )}
+
+            {onBotTap && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={onBotTap}
+                style={styles.actionBtn}>
+                <BotIcon size={20} color={theme.textPrimary} />
               </TouchableOpacity>
             )}
 

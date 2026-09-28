@@ -64,7 +64,7 @@ export function ChatComposer({
     <View style={styles.outerWrapper}>
       {/* 1:1 Model Selection Floating Dropdown (Screenshot 2) */}
       {dropdownOpen && (
-        <View style={[styles.dropdownPopup, { backgroundColor: '#181A17', borderColor: '#2E322C' }]}>
+        <View style={[styles.dropdownPopup, { backgroundColor: theme.secondaryBackground, borderColor: theme.border }]}>
           {AVAILABLE_MODELS.map(modelItem => {
             const isSelected = selectedModel === modelItem.id;
             return (
@@ -77,16 +77,16 @@ export function ChatComposer({
                 }}
                 style={styles.dropdownRow}>
                 <View style={styles.checkCol}>
-                  {isSelected && <CheckmarkIcon size={14} color="#E4E8E2" />}
+                  {isSelected && <CheckmarkIcon size={14} color={theme.textPrimary} />}
                 </View>
                 <Text
                   style={[
                     styles.modelNameText,
-                    { color: isSelected ? '#FFFFFF' : '#C7CBC5', fontFamily: monoFont },
+                    { color: isSelected ? theme.textPrimary : theme.textSecondary, fontFamily: monoFont },
                   ]}>
                   {modelItem.label}
                 </Text>
-                <Text style={[styles.modelBadgeText, { color: '#71767B', fontFamily: monoFont }]}>
+                <Text style={[styles.modelBadgeText, { color: theme.textMuted, fontFamily: monoFont }]}>
                   {modelItem.badge}
                 </Text>
               </TouchableOpacity>
@@ -100,8 +100,8 @@ export function ChatComposer({
         style={[
           styles.container,
           {
-            backgroundColor: '#151714',
-            borderColor: '#262925',
+            backgroundColor: theme.cardBackground,
+            borderColor: theme.border,
           },
         ]}>
         {/* Top Multiline Input */}
@@ -113,12 +113,12 @@ export function ChatComposer({
             onFocus?.();
           }}
           placeholder="A question, a thought, a wild idea..."
-          placeholderTextColor="#71767B"
+          placeholderTextColor={theme.placeholderText}
           multiline
           style={[
             styles.input,
             {
-              color: '#ECEEEC',
+              color: theme.textPrimary,
               fontFamily: monoFont,
             },
           ]}
@@ -135,17 +135,17 @@ export function ChatComposer({
                 onPlusTap();
               }}
               style={styles.actionIconBtn}>
-              <PlusIcon size={18} color="#8E9297" />
+              <PlusIcon size={18} color={theme.textMuted} />
             </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setDropdownOpen(prev => !prev)}
               style={styles.modelPillBtn}>
-              <Text style={[styles.modelPillLabel, { color: '#8E9297', fontFamily: monoFont }]}>
+              <Text style={[styles.modelPillLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
                 {currentModelObj.label}
               </Text>
-              <ChevronDownIcon size={12} color="#8E9297" />
+              <ChevronDownIcon size={12} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -158,7 +158,7 @@ export function ChatComposer({
                 styles.actionIconBtn,
                 isListening && { backgroundColor: 'rgba(255, 77, 79, 0.2)', borderRadius: 16 },
               ]}>
-              <MicIcon size={18} color={isListening ? '#FF4D4F' : '#8E9297'} />
+              <MicIcon size={18} color={isListening ? '#FF4D4F' : theme.textMuted} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -171,13 +171,22 @@ export function ChatComposer({
               style={[
                 styles.sendBtn,
                 {
-                  backgroundColor: canSubmit ? '#363C34' : '#222521',
+                  backgroundColor: canSubmit
+                    ? (theme.background === '#f1f0e9' ? '#D6D3C7' : '#363C34')
+                    : (theme.background === '#f1f0e9' ? '#E4E2D8' : '#222521'),
                 },
               ]}>
               {isSending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={theme.textPrimary} />
               ) : (
-                <UpArrowIcon size={16} color={canSubmit ? '#FFFFFF' : '#656A64'} />
+                <UpArrowIcon
+                  size={16}
+                  color={
+                    canSubmit
+                      ? (theme.background === '#f1f0e9' ? '#1A1D18' : '#FFFFFF')
+                      : (theme.background === '#f1f0e9' ? '#8E9287' : '#656A64')
+                  }
+                />
               )}
             </TouchableOpacity>
           </View>

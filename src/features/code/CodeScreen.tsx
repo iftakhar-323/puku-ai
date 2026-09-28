@@ -1,291 +1,175 @@
 import React, { useState } from 'react';
 import {
-  FlatList,
-  Modal,
+  ActivityIndicator,
+  Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
-  TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppHeader } from '../../components/common/AppHeader';
 import {
-  CloseIcon,
-  CodeIcon,
-  PlusIcon,
+  BotIcon,
+  MoonIcon,
+  SidebarToggleIcon,
+  SunIcon,
+  TerminalPromptIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
-import { CodeSession } from '../../types';
 
 export function CodeScreen() {
   const insets = useSafeAreaInsets();
-  const {
-    theme,
-    codeSessions,
-    activeCodeSession,
-    selectCodeSession,
-    createCodeSession,
-    runCodeSession,
-  } = useApp();
+  const { theme, isDark, updateSettings, setDrawerOpen, navigate } = useApp();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingPast, setIsLoadingPast] = useState(false);
+  const [showPastSessions, setShowPastSessions] = useState(false);
 
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [prompt, setPrompt] = useState('');
-  const [environment, setEnvironment] = useState('React Native / TypeScript');
-  const [autoAccept, setAutoAccept] = useState(true);
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
-  const [interactiveCode, setInteractiveCode] = useState(
-    activeCodeSession?.code || ''
-  );
-
-  const handleStartSession = () => {
-    if (!prompt.trim()) return;
-    const session = createCodeSession(
-      prompt.trim(),
-      environment,
-      autoAccept
-    );
-    setInteractiveCode(session.code || '');
-    setPrompt('');
-    setShowNewModal(false);
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 600);
   };
 
-  const handleRun = () => {
-    if (!activeCodeSession) return;
-    runCodeSession(activeCodeSession.id, interactiveCode);
+  const handleLoadPastSessions = () => {
+    setIsLoadingPast(true);
+    setTimeout(() => {
+      setIsLoadingPast(false);
+      setShowPastSessions(true);
+    }, 600);
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <AppHeader
-        showBack
-        title="Code Sessions"
-        rightAction={
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.background,
+          paddingTop: Math.max(insets.top, 12),
+        },
+      ]}>
+      {/* 1:1 Header matching screenshot */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => setDrawerOpen(true)}
+          style={styles.actionBtn}>
+          <SidebarToggleIcon size={22} color={theme.textPrimary} />
+        </TouchableOpacity>
+
+        <View style={styles.trailingGroup}>
           <TouchableOpacity
-            onPress={() => setShowNewModal(true)}
-            style={[styles.newBtn, { backgroundColor: theme.primary }]}>
-            <PlusIcon size={16} color="#FFFFFF" />
-            <Text style={styles.newBtnText}>New</Text>
+            activeOpacity={0.7}
+            onPress={() => navigate('chat')}
+            style={styles.actionBtn}>
+            <TerminalPromptIcon size={20} color={theme.textPrimary} />
           </TouchableOpacity>
-        }
-      />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigate('pukuBot')}
+            style={styles.actionBtn}>
+            <BotIcon size={20} color={theme.textPrimary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
+            style={styles.actionBtn}>
+            {isDark ? (
+              <SunIcon size={20} color={theme.textPrimary} />
+            ) : (
+              <MoonIcon size={20} color={theme.textPrimary} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <ScrollView
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Math.max(insets.bottom, 24) },
-        ]}>
-        {/* Suggested Connect Integrations Card */}
-        <View
-          style={[
-            styles.suggestedCard,
-            {
-              backgroundColor: theme.secondaryBackground,
-              borderColor: theme.border,
-            },
-          ]}>
-          <Text style={[styles.suggestedTitle, { color: theme.textMuted }]}>
-            SUGGESTED INTEGRATIONS
-          </Text>
-          <View style={styles.integrationRow}>
-            <View style={styles.integrationItem}>
-              <Text style={[styles.integrationName, { color: theme.textPrimary }]}>
-                GitHub
-              </Text>
-              <Text style={[styles.integrationStatus, { color: theme.success }]}>
-                Connected
-              </Text>
-            </View>
-            <View style={styles.integrationItem}>
-              <Text style={[styles.integrationName, { color: theme.textPrimary }]}>
-                Figma
-              </Text>
-              <Text style={[styles.integrationStatus, { color: theme.textMuted }]}>
-                Available
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Sessions list */}
-        <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>
-          Active Sessions
+        ]}
+        showsVerticalScrollIndicator={false}>
+        {/* Main Title & Subtitle */}
+        <Text style={[styles.mainTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+          CLI sessions
         </Text>
-        <View style={styles.sessionsList}>
-          {codeSessions.map(session => {
-            const isSelected = activeCodeSession?.id === session.id;
-            return (
-              <TouchableOpacity
-                key={session.id}
-                onPress={() => {
-                  selectCodeSession(session.id);
-                  setInteractiveCode(session.code || '');
-                }}
-                activeOpacity={0.7}
-                style={[
-                  styles.sessionCard,
-                  {
-                    backgroundColor: theme.secondaryBackground,
-                    borderColor: isSelected ? theme.primary : theme.border,
-                    borderWidth: isSelected ? 1.5 : 1,
-                  },
-                ]}>
-                <View style={styles.sessionHeader}>
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.sessionTitle, { color: theme.textPrimary }]}>
-                    {session.title}
-                  </Text>
-                  <View
-                    style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor:
-                          session.status === 'running'
-                            ? theme.warning
-                            : theme.pillBackground,
-                      },
-                    ]}>
-                    <Text
-                      style={[
-                        styles.statusText,
-                        {
-                          color:
-                            session.status === 'running'
-                              ? '#FFFFFF'
-                              : theme.tagText,
-                        },
-                      ]}>
-                      {session.status}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.sessionMeta, { color: theme.textSecondary }]}>
-                  {session.environment} • {session.lastActivity}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <Text style={[styles.subtitle, { color: theme.textSecondary, fontFamily: monoFont }]}>
+          Continue a terminal session from this browser.
+        </Text>
 
-        {/* Live Code Editor & Terminal Runner */}
-        {activeCodeSession && (
-          <View
-            style={[
-              styles.runnerCard,
-              {
-                backgroundColor: theme.codeBackground,
-                borderColor: theme.border,
-              },
-            ]}>
-            <View style={styles.runnerHeader}>
-              <View style={styles.terminalDots}>
-                <View style={[styles.dot, { backgroundColor: '#FF5F56' }]} />
-                <View style={[styles.dot, { backgroundColor: '#FFBD2E' }]} />
-                <View style={[styles.dot, { backgroundColor: '#27C93F' }]} />
-              </View>
-              <Text style={styles.runnerTitle}>{activeCodeSession.title}</Text>
-              <TouchableOpacity
-                onPress={handleRun}
-                style={[styles.runBtn, { backgroundColor: theme.primary }]}>
-                <Text style={styles.runBtnText}>Run Code</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Start on your computer Section */}
+        <Text style={[styles.sectionHeading, { color: theme.textPrimary, fontFamily: monoFont }]}>
+          Start on your computer
+        </Text>
 
-            <TextInput
-              style={styles.codeEditor}
-              multiline
-              value={interactiveCode}
-              onChangeText={setInteractiveCode}
-              placeholderTextColor="#666"
-            />
-
-            {/* Terminal Output */}
-            <View style={styles.terminalConsole}>
-              <Text style={styles.consoleHeader}>TERMINAL OUTPUT</Text>
-              {activeCodeSession.terminalOutput?.map((line, idx) => (
-                <Text key={idx} style={styles.consoleLine}>
-                  {line}
-                </Text>
-              ))}
-            </View>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* New Code Session Modal */}
-      <Modal
-        visible={showNewModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowNewModal(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowNewModal(false)}>
-          <View style={styles.modalBackdrop} />
-        </TouchableWithoutFeedback>
-        <View
-          style={[
-            styles.modalContent,
-            {
-              backgroundColor: theme.secondaryBackground,
-              paddingBottom: Math.max(insets.bottom, 20),
-            },
-          ]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-              New Code Session
-            </Text>
-            <TouchableOpacity onPress={() => setShowNewModal(false)}>
-              <CloseIcon size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-            Describe what you want to build
+        <View style={styles.stepsList}>
+          <Text style={[styles.stepItem, { color: theme.textPrimary, fontFamily: monoFont }]}>
+            1. Open your project in a terminal and run{'\n'}   puku-cli.
           </Text>
-          <TextInput
-            style={[
-              styles.textArea,
-              {
-                backgroundColor: theme.background,
-                color: theme.textPrimary,
-                borderColor: theme.border,
-              },
-            ]}
-            placeholder="e.g. Build an animated bottom navigation bar with fluid transitions..."
-            placeholderTextColor={theme.placeholderText}
-            value={prompt}
-            onChangeText={setPrompt}
-            multiline
-            numberOfLines={4}
-          />
+          <Text style={[styles.stepItem, { color: theme.textPrimary, fontFamily: monoFont }]}>
+            2. Type /remote-web inside the CLI.
+          </Text>
+          <Text style={[styles.stepItem, { color: theme.textPrimary, fontFamily: monoFont }]}>
+            3. Keep the terminal open, then select its{'\n'}   session below.
+          </Text>
+        </View>
 
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>
-                Accept edits automatically
-              </Text>
-              <Text style={[styles.switchSubtitle, { color: theme.textSecondary }]}>
-                Puku will apply code changes without manual confirmation
+        <Text style={[styles.accountNotice, { color: theme.textPrimary, fontFamily: monoFont }]}>
+          Use the same Puku account on both devices.
+        </Text>
+
+        {/* Empty CLI sessions note */}
+        <Text style={[styles.emptyNotice, { color: theme.textPrimary, fontFamily: monoFont }]}>
+          No CLI sessions yet. They will appear here when you run /remote-web.
+        </Text>
+
+        {/* Refresh Sessions Button */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handleRefresh}
+          style={[styles.outlineBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color={theme.textPrimary} />
+          ) : (
+            <Text style={[styles.btnLabel, { color: theme.textPrimary, fontFamily: monoFont }]}>
+              Refresh sessions
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Past Sessions Section */}
+        <View style={styles.pastSessionsSection}>
+          <Text style={[styles.sectionHeading, { color: theme.textPrimary, fontFamily: monoFont }]}>
+            Past sessions
+          </Text>
+
+          {showPastSessions ? (
+            <View style={[styles.pastSessionsBox, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+              <Text style={[styles.noPastText, { color: theme.textMuted, fontFamily: monoFont }]}>
+                No past remote CLI sessions found for this account.
               </Text>
             </View>
-            <Switch
-              value={autoAccept}
-              onValueChange={setAutoAccept}
-              trackColor={{ false: theme.outline, true: theme.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-
-          <TouchableOpacity
-            onPress={handleStartSession}
-            style={[styles.startBtn, { backgroundColor: theme.primary }]}>
-            <Text style={styles.startBtnText}>Start Session</Text>
-          </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleLoadPastSessions}
+              style={[styles.outlineBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+              {isLoadingPast ? (
+                <ActivityIndicator size="small" color={theme.textPrimary} />
+              ) : (
+                <Text style={[styles.btnLabel, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                  Load past sessions
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
-      </Modal>
+      </ScrollView>
     </View>
   );
 }
@@ -294,211 +178,84 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  newBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 18,
-    gap: 6,
-  },
-  newBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  content: {
-    padding: 16,
-    gap: 16,
-  },
-  suggestedCard: {
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  suggestedTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 12,
-  },
-  integrationRow: {
-    flexDirection: 'row',
-    gap: 14,
-  },
-  integrationItem: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: 'rgba(108, 71, 235, 0.05)',
-  },
-  integrationName: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  integrationStatus: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  sectionHeading: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  sessionsList: {
-    gap: 10,
-  },
-  sessionCard: {
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  sessionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  sessionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-  },
-  statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  sessionMeta: {
-    fontSize: 13,
-  },
-  runnerCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  runnerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    backgroundColor: '#120F24',
-    borderBottomWidth: 1,
-    borderBottomColor: '#26223D',
-  },
-  terminalDots: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  runnerTitle: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  runBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  runBtnText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  codeEditor: {
-    minHeight: 120,
-    padding: 14,
-    color: '#A5A5FF',
-    fontFamily: 'monospace',
-    fontSize: 13,
-    lineHeight: 18,
-    textAlignVertical: 'top',
-  },
-  terminalConsole: {
-    backgroundColor: '#07050F',
-    padding: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#26223D',
-  },
-  consoleHeader: {
-    color: '#87868E',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 6,
-  },
-  consoleLine: {
-    color: '#52C41A',
-    fontFamily: 'monospace',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  textArea: {
-    height: 100,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
-    fontSize: 14,
-    textAlignVertical: 'top',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 18,
-    gap: 14,
-  },
-  switchTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  switchSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  startBtn: {
+  header: {
     height: 48,
-    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  actionBtn: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  startBtnText: {
-    color: '#FFFFFF',
+  trailingGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  mainTitle: {
+    fontSize: 24,
     fontWeight: '700',
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 28,
+  },
+  sectionHeading: {
     fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  stepsList: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  stepItem: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  accountNotice: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 28,
+  },
+  emptyNotice: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  outlineBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnLabel: {
+    fontSize: 13,
+  },
+  pastSessionsSection: {
+    marginTop: 36,
+  },
+  pastSessionsBox: {
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  noPastText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

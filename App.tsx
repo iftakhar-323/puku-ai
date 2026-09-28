@@ -18,6 +18,7 @@ import { LoginScreen } from './src/features/login/LoginScreen';
 import { ProfileScreen } from './src/features/settings/ProfileScreen';
 import { ProjectDetailsScreen } from './src/features/projects/ProjectDetailsScreen';
 import { ProjectsScreen } from './src/features/projects/ProjectsScreen';
+import { PukuBotScreen } from './src/features/puku_bot/PukuBotScreen';
 import { RemoteSessionScreen } from './src/features/remote_session/RemoteSessionScreen';
 import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { UsageScreen } from './src/features/settings/UsageScreen';
@@ -44,6 +45,8 @@ function MainNavigator(): React.JSX.Element {
         return <ArtifactsScreen />;
       case 'code':
         return <CodeScreen />;
+      case 'pukuBot':
+        return <PukuBotScreen />;
       case 'remoteSession':
         return <RemoteSessionScreen />;
       case 'transcribe':

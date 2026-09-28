@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Modal,
+  Platform,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
@@ -10,13 +10,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  CameraIcon,
   ChevronRightIcon,
-  CloseIcon,
-  CloudSnowIcon,
-  ConnectIcon,
-  FolderLibraryIcon,
-  PhotosIcon,
+  ConnectorsBranchIcon,
+  FolderOutlinedIcon,
+  PaperclipIcon,
+  ToolsGridIcon,
 } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 
@@ -28,6 +26,7 @@ interface ChatAttachmentSheetProps {
   onPhotosTap: () => void;
   onAddToProjectTap: () => void;
   onToolAccessTap: () => void;
+  onConnectorsTap?: () => void;
 }
 
 export function ChatAttachmentSheet({
@@ -38,15 +37,36 @@ export function ChatAttachmentSheet({
   onPhotosTap,
   onAddToProjectTap,
   onToolAccessTap,
+  onConnectorsTap,
 }: ChatAttachmentSheetProps) {
   const insets = useSafeAreaInsets();
-  const [researchEnabled, setResearchEnabled] = useState(false);
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
+  const handleFilesPress = () => {
+    onClose();
+    onPhotosTap();
+  };
+
+  const handleToolsPress = () => {
+    onClose();
+    onToolAccessTap();
+  };
+
+  const handleProjectPress = () => {
+    onClose();
+    onAddToProjectTap();
+  };
+
+  const handleConnectorsPress = () => {
+    onClose();
+    onConnectorsTap?.();
+  };
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop} />
@@ -54,100 +74,79 @@ export function ChatAttachmentSheet({
 
       <View
         style={[
-          styles.content,
+          styles.sheetContent,
           {
-            backgroundColor: theme.secondaryBackground,
-            paddingBottom: Math.max(insets.bottom, 20),
+            backgroundColor: theme.cardBackground,
+            paddingBottom: Math.max(insets.bottom, 24),
           },
         ]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
-            Add to chat
-          </Text>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={onClose}
-            style={styles.closeBtn}>
-            <CloseIcon size={20} color={theme.textMuted} />
-          </TouchableOpacity>
+        {/* Top Handle */}
+        <View style={styles.handleWrapper}>
+          <View style={[styles.handleBar, { backgroundColor: theme.textMuted }]} />
         </View>
 
-        {/* Quick Actions (Camera & Photos) */}
-        <View style={styles.quickGrid}>
+        {/* Title */}
+        <Text style={[styles.sheetTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+          Add
+        </Text>
+
+        {/* Action Rows */}
+        <View style={styles.rowsList}>
+          {/* 1. Add files or photos */}
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={onCameraTap}
-            style={[styles.quickCard, { backgroundColor: theme.buttonBackground }]}>
-            <CameraIcon size={24} color={theme.textPrimary} />
-            <Text style={[styles.quickLabel, { color: theme.textPrimary }]}>
-              Camera
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={onPhotosTap}
-            style={[styles.quickCard, { backgroundColor: theme.buttonBackground }]}>
-            <PhotosIcon size={24} color={theme.textPrimary} />
-            <Text style={[styles.quickLabel, { color: theme.textPrimary }]}>
-              Photos
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Research Option */}
-        <View style={styles.optionRow}>
-          <View style={styles.optionLeading}>
-            <CloudSnowIcon size={22} color={theme.textPrimary} />
-            <View style={styles.optionTexts}>
-              <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>
-                Research
-              </Text>
-              <Text style={[styles.optionSubtitle, { color: theme.textMuted }]}>
-                Deep multi-step reasoning & web analysis
+            onPress={handleFilesPress}
+            style={styles.actionRow}>
+            <View style={styles.leftInfo}>
+              <PaperclipIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.actionLabel, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                Add files or photos
               </Text>
             </View>
-          </View>
-          <Switch
-            value={researchEnabled}
-            onValueChange={setResearchEnabled}
-            trackColor={{ false: 'rgba(255,255,255,0.1)', true: theme.blue }}
-            thumbColor="#FFFFFF"
-          />
+          </TouchableOpacity>
+
+          {/* 2. Tools */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleToolsPress}
+            style={styles.actionRow}>
+            <View style={styles.leftInfo}>
+              <ToolsGridIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.actionLabel, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                Tools
+              </Text>
+            </View>
+            <ChevronRightIcon size={16} color={theme.textMuted} />
+          </TouchableOpacity>
+
+          {/* 3. Add to project */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleProjectPress}
+            style={styles.actionRow}>
+            <View style={styles.leftInfo}>
+              <FolderOutlinedIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.actionLabel, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                Add to project
+              </Text>
+            </View>
+            <ChevronRightIcon size={16} color={theme.textMuted} />
+          </TouchableOpacity>
+
+          {/* 4. Connectors */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleConnectorsPress}
+            style={styles.actionRow}>
+            <View style={styles.leftInfo}>
+              <ConnectorsBranchIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.actionLabel, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                Connectors
+              </Text>
+            </View>
+            <ChevronRightIcon size={16} color={theme.textMuted} />
+          </TouchableOpacity>
         </View>
-
-        <View style={[styles.divider, { backgroundColor: theme.outline }]} />
-
-        {/* Add to Project */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={onAddToProjectTap}
-          style={styles.optionRow}>
-          <View style={styles.optionLeading}>
-            <FolderLibraryIcon size={22} color={theme.textPrimary} />
-            <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>
-              Add to Project
-            </Text>
-          </View>
-          <ChevronRightIcon size={18} color={theme.textMuted} />
-        </TouchableOpacity>
-
-        <View style={[styles.divider, { backgroundColor: theme.outline }]} />
-
-        {/* Tool Access */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={onToolAccessTap}
-          style={styles.optionRow}>
-          <View style={styles.optionLeading}>
-            <ConnectIcon size={22} color={theme.textPrimary} />
-            <Text style={[styles.optionTitle, { color: theme.textPrimary }]}>
-              Tool access
-            </Text>
-          </View>
-          <ChevronRightIcon size={18} color={theme.textMuted} />
-        </TouchableOpacity>
       </View>
     </Modal>
   );
@@ -156,71 +155,44 @@ export function ChatAttachmentSheet({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
-  content: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  sheetContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 12,
   },
-  header: {
-    flexDirection: 'row',
+  handleWrapper: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 16,
+    marginBottom: 16,
   },
-  headerTitle: {
-    fontSize: 18,
+  handleBar: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.6,
+  },
+  sheetTitle: {
+    fontSize: 16,
     fontWeight: '700',
+    marginBottom: 16,
   },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
+  rowsList: {
+    gap: 4,
   },
-  quickGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
-  quickCard: {
-    flex: 1,
-    height: 90,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  quickLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  optionRow: {
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
   },
-  optionLeading: {
+  leftInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    flex: 1,
   },
-  optionTexts: {
-    flex: 1,
-  },
-  optionTitle: {
+  actionLabel: {
     fontSize: 15,
-    fontWeight: '600',
-  },
-  optionSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
   },
 });

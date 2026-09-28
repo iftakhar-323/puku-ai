@@ -133,6 +133,7 @@ export type AppRoute =
   | 'projectDetails'
   | 'artifacts'
   | 'code'
+  | 'pukuBot'
   | 'remoteSession'
   | 'transcribe'
   | 'liveVoice'

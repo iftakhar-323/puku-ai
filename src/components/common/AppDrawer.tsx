@@ -128,7 +128,7 @@ export function AppDrawer() {
           style={[
             styles.drawerContent,
             {
-              backgroundColor: '#111310',
+              backgroundColor: theme.secondaryBackground,
               paddingTop: Math.max(insets.top, 16),
               paddingBottom: Math.max(insets.bottom, 14),
             },
@@ -137,13 +137,13 @@ export function AppDrawer() {
           <View style={styles.drawerHeader}>
             <View style={styles.brandRow}>
               <PukuLogoIcon size={24} />
-              <Text style={[styles.brandText, { color: '#FFFFFF' }]}>puku</Text>
+              <Text style={[styles.brandText, { color: theme.textPrimary }]}>puku</Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setDrawerOpen(false)}
               style={styles.closeBtn}>
-              <CloseIcon size={20} color="#ECEEEC" />
+              <CloseIcon size={20} color={theme.textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -152,12 +152,12 @@ export function AppDrawer() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setIsProjectsDropdownOpen(prev => !prev)}
-              style={[styles.allProjectsBtn, { borderColor: '#262925', backgroundColor: '#181A16' }]}>
-              <FolderSmallIcon size={16} color="#ECEEEC" />
-              <Text style={[styles.allProjectsText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+              style={[styles.allProjectsBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+              <FolderSmallIcon size={16} color={theme.textPrimary} />
+              <Text style={[styles.allProjectsText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                 All projects
               </Text>
-              <ChevronDownIcon size={12} color="#71767B" />
+              <ChevronDownIcon size={12} color={theme.textMuted} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -166,20 +166,20 @@ export function AppDrawer() {
                 setDrawerOpen(false);
                 navigate('projects');
               }}
-              style={[styles.squareIconBtn, { borderColor: '#262925', backgroundColor: '#181A16' }]}>
-              <ArchiveBoxIcon size={16} color="#ECEEEC" />
+              style={[styles.squareIconBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+              <ArchiveBoxIcon size={16} color={theme.textPrimary} />
             </TouchableOpacity>
           </View>
 
           {/* Projects Dropdown Menu (Screenshot 3) */}
           {isProjectsDropdownOpen && (
-            <View style={[styles.projectsDropdownCard, { backgroundColor: '#181A16', borderColor: '#2E322C' }]}>
+            <View style={[styles.projectsDropdownCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setIsProjectsDropdownOpen(false)}
                 style={styles.dropdownItemRow}>
-                <CheckmarkIcon size={14} color="#ECEEEC" />
-                <Text style={[styles.dropdownItemText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                <CheckmarkIcon size={14} color={theme.textPrimary} />
+                <Text style={[styles.dropdownItemText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                   All projects
                 </Text>
               </TouchableOpacity>
@@ -192,8 +192,8 @@ export function AppDrawer() {
                   navigate('projects');
                 }}
                 style={styles.dropdownItemRow}>
-                <PlusIcon size={14} color="#ECEEEC" />
-                <Text style={[styles.dropdownItemText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                <PlusIcon size={14} color={theme.textPrimary} />
+                <Text style={[styles.dropdownItemText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                   New project
                 </Text>
               </TouchableOpacity>
@@ -202,14 +202,14 @@ export function AppDrawer() {
 
           {/* Search & New Chat Row */}
           <View style={styles.searchRow}>
-            <View style={[styles.searchBox, { borderColor: '#262925', backgroundColor: '#181A16' }]}>
-              <SearchIcon size={16} color="#71767B" />
+            <View style={[styles.searchBox, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+              <SearchIcon size={16} color={theme.textMuted} />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder="Search"
-                placeholderTextColor="#71767B"
-                style={[styles.searchInput, { color: '#ECEEEC', fontFamily: monoFont }]}
+                placeholderTextColor={theme.placeholderText}
+                style={[styles.searchInput, { color: theme.textPrimary, fontFamily: monoFont }]}
               />
             </View>
 
@@ -220,18 +220,18 @@ export function AppDrawer() {
                 setDrawerOpen(false);
                 navigate('chat');
               }}
-              style={[styles.squareIconBtn, { borderColor: '#262925', backgroundColor: '#181A16' }]}>
-              <PlusIcon size={18} color="#ECEEEC" />
+              style={[styles.squareIconBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
+              <PlusIcon size={18} color={theme.textPrimary} />
             </TouchableOpacity>
           </View>
 
           {/* Recent Section Header */}
           <View style={styles.recentSectionHeader}>
-            <Text style={[styles.recentHeaderText, { color: '#71767B', fontFamily: monoFont }]}>
+            <Text style={[styles.recentHeaderText, { color: theme.textMuted, fontFamily: monoFont }]}>
               Recent
             </Text>
             <TouchableOpacity activeOpacity={0.7}>
-              <SortIcon size={14} color="#71767B" />
+              <SortIcon size={14} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -253,15 +253,15 @@ export function AppDrawer() {
                     }}
                     style={[
                       styles.convItem,
-                      isActive && { backgroundColor: '#1A1D18', borderRadius: 8 },
+                      isActive && { backgroundColor: theme.pillBackground, borderRadius: 8 },
                     ]}>
-                    <ChatBubbleOutlineIcon size={15} color={isActive ? '#FFFFFF' : '#71767B'} />
+                    <ChatBubbleOutlineIcon size={15} color={isActive ? theme.textPrimary : theme.textMuted} />
                     <Text
                       numberOfLines={1}
                       style={[
                         styles.convTitle,
                         {
-                          color: isActive ? '#FFFFFF' : '#C7CBC5',
+                          color: isActive ? theme.textPrimary : theme.textSecondary,
                           fontFamily: monoFont,
                         },
                       ]}>
@@ -274,7 +274,7 @@ export function AppDrawer() {
                         setActiveMenuConvId(prev => (prev === conv.id ? null : conv.id))
                       }
                       style={styles.dotsBtn}>
-                      <ThreeDotsHorizontalIcon size={16} color="#71767B" />
+                      <ThreeDotsHorizontalIcon size={16} color={theme.textMuted} />
                     </TouchableOpacity>
                   </TouchableOpacity>
 
@@ -283,14 +283,14 @@ export function AppDrawer() {
                     <View
                       style={[
                         styles.contextMenuCard,
-                        { backgroundColor: '#181A16', borderColor: '#2E322C' },
+                        { backgroundColor: theme.cardBackground, borderColor: theme.border },
                       ]}>
                       <TouchableOpacity
                         activeOpacity={0.7}
                         onPress={() => handleRename(conv.id, conv.title)}
                         style={styles.contextMenuItem}>
-                        <PencilIcon size={14} color="#ECEEEC" />
-                        <Text style={[styles.contextMenuText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                        <PencilIcon size={14} color={theme.textPrimary} />
+                        <Text style={[styles.contextMenuText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                           Rename
                         </Text>
                       </TouchableOpacity>
@@ -299,8 +299,8 @@ export function AppDrawer() {
                         activeOpacity={0.7}
                         onPress={() => setActiveMenuConvId(null)}
                         style={styles.contextMenuItem}>
-                        <PinIcon size={14} color="#ECEEEC" />
-                        <Text style={[styles.contextMenuText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                        <PinIcon size={14} color={theme.textPrimary} />
+                        <Text style={[styles.contextMenuText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                           Pin
                         </Text>
                       </TouchableOpacity>
@@ -312,8 +312,8 @@ export function AppDrawer() {
                           navigate('projects');
                         }}
                         style={styles.contextMenuItem}>
-                        <FolderSmallIcon size={14} color="#ECEEEC" />
-                        <Text style={[styles.contextMenuText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                        <FolderSmallIcon size={14} color={theme.textPrimary} />
+                        <Text style={[styles.contextMenuText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                           Move to project
                         </Text>
                       </TouchableOpacity>
@@ -322,13 +322,13 @@ export function AppDrawer() {
                         activeOpacity={0.7}
                         onPress={() => setActiveMenuConvId(null)}
                         style={styles.contextMenuItem}>
-                        <ArchiveBoxIcon size={14} color="#ECEEEC" />
-                        <Text style={[styles.contextMenuText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                        <ArchiveBoxIcon size={14} color={theme.textPrimary} />
+                        <Text style={[styles.contextMenuText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                           Archive
                         </Text>
                       </TouchableOpacity>
 
-                      <View style={[styles.contextDivider, { backgroundColor: '#2E322C' }]} />
+                      <View style={[styles.contextDivider, { backgroundColor: theme.border }]} />
 
                       <TouchableOpacity
                         activeOpacity={0.7}
@@ -348,7 +348,7 @@ export function AppDrawer() {
 
           {/* Bottom Footer Section */}
           <View style={styles.footerSection}>
-            <View style={[styles.horizontalDivider, { backgroundColor: '#262925' }]} />
+            <View style={[styles.horizontalDivider, { backgroundColor: theme.border }]} />
 
             {/* Actions: Customize, Download, Help */}
             <View style={styles.bottomActionsRow}>
@@ -359,18 +359,18 @@ export function AppDrawer() {
                   navigate('settings');
                 }}
                 style={styles.customizeBtn}>
-                <SlidersIcon size={16} color="#ECEEEC" />
-                <Text style={[styles.customizeText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                <SlidersIcon size={16} color={theme.textPrimary} />
+                <Text style={[styles.customizeText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                   Customize
                 </Text>
               </TouchableOpacity>
 
               <View style={styles.rightActionIcons}>
                 <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
-                  <DownloadIcon size={18} color="#71767B" />
+                  <DownloadIcon size={18} color={theme.textMuted} />
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
-                  <HelpCircleIcon size={18} color="#71767B" />
+                  <HelpCircleIcon size={18} color={theme.textMuted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -388,7 +388,7 @@ export function AppDrawer() {
                   {displayName.substring(0, 2).toUpperCase()}
                 </Text>
               </View>
-              <Text style={[styles.userNameText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+              <Text style={[styles.userNameText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                 {displayName}
               </Text>
             </TouchableOpacity>
@@ -402,12 +402,12 @@ export function AppDrawer() {
                   navigate('usage');
                 }}
                 style={styles.powerBtn}>
-                <Text style={[styles.powerBtnText, { color: '#ECEEEC', fontFamily: monoFont }]}>
+                <Text style={[styles.powerBtnText, { color: theme.textPrimary, fontFamily: monoFont }]}>
                   Power
                 </Text>
               </TouchableOpacity>
-              <View style={[styles.powerTrack, { backgroundColor: '#262925' }]}>
-                <View style={[styles.powerFill, { backgroundColor: '#444A40' }]} />
+              <View style={[styles.powerTrack, { backgroundColor: theme.border }]}>
+                <View style={[styles.powerFill, { backgroundColor: theme.textMuted }]} />
               </View>
             </View>
           </View>

@@ -1019,3 +1019,88 @@ export function CalendarIcon({ size = 18, color = '#71767B' }: IconProps) {
   );
 }
 
+/**
+ * Grok / Puku Bot Icon
+ */
+export function BotIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Antenna */}
+      <Path d="M12 2V5M10 2H14" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Robot Head */}
+      <Rect x="4" y="5" width="16" height="14" rx="4" stroke={color} strokeWidth="1.8" />
+      {/* Eyes */}
+      <Circle cx="8.5" cy="11.5" r="1.5" fill={color} />
+      <Circle cx="15.5" cy="11.5" r="1.5" fill={color} />
+      {/* Mouth */}
+      <Path d="M8.5 15.5H15.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      {/* Ears */}
+      <Path d="M2 10.5V13.5M22 10.5V13.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/**
+ * Attachment / Paperclip Icon for Add Sheet
+ */
+export function PaperclipIcon({ size = 20, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * Tools Grid Icon (4 squares)
+ */
+export function ToolsGridIcon({ size = 20, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="3" width="7" height="7" rx="1.5" stroke={color} strokeWidth="1.8" />
+      <Rect x="14" y="3" width="7" height="7" rx="1.5" stroke={color} strokeWidth="1.8" />
+      <Rect x="14" y="14" width="7" height="7" rx="1.5" stroke={color} strokeWidth="1.8" />
+      <Rect x="3" y="14" width="7" height="7" rx="1.5" stroke={color} strokeWidth="1.8" />
+    </Svg>
+  );
+}
+
+/**
+ * Outlined Folder Icon
+ */
+export function FolderOutlinedIcon({ size = 20, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 4h4.586a1 1 0 0 1 .707.293L11.707 6.7A1 1 0 0 0 12.414 7H20a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * Connectors Branch / Link Nodes Icon
+ */
+export function ConnectorsBranchIcon({ size = 20, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="6" cy="6" r="2.5" stroke={color} strokeWidth="1.8" />
+      <Circle cx="18" cy="18" r="2.5" stroke={color} strokeWidth="1.8" />
+      <Path d="M8.5 6h5a4 4 0 0 1 4 4v5.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <Circle cx="6" cy="18" r="2.5" stroke={color} strokeWidth="1.8" />
+      <Path d="M8.5 18h2" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+

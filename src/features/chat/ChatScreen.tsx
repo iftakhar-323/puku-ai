@@ -167,7 +167,7 @@ export function ChatScreen() {
           paddingBottom: isKeyboardVisible ? 4 : Math.max(insets.bottom, 12),
         },
       ]}>
-      {/* 1:1 Authentic Header with SidebarToggle, Terminal, and Theme toggle */}
+      {/* 1:1 Authentic Header with SidebarToggle, Terminal, Bot, and Theme toggle */}
       <ChatHeader
         theme={theme}
         isDark={isDark}
@@ -176,6 +176,7 @@ export function ChatScreen() {
         onLeadingTap={() => setDrawerOpen(true)}
         onTrailingTap={() => setIncognito(!isIncognito)}
         onTerminalTap={() => navigate('code')}
+        onBotTap={() => navigate('pukuBot')}
         onThemeTap={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
       />
 
