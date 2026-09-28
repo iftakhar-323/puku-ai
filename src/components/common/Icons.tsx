@@ -1020,7 +1020,7 @@ export function CalendarIcon({ size = 18, color = '#71767B' }: IconProps) {
 }
 
 /**
- * Grok / Puku Bot Icon
+ * Puku Bot Icon
  */
 export function BotIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
   return (

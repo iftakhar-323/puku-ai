@@ -26,11 +26,11 @@ import { useApp } from '../../store/AppContext';
  * ══════════════════════════════════════════════════════════════════════════
  * Note: Puku Bot backend is being configured by the team.
  * You can easily point this endpoint to your custom webhook, LLM server,
- * or Grok-compatible API when ready!
+ * or custom Bot API when ready!
  */
 export const PUKU_BOT_CONFIG = {
   name: 'Puku Bot',
-  version: '1.0.0-grok',
+  version: '1.0.0',
   customApiUrl: '', // e.g. 'https://your-bot-backend.example.com/api/chat'
   apiKey: '',
   defaultPersonality: 'fun', // 'fun' | 'fast' | 'deep'
@@ -64,7 +64,7 @@ export function PukuBotScreen() {
 
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
-  const generateGrokResponse = (userPrompt: string, mode: BotMode): string => {
+  const generatePukuBotResponse = (userPrompt: string, mode: BotMode): string => {
     const lower = userPrompt.toLowerCase();
 
     if (mode === 'fun') {
@@ -77,7 +77,7 @@ export function PukuBotScreen() {
       if (lower.includes('drama') || lower.includes('ai')) {
         return "The AI world right now is just trillion-dollar companies burning small countries' worth of electricity arguing about whether a chatbot is sentient or just really good at predicting the next word. Meanwhile, we're all still asking it to fix our regex! 🍿";
       }
-      return `[Puku Bot 🔥 Grok Mode]\n\nYou asked: "${userPrompt}"\n\nHere's the unfiltered truth: computers do exactly what you tell them to do, which is usually the exact opposite of what you wanted them to do. Keep cooking, but check your syntax first!`;
+      return `[Puku Bot 🔥 Fun Mode]\n\nYou asked: "${userPrompt}"\n\nHere's the unfiltered truth: computers do exactly what you tell them to do, which is usually the exact opposite of what you wanted them to do. Keep cooking, but check your syntax first!`;
     }
 
     if (mode === 'fast') {
@@ -110,7 +110,7 @@ export function PukuBotScreen() {
 
     // Simulate smart Bot stream / response
     setTimeout(() => {
-      const botReply = generateGrokResponse(query, selectedMode);
+      const botReply = generatePukuBotResponse(query, selectedMode);
       const botMsg: BotMessage = {
         id: (Date.now() + 1).toString(),
         role: 'bot',
@@ -153,7 +153,7 @@ export function PukuBotScreen() {
           </Text>
           <View style={[styles.badge, { backgroundColor: isDark ? '#262925' : '#E4E5DB' }]}>
             <Text style={[styles.badgeText, { color: isDark ? '#35D6B4' : '#1A1D18', fontFamily: monoFont }]}>
-              GROK
+              AI
             </Text>
           </View>
         </View>
@@ -266,7 +266,7 @@ export function PukuBotScreen() {
             Puku Bot
           </Text>
           <Text style={[styles.heroSubhead, { color: theme.textSecondary, fontFamily: monoFont }]}>
-            Inspired by Grok. Direct, candid, and unrestricted reasoning AI assistant.
+            Direct, candid, and unrestricted reasoning AI assistant.
           </Text>
 
           <View style={[styles.statusNotice, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
@@ -366,7 +366,7 @@ export function PukuBotScreen() {
           <View style={styles.composerLeftMeta}>
             <View style={[styles.modeIndicatorTag, { borderColor: theme.border }]}>
               <Text style={[styles.modeIndicatorText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                {selectedMode === 'fun' ? '🔥 Grok Fun' : selectedMode === 'fast' ? '⚡ Fast' : '🧠 Deep'}
+                {selectedMode === 'fun' ? '🔥 Fun Mode' : selectedMode === 'fast' ? '⚡ Fast' : '🧠 Deep'}
               </Text>
             </View>
           </View>

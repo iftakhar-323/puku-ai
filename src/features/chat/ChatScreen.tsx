@@ -20,7 +20,8 @@ import { ChatIncognitoView } from './components/ChatIncognitoView';
 import { ChatModelSelectionSheet } from './components/ChatModelSelectionSheet';
 import { MessageBubble } from './components/MessageBubble';
 import { TypingIndicator } from './components/TypingIndicator';
-import { NativeSpeech } from '../../services/nativeModules';
+import { NativeClipboard, NativeSpeech } from '../../services/nativeModules';
+import { useToast } from '../../components/ui/Toast';
 
 function getModelLabel(model: ChatModelType): string {
   switch (model) {
@@ -54,6 +55,7 @@ export function ChatScreen() {
     navigate,
     incognitoMessages,
   } = useApp();
+  const { show } = useToast();
 
   const [inputVal, setInputVal] = useState('');
   const [showModelSheet, setShowModelSheet] = useState(false);
@@ -118,11 +120,11 @@ export function ChatScreen() {
       await NativeSpeech.stopListening();
       setIsListening(false);
     } else {
-      const started = await NativeSpeech.startListening();
-      if (started) {
-        setIsListening(true);
-      } else {
-        navigate('transcribe');
+      setIsListening(true);
+      try {
+        await NativeSpeech.startListening();
+      } catch {
+        // Fallback keep listening flag
       }
     }
   };
@@ -219,7 +221,42 @@ export function ChatScreen() {
               flatListRef.current?.scrollToEnd({ animated: isGenerating })
             }
             renderItem={({ item }) => (
-              <MessageBubble message={item} theme={theme} />
+              <MessageBubble
+                message={item}
+                theme={theme}
+                onEditPrompt={text => {
+                  setInputVal(text);
+                  show({ title: 'Prompt loaded for editing', variant: 'default' });
+                }}
+                onRegenerate={msgId => {
+                  if (isGenerating) return;
+                  const msgIdx = messages.findIndex(m => m.id === msgId);
+                  let promptToResend = '';
+                  if (msgIdx !== -1) {
+                    for (let i = msgIdx - 1; i >= 0; i--) {
+                      if (messages[i].role === 'user') {
+                        promptToResend = messages[i].content;
+                        break;
+                      }
+                    }
+                  }
+                  if (!promptToResend && messages.length > 0) {
+                    const lastUser = [...messages].reverse().find(m => m.role === 'user');
+                    if (lastUser) promptToResend = lastUser.content;
+                  }
+                  if (promptToResend) {
+                    show({ title: 'Regenerating answer...', variant: 'default' });
+                    sendMessage(promptToResend);
+                  }
+                }}
+                onBranch={async msgId => {
+                  const msg = messages.find(m => m.id === msgId);
+                  if (msg?.content) {
+                    await NativeClipboard.setString(msg.content);
+                    show({ title: 'Turn branched & copied to clipboard', variant: 'success' });
+                  }
+                }}
+              />
             )}
             ListFooterComponent={
               isGenerating &&

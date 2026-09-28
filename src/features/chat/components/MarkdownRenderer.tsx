@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { ThemeColors } from '../../../theme/theme';
 import { CheckmarkIcon, CopyIcon } from '../../../components/common/Icons';
+import { NativeClipboard } from '../../../services/nativeModules';
 
 interface MarkdownRendererProps {
   content: string;

@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { CheckmarkIcon, CopyIcon } from '../../../components/common/Icons';
+import {
+  CheckmarkIcon,
+  ConnectorsBranchIcon,
+  CopyIcon,
+  PencilIcon,
+  RefreshIcon,
+} from '../../../components/common/Icons';
 import { NativeClipboard } from '../../../services/nativeModules';
 import { ThemeColors } from '../../../theme/theme';
 import { ChatMessage } from '../../../types';
@@ -10,17 +16,35 @@ import { TypingIndicator } from './TypingIndicator';
 interface MessageBubbleProps {
   message: ChatMessage;
   theme: ThemeColors;
+  onEditPrompt?: (text: string) => void;
+  onRegenerate?: (messageId: string) => void;
+  onBranch?: (messageId: string) => void;
 }
 
-export function MessageBubble({ message, theme }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  theme,
+  onEditPrompt,
+  onRegenerate,
+  onBranch,
+}: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isCopied, setIsCopied] = useState(false);
+  const [isBranched, setIsBranched] = useState(false);
 
   const handleCopy = async () => {
     if (!message.content) return;
     await NativeClipboard.setString(message.content);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 1800);
+  };
+
+  const handleBranchClick = () => {
+    if (onBranch) {
+      onBranch(message.id);
+      setIsBranched(true);
+      setTimeout(() => setIsBranched(false), 1800);
+    }
   };
 
   if (isUser) {
@@ -39,17 +63,29 @@ export function MessageBubble({ message, theme }: MessageBubbleProps) {
         </View>
         {!!message.content && (
           <View style={styles.userActionRow}>
+            {/* Copy button */}
             <TouchableOpacity
               activeOpacity={0.6}
               onPress={handleCopy}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.actionBtn}>
               {isCopied ? (
-                <CheckmarkIcon size={14} color="#52C41A" />
+                <CheckmarkIcon size={15} color="#52C41A" />
               ) : (
-                <CopyIcon size={14} color={theme.textMuted} />
+                <CopyIcon size={15} color={theme.textMuted} />
               )}
             </TouchableOpacity>
+
+            {/* Edit button */}
+            {!!onEditPrompt && (
+              <TouchableOpacity
+                activeOpacity={0.6}
+                onPress={() => onEditPrompt(message.content)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={[styles.actionBtn, { marginLeft: 12 }]}>
+                <PencilIcon size={15} color={theme.textMuted} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -73,17 +109,44 @@ export function MessageBubble({ message, theme }: MessageBubbleProps) {
       </View>
       {!!message.content && (
         <View style={styles.assistantActionRow}>
+          {/* Copy button */}
           <TouchableOpacity
             activeOpacity={0.6}
             onPress={handleCopy}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.actionBtn}>
             {isCopied ? (
-              <CheckmarkIcon size={14} color="#52C41A" />
+              <CheckmarkIcon size={15} color="#52C41A" />
             ) : (
-              <CopyIcon size={14} color={theme.textMuted} />
+              <CopyIcon size={15} color={theme.textMuted} />
             )}
           </TouchableOpacity>
+
+          {/* Again search / Regenerate button */}
+          {!!onRegenerate && (
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={() => onRegenerate(message.id)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.actionBtn, { marginLeft: 12 }]}>
+              <RefreshIcon size={15} color={theme.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {/* Branch / Share button */}
+          {!!onBranch && (
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={handleBranchClick}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.actionBtn, { marginLeft: 12 }]}>
+              {isBranched ? (
+                <CheckmarkIcon size={15} color="#52C41A" />
+              ) : (
+                <ConnectorsBranchIcon size={16} color={theme.textMuted} />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -113,8 +176,10 @@ const styles = StyleSheet.create({
   userActionRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    marginTop: 3,
+    marginTop: 4,
+    marginBottom: 4,
   },
   assistantWrapper: {
     marginVertical: 4,
@@ -127,19 +192,21 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   assistantCard: {
-    maxWidth: '88%',
+    width: '100%',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   assistantActionRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    marginTop: 3,
+    marginTop: 4,
+    marginBottom: 4,
   },
   actionBtn: {
-    padding: 4,
+    padding: 5,
     borderRadius: 6,
   },
 });

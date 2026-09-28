@@ -20,6 +20,7 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'reac
 import {
   CheckmarkIcon,
   CloseIcon,
+  DownloadIcon,
   EmailIcon,
   EyeIcon,
   EyeOffIcon,
@@ -549,113 +550,100 @@ export function LoginScreen() {
     }
   };
 
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
   return (
-    <View style={styles.container}>
-      <View style={styles.contentColumn}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: Math.max(insets.top, 12) },
-          ]}
-          showsVerticalScrollIndicator={false}>
-          {/* 1. LoginBrandHeader (Matching Flutter LoginBrandHeader) */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => showSnackBar('Puku AI v0.42.0 • Online')}
-            style={styles.brandHeader}>
-            <PukuLogoIcon size={36} />
-            <Text style={styles.brandTitle}>Puku Editor</Text>
-          </TouchableOpacity>
-
-          {/* 2. LoginHeroSection (Matching Flutter LoginHeroSection) */}
-          <View style={styles.heroSection}>
-            <Text style={styles.heroHeadline}>
-              The <Text style={styles.heroHeadlineMuted}>AI Code Editor</Text>
-              {'\n'}That Understands{'\n'}Your Entire{'\n'}
-              <Text style={styles.heroHeadlineAccent}>Codebase</Text>
-            </Text>
-
-            <Text style={styles.heroSubtitle}>
-              <Text style={styles.heroSubtitleLead}>Puku </Text>
-              understands your entire codebase, predicts what needs to change
-              next, and guides you through it so you can build faster without
-              losing context.
-            </Text>
-          </View>
-
-          {/* 3. LoginGoogleCta (Directly launches authentic Google OAuth) */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleGoogleSignIn}
-            style={styles.googleCtaBtn}>
-            <GoogleIcon size={24} color={AppColors.black} />
-            <Text style={styles.googleCtaText}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          {/* 4. OR Divider (Matching Flutter OR Row) */}
-          <View style={styles.orRow}>
-            <View style={styles.orLine} />
-            <Text style={styles.orLabel}>OR</Text>
-            <View style={styles.orLine} />
-          </View>
-
-          {/* 5. LoginEmailCta (Opens in-app Authentic Token / Email modal) */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              setEmailErrorMessage(null);
-              setIsEmailModalOpen(true);
-            }}
-            style={styles.emailCtaBtn}>
-            <Text style={styles.emailCtaText}>Sign in with Puku Token or Email</Text>
-          </TouchableOpacity>
-
-          {/* 6. LoginLegalText (Matching Flutter LoginLegalText) */}
-          <View style={styles.legalWrapper}>
-            <Text style={styles.legalBase}>
-              By continuing, you agree to Puku's{' '}
-              <Text
-                onPress={() => showSnackBar('Consumer Terms: Standard Developer License')}
-                style={styles.legalLink}>
-                Consumer Terms
-              </Text>
-              {' and '}
-              <Text
-                onPress={() => showSnackBar('Usage Policy: AI Code Assistance')}
-                style={styles.legalLink}>
-                Usage Policy,
-              </Text>
-              {' and acknowledge their '}
-              <Text
-                onPress={() => showSnackBar('Privacy Policy: End-to-end Encrypted')}
-                style={styles.legalLink}>
-                Privacy Policy
-              </Text>
-              .
-            </Text>
-          </View>
-        </ScrollView>
-
-        {/* 7. Bottom Illustration with Fade Gradient (Matching Flutter Bottom Image Stack) */}
-        <View style={styles.bottomStack}>
-          <Image
-            source={require('../../assets/images/login_screen_bottom.png')}
-            style={styles.bottomImage}
-            resizeMode="cover"
-          />
-          <View style={styles.bottomGradientOverlay} pointerEvents="none">
-            <Svg height={80} width="100%">
-              <Defs>
-                <SvgLinearGradient id="bottomFadeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <Stop offset="0%" stopColor={AppColors.background} stopOpacity="1" />
-                  <Stop offset="100%" stopColor={AppColors.background} stopOpacity="0" />
-                </SvgLinearGradient>
-              </Defs>
-              <Rect x="0" y="0" width="100%" height={80} fill="url(#bottomFadeGrad)" />
-            </Svg>
-          </View>
+    <View style={[styles.container, { backgroundColor: '#F6F4EE' }]}>
+      {/* 1. Header Bar matching screenshot */}
+      <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 14) }]}>
+        <View style={styles.brandRow}>
+          <PukuLogoIcon size={26} />
+          <Text style={[styles.brandLogoText, { fontFamily: monoFont }]}>puku</Text>
         </View>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => Linking.openURL('https://puku.ai')}
+          style={styles.aboutPukuBtn}>
+          <Text style={[styles.aboutPukuText, { fontFamily: monoFont }]}>
+            About Puku ↗
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        {/* 2. Retro Macintosh Computer Illustration */}
+        <View style={styles.retroComputerWrap}>
+          <Image
+            source={require('../../assets/images/retro_puku_computer.png')}
+            style={styles.retroComputerImage}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* 3. Hero Typography matching screenshot */}
+        <View style={styles.heroSection}>
+          <Text style={[styles.heroHeadline, { fontFamily: monoFont }]}>
+            A little{'\n'}curiosity.{'\n'}A lot of{'\n'}possibility.
+          </Text>
+
+          <Text style={[styles.heroSubtitle, { fontFamily: monoFont }]}>
+            A place to think, make and figure things out.
+          </Text>
+        </View>
+
+        {/* 4. Primary Sign In CTA Button (Vibrant Indigo matching screenshot) */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          disabled={isGoogleLoading}
+          onPress={handleGoogleSignIn}
+          style={styles.primarySignInBtn}>
+          {isGoogleLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={[styles.primarySignInText, { fontFamily: monoFont }]}>
+              Sign in to Puku ↗
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* 5. Legal Notice matching screenshot */}
+        <Text style={[styles.legalBase, { fontFamily: monoFont }]}>
+          By continuing, you acknowledge Puku's{' '}
+          <Text
+            onPress={() => Linking.openURL('https://puku.ai/privacy')}
+            style={styles.legalLink}>
+            Privacy Policy
+          </Text>
+          .
+        </Text>
+
+        {/* 6. Developer Token or Email Option */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            setEmailErrorMessage(null);
+            setIsEmailModalOpen(true);
+          }}
+          style={styles.devTokenOptionBtn}>
+          <Text style={[styles.devTokenOptionText, { fontFamily: monoFont }]}>
+            Sign in with Puku Token or Email
+          </Text>
+        </TouchableOpacity>
+
+        {/* 7. Bottom Local Chat Link with Download Icon */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => showSnackBar('Puku local runtime enabled')}
+          style={styles.getLocallyRow}>
+          <DownloadIcon size={16} color="#6F736D" />
+          <Text style={[styles.getLocallyText, { fontFamily: monoFont }]}>
+            Get Puku chat locally
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       {/* Floating SnackBar matching Flutter ScaffoldMessenger SnackBar */}
       {snackBarMessage && (
@@ -878,140 +866,117 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: AppColors.background, // #100D1D
+    backgroundColor: '#F6F4EE',
   },
-  contentColumn: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    zIndex: 2,
-  },
-  // 1. Brand Header
-  brandHeader: {
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingVertical: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E6E2D8',
+    backgroundColor: '#F6F4EE',
   },
-  brandTitle: {
-    fontSize: 16,
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  brandLogoText: {
+    fontSize: 22,
     fontWeight: '700',
-    color: AppColors.primaryText,
+    color: '#1A1D18',
+    letterSpacing: -0.5,
   },
-  // 2. Hero Section
+  aboutPukuBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  aboutPukuText: {
+    fontSize: 13,
+    color: '#5D625A',
+    fontWeight: '500',
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  retroComputerWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 24,
+  },
+  retroComputerImage: {
+    width: 220,
+    height: 190,
+  },
   heroSection: {
-    marginTop: 24,
-    marginBottom: 34,
+    marginBottom: 28,
   },
   heroHeadline: {
-    fontSize: 34,
-    fontWeight: '800',
-    lineHeight: 40.8,
-    letterSpacing: -1.8,
-    color: AppColors.primaryText,
-  },
-  heroHeadlineMuted: {
-    color: AppColors.coolGrey,
-  },
-  heroHeadlineAccent: {
-    color: AppColors.pumpkin,
+    fontSize: 32,
+    lineHeight: 40,
+    fontWeight: '700',
+    letterSpacing: -1,
+    color: '#1A1D18',
+    marginBottom: 16,
   },
   heroSubtitle: {
     fontSize: 14,
-    lineHeight: 20.3,
+    lineHeight: 22,
+    color: '#5D625A',
     fontWeight: '400',
-    color: AppColors.coolGrey,
-    marginTop: 30,
   },
-  heroSubtitleLead: {
-    color: AppColors.primaryText,
-    fontWeight: '700',
-  },
-  // 3. Google CTA
-  googleCtaBtn: {
-    flexDirection: 'row',
+  primarySignInBtn: {
+    backgroundColor: '#4A54E8',
+    borderRadius: 10,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: AppColors.white,
-    height: 56,
-    borderRadius: 16,
-    gap: 8,
+    marginBottom: 16,
   },
-  googleCtaText: {
-    color: AppColors.background,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  // 4. OR Divider
-  orRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: AppColors.outline,
-  },
-  orLabel: {
+  primarySignInText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '500',
-    color: AppColors.coolGrey,
-    marginHorizontal: 20,
-  },
-  // 5. Email CTA
-  emailCtaBtn: {
-    height: 56,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: AppColors.outline,
-    backgroundColor: 'rgba(107, 107, 142, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emailCtaText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: AppColors.secondaryText,
-  },
-  // 6. Legal Text
-  legalWrapper: {
-    marginTop: 20,
-    alignItems: 'center',
-    paddingHorizontal: 8,
+    fontWeight: '600',
   },
   legalBase: {
     fontSize: 12,
-    lineHeight: 17.4,
-    textAlign: 'center',
-    fontWeight: '400',
-    color: 'rgba(107, 107, 142, 0.7)',
+    lineHeight: 18,
+    color: '#5D625A',
+    textAlign: 'left',
+    marginBottom: 14,
   },
   legalLink: {
     textDecorationLine: 'underline',
-    fontWeight: '700',
-    color: AppColors.coolGrey,
+    color: '#1A1D18',
+    fontWeight: '600',
   },
-  // 7. Bottom Illustration Stack
-  bottomStack: {
-    height: 160,
-    width: '100%',
-    overflow: 'hidden',
-    position: 'relative',
+  devTokenOptionBtn: {
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
-  bottomImage: {
-    width: '100%',
-    height: '100%',
+  devTokenOptionText: {
+    color: '#4A54E8',
+    fontSize: 13,
+    fontWeight: '500',
   },
-  bottomGradientOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 80,
+  getLocallyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingVertical: 8,
+  },
+  getLocallyText: {
+    color: '#5D625A',
+    fontSize: 13,
+    fontWeight: '500',
   },
   // SnackBar
   snackBar: {
