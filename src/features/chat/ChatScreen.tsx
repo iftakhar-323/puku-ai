@@ -38,6 +38,10 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const {
     theme,
+    isDark,
+    updateSettings,
+    conversations,
+    selectConversation,
     activeConversation,
     sendMessage,
     isGenerating,
@@ -163,13 +167,16 @@ export function ChatScreen() {
           paddingBottom: isKeyboardVisible ? 4 : Math.max(insets.bottom, 12),
         },
       ]}>
-      {/* 1:1 Authentic Header */}
+      {/* 1:1 Authentic Header with SidebarToggle, Terminal, and Theme toggle */}
       <ChatHeader
         theme={theme}
+        isDark={isDark}
         isIncognitoMode={isIncognito}
         title={isIncognito ? 'Incognito' : null}
         onLeadingTap={() => setDrawerOpen(true)}
         onTrailingTap={() => setIncognito(!isIncognito)}
+        onTerminalTap={() => navigate('code')}
+        onThemeTap={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
       />
 
       {/* Main Body */}
@@ -187,7 +194,14 @@ export function ChatScreen() {
             onLearnMoreTap={() => setIncognito(false)}
           />
         ) : !isIncognito && messages.length === 0 ? (
-          <ChatEmptyState theme={theme} />
+          <ChatEmptyState
+            theme={theme}
+            conversations={conversations}
+            onSelectConversation={id => selectConversation(id)}
+            onPromptTap={prompt => {
+              sendMessage(prompt);
+            }}
+          />
         ) : (
           <FlatList
             ref={flatListRef}
@@ -217,12 +231,13 @@ export function ChatScreen() {
         )}
       </View>
 
-      {/* 1:1 Authentic Composer */}
+      {/* 1:1 Authentic Composer with Dropdown */}
       <ChatComposer
         theme={theme}
         inputVal={inputVal}
         onChangeText={setInputVal}
-        selectedModelLabel={getModelLabel(selectedModel)}
+        selectedModel={selectedModel}
+        onSelectModel={model => setSelectedModel(model)}
         isSending={isGenerating}
         isListening={isListening}
         onFocus={() => {
@@ -231,9 +246,7 @@ export function ChatScreen() {
           }, 80);
         }}
         onPlusTap={() => setShowAttachmentSheet(true)}
-        onModelTap={() => setShowModelSheet(true)}
         onSubmitTap={handleSend}
-        onVoiceConversationTap={() => navigate('liveVoice')}
         onMicrophoneTap={handleToggleMic}
       />
 

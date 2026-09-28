@@ -797,3 +797,123 @@ export function SunIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
   );
 }
 
+export function SidebarToggleIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="4" width="18" height="16" rx="3" stroke={color} strokeWidth="1.8" />
+      <Path d="M9 4v16" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function TerminalPromptIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 7l5 5-5 5M12 17h8"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function ArrowUpRightIcon({ size = 16, color = '#8E9297' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Path
+        d="M6 14L14 6M14 6H7.5M14 6V12.5"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function UpArrowIcon({ size = 18, color = '#FFFFFF' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 19V5M5 12l7-7 7 7"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+
+/**
+ * Retro Macintosh-style Puku Computer Illustration
+ * Authentic 1:1 match to screenshot hero asset
+ */
+export function RetroPukuComputer({ width = 110, height = 100 }: { width?: number; height?: number }) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 110 100" fill="none">
+      <Defs>
+        <LinearGradient id="compBody" x1="20" y1="5" x2="70" y2="70" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#E6E0D5" />
+          <Stop offset="1" stopColor="#C9C2B5" />
+        </LinearGradient>
+        <LinearGradient id="screenGlow" x1="26" y1="18" x2="64" y2="48" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#142B28" />
+          <Stop offset="1" stopColor="#0B1A17" />
+        </LinearGradient>
+        <LinearGradient id="kbGrad" x1="10" y1="72" x2="75" y2="92" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#E2DCD1" />
+          <Stop offset="1" stopColor="#BFB9AC" />
+        </LinearGradient>
+      </Defs>
+
+      {/* Main Computer Tower Monitor Shadow */}
+      <Rect x="20" y="8" width="52" height="58" rx="4" fill="#7A756C" opacity={0.4} />
+
+      {/* Main Computer Tower Monitor Body */}
+      <Rect x="18" y="6" width="52" height="58" rx="4" fill="url(#compBody)" stroke="#9E978B" strokeWidth="1" />
+
+      {/* Bezel inner bevel */}
+      <Rect x="23" y="14" width="42" height="36" rx="2" fill="#2E2C28" />
+      <Rect x="25" y="16" width="38" height="32" rx="1.5" fill="url(#screenGlow)" />
+
+      {/* Retro PUKU glowing text on screen */}
+      {/* P */}
+      <Path d="M30 24h5a3 3 0 0 1 0 6h-5v8m0-8v8m0-5h5" stroke="#36E5C2" strokeWidth="1.5" strokeLinecap="round" />
+      {/* U */}
+      <Path d="M40 24v7a3 3 0 0 0 6 0v-7" stroke="#36E5C2" strokeWidth="1.5" strokeLinecap="round" />
+      {/* K */}
+      <Path d="M49 24v14m5-14l-5 7 5 7" stroke="#36E5C2" strokeWidth="1.5" strokeLinecap="round" />
+      {/* U */}
+      <Path d="M57 24v7a3 3 0 0 0 6 0v-7" stroke="#36E5C2" strokeWidth="1.5" strokeLinecap="round" />
+
+      {/* Floppy Disk Slot */}
+      <Rect x="30" y="55" width="28" height="2.5" rx="0.8" fill="#3D3A35" />
+      <Circle cx="25" cy="56.2" r="1.2" fill="#5A8A62" />
+
+      {/* Keyboard Cable connecting to computer */}
+      <Path d="M68 64c8 2 12 10 10 18" stroke="#8E887D" strokeWidth="1.5" strokeLinecap="round" />
+
+      {/* Keyboard */}
+      <Rect x="10" y="70" width="68" height="20" rx="2" fill="url(#kbGrad)" stroke="#9C9588" strokeWidth="1" />
+      {/* Key rows */}
+      <Rect x="13" y="73" width="62" height="3" rx="0.5" fill="#D5CEBF" />
+      <Rect x="13" y="77.5" width="62" height="3" rx="0.5" fill="#D5CEBF" />
+      <Rect x="13" y="82" width="62" height="3" rx="0.5" fill="#D5CEBF" />
+      {/* Spacebar */}
+      <Rect x="26" y="86" width="30" height="2.5" rx="0.5" fill="#C2BBAE" />
+
+      {/* Mouse Cable */}
+      <Path d="M78 82c6-3 6-8 10-6" stroke="#8E887D" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+
+      {/* Mouse */}
+      <Rect x="83" y="76" width="12" height="18" rx="4" fill="url(#kbGrad)" stroke="#9C9588" strokeWidth="1" />
+      <Path d="M89 76v6" stroke="#9C9588" strokeWidth="0.8" />
+    </Svg>
+  );
+}
+

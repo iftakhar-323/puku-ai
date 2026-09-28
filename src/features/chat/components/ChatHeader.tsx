@@ -3,27 +3,35 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   BackIcon,
   CloseIcon,
-  IncognitoIcon,
-  MenuIcon,
+  MoonIcon,
+  SidebarToggleIcon,
+  SunIcon,
+  TerminalPromptIcon,
 } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 
 interface ChatHeaderProps {
   theme: ThemeColors;
+  isDark?: boolean;
   showsBackButton?: boolean;
   isIncognitoMode?: boolean;
   title?: string | null;
   onLeadingTap: () => void;
-  onTrailingTap: () => void;
+  onTrailingTap?: () => void;
+  onTerminalTap?: () => void;
+  onThemeTap?: () => void;
 }
 
 export function ChatHeader({
   theme,
+  isDark = true,
   showsBackButton = false,
   isIncognitoMode = false,
   title,
   onLeadingTap,
   onTrailingTap,
+  onTerminalTap,
+  onThemeTap,
 }: ChatHeaderProps) {
   return (
     <View style={styles.container}>
@@ -32,9 +40,9 @@ export function ChatHeader({
         onPress={onLeadingTap}
         style={styles.actionBtn}>
         {showsBackButton ? (
-          <BackIcon size={24} color={theme.textPrimary} />
+          <BackIcon size={22} color={theme.textPrimary} />
         ) : (
-          <MenuIcon size={24} color={theme.textPrimary} />
+          <SidebarToggleIcon size={22} color={theme.textPrimary} />
         )}
       </TouchableOpacity>
 
@@ -46,16 +54,40 @@ export function ChatHeader({
         ) : null}
       </View>
 
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={onTrailingTap}
-        style={styles.actionBtn}>
+      <View style={styles.trailingGroup}>
         {isIncognitoMode ? (
-          <CloseIcon size={22} color={theme.textPrimary} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={onTrailingTap}
+            style={styles.actionBtn}>
+            <CloseIcon size={22} color={theme.textPrimary} />
+          </TouchableOpacity>
         ) : (
-          <IncognitoIcon size={24} color={theme.textPrimary} />
+          <>
+            {onTerminalTap && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={onTerminalTap}
+                style={styles.actionBtn}>
+                <TerminalPromptIcon size={20} color={theme.textPrimary} />
+              </TouchableOpacity>
+            )}
+
+            {onThemeTap && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={onThemeTap}
+                style={styles.actionBtn}>
+                {isDark ? (
+                  <SunIcon size={20} color={theme.textPrimary} />
+                ) : (
+                  <MoonIcon size={20} color={theme.textPrimary} />
+                )}
+              </TouchableOpacity>
+            )}
+          </>
         )}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -69,9 +101,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   actionBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -83,5 +115,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  trailingGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
 });
