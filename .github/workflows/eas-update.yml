@@ -38,6 +38,11 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
+      - name: Initialize EAS project if not linked
+        run: |
+          npx eas-cli init --account iftakhar-alam --non-interactive || true
+
       - name: Publish EAS Update
         run: |
           npx eas-cli update --auto --non-interactive
+
