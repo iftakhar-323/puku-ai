@@ -1,0 +1,27 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "default",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.js",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "src/components",
+    "utils": "src/lib/utils",
+    "ui": "src/components/puku-ui",
+    "lib": "src/lib",
+    "hooks": "src/hooks"
+  },
+  "registries": {
+    "@puku": {
+      "url": "https://ds.puku.sh/r/{name}.json",
+      "headers": {
+        "Authorization": "Bearer ${PUKUSH_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

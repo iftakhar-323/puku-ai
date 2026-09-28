@@ -1,9 +1,7 @@
-/**
- * @format
- */
-
+import { registerRootComponent } from 'expo';
 import { AppRegistry } from 'react-native';
 import App from './App';
-import { name as appName } from './app.json';
 
-AppRegistry.registerComponent(appName, () => App);
+// Register for both bare React Native (MainActivity: PukuAI) and Expo platform
+AppRegistry.registerComponent('PukuAI', () => App);
+registerRootComponent(App);

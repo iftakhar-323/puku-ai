@@ -5,7 +5,7 @@
  * @format
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppDrawer } from './src/components/common/AppDrawer';
@@ -23,9 +23,15 @@ import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { TranscribeScreen } from './src/features/transcribe/TranscribeScreen';
 import { AppProvider, useApp } from './src/store/AppContext';
 import { ToastProvider } from './src/components/ui/Toast';
+import { UpdateService } from './src/services/updateService';
 
 function MainNavigator(): React.JSX.Element {
   const { activeRoute, isDark } = useApp();
+
+  useEffect(() => {
+    UpdateService.checkForUpdates();
+  }, []);
+
 
   const renderScreen = () => {
     switch (activeRoute) {

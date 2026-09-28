@@ -35,33 +35,33 @@ export interface ThemeColors {
 }
 
 export const darkTheme: ThemeColors = {
-  background: AppColors.background, // #100D1D
-  secondaryBackground: AppColors.secondaryBackground, // #151125
-  cardBackground: AppColors.secondaryBackground, // #151125
-  chatBarBackground: AppColors.secondaryBackground, // #151125
-  chatBarBorder: AppColors.outline, // rgba(255,255,255,0.2)
-  primary: AppColors.primary, // #201C59
-  primaryLight: AppColors.blue, // #2B7FFF
-  accent: AppColors.accent, // #A5A5FF
-  textPrimary: AppColors.primaryText, // #FFFFFF
-  textSecondary: AppColors.secondaryText, // #87868E
-  textMuted: AppColors.coolGrey, // #6B6B8E
-  placeholderText: AppColors.secondaryText, // #87868E
-  border: AppColors.outline,
-  outline: AppColors.outline,
+  background: AppColors.background, // #151614 (official Puku deep charcoal black)
+  secondaryBackground: AppColors.secondaryBackground, // #1c1d1a (official Puku panel)
+  cardBackground: AppColors.secondaryBackground, // #1c1d1a
+  chatBarBackground: AppColors.secondaryBackground, // #1c1d1a
+  chatBarBorder: AppColors.outline, // #34362e
+  primary: AppColors.primary, // #242620
+  primaryLight: AppColors.accent, // #b0b3fc
+  accent: AppColors.accent, // #b0b3fc
+  textPrimary: AppColors.primaryText, // #eeeee5
+  textSecondary: AppColors.secondaryText, // #9da193
+  textMuted: '#626759',
+  placeholderText: AppColors.secondaryText, // #9da193
+  border: AppColors.outline, // #34362e
+  outline: AppColors.outline, // #34362e
   buttonBackground: 'rgba(255, 255, 255, 0.06)',
   pillBackground: 'rgba(255, 255, 255, 0.08)',
   tagText: AppColors.accent,
-  menuIcon: AppColors.white,
-  error: '#FF4D4F',
-  success: '#52C41A',
-  warning: AppColors.pumpkin, // #E07830
-  codeBackground: AppColors.secondary, // #0B0817
+  menuIcon: AppColors.primaryText,
+  error: AppColors.pukuDanger, // #ff9198
+  success: AppColors.pukuSuccess, // #94c7a0
+  warning: AppColors.pukuWarning, // #e8b187
+  codeBackground: AppColors.secondary, // #10110f
   thinkingBackground: 'rgba(255, 255, 255, 0.04)',
-  userBubble: AppColors.primary, // #201C59
-  onUserBubble: '#FFFFFF',
-  assistantBubble: AppColors.black, // #000000 matching Flutter surfaceContainerHighest
-  iconBackground: AppColors.iconBackground, // #1C1732
+  userBubble: AppColors.secondaryBackground, // #1c1d1a (matches official --user-msg-bg)
+  onUserBubble: AppColors.primaryText, // #eeeee5
+  assistantBubble: AppColors.background, // #151614
+  iconBackground: AppColors.iconBackground, // #242620
   pumpkin: AppColors.pumpkin,
   blue: AppColors.blue,
   blueLite: AppColors.blueLite,
@@ -69,37 +69,37 @@ export const darkTheme: ThemeColors = {
 };
 
 export const lightTheme: ThemeColors = {
-  background: '#FBFBFE',
-  secondaryBackground: '#FFFFFF',
-  cardBackground: '#FFFFFF',
-  chatBarBackground: '#F0EEF8',
-  chatBarBorder: '#E4E0F2',
-  primary: '#6C47EB',
-  primaryLight: '#8B6BFF',
-  accent: '#7B61FF',
-  textPrimary: '#1A1729',
-  textSecondary: '#6F6B85',
-  textMuted: '#9B98AE',
-  placeholderText: '#8E8A9F',
-  border: '#EAE7F5',
-  outline: '#E0DCF0',
-  buttonBackground: '#FFFFFF',
-  pillBackground: '#E8E3FA',
-  tagText: '#4A2EC7',
-  menuIcon: '#1A1729',
-  error: '#FF4D4F',
-  success: '#52C41A',
-  warning: '#FAAD14',
-  codeBackground: '#F2F0FA',
-  thinkingBackground: '#F0ECFC',
-  userBubble: '#EAE4F9',
-  onUserBubble: '#1E1B2E',
-  assistantBubble: '#FBFBFE',
-  iconBackground: '#E8E3FA',
-  pumpkin: '#E07830',
+  background: '#f1f0e9', // Official Puku Light Main
+  secondaryBackground: '#fafaf5', // Official Puku Light Panel
+  cardBackground: '#fafaf5',
+  chatBarBackground: '#e9e9e0',
+  chatBarBorder: '#c9cdc0',
+  primary: '#484dd0',
+  primaryLight: '#484dd0',
+  accent: '#484dd0',
+  textPrimary: '#282c22',
+  textSecondary: '#626759',
+  textMuted: '#9da193',
+  placeholderText: '#626759',
+  border: '#c9cdc0',
+  outline: '#c9cdc0',
+  buttonBackground: '#fafaf5',
+  pillBackground: '#e4e5db',
+  tagText: '#484dd0',
+  menuIcon: '#282c22',
+  error: '#b5263e',
+  success: '#326b40',
+  warning: '#8b4a18',
+  codeBackground: '#e9e9e0',
+  thinkingBackground: '#e4e5db',
+  userBubble: '#fafaf5',
+  onUserBubble: '#282c22',
+  assistantBubble: '#f1f0e9',
+  iconBackground: '#e4e5db',
+  pumpkin: '#8b4a18',
   blue: '#2B7FFF',
   blueLite: '#51A2FF',
-  coolGrey: '#6B6B8E',
+  coolGrey: '#626759',
 };
 
 export const dimens = {

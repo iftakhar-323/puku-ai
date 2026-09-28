@@ -28,3 +28,16 @@ jest.mock('react-native-inappbrowser-reborn', () => ({
     close: jest.fn(),
   },
 }));
+
+jest.mock('expo-updates', () => ({
+  isEnabled: false,
+  isEmbeddedLaunch: true,
+  checkForUpdateAsync: jest.fn().mockResolvedValue({ isAvailable: false }),
+  fetchUpdateAsync: jest.fn().mockResolvedValue({ isNew: false }),
+  reloadAsync: jest.fn().mockResolvedValue(undefined),
+  addListener: jest.fn(),
+  channel: 'production',
+  updateId: 'test-id',
+  runtimeVersion: '1.0.0',
+}));
+

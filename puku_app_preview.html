@@ -1,0 +1,2037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Puku AI - Android App Interactive Simulator (Samsung Galaxy A54)</title>
+  <link rel="stylesheet" href="/src/components/puku-ui/puku.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            puku: {
+              bg: '#151614',
+              secondary: '#1c1d1a',
+              card: '#1c1d1a',
+              dark: '#10110f',
+              primary: '#242620',
+              accent: '#b0b3fc',
+              purple: '#b0b3fc',
+              pumpkin: '#e8b187',
+              blue: '#2B7FFF',
+              border: 'rgba(255,255,255,0.08)',
+              outline: 'rgba(255,255,255,0.15)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    @keyframes orb-glow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 25px rgba(108, 71, 235, 0.6)); }
+      50% { transform: scale(1.08); filter: drop-shadow(0 0 45px rgba(165, 165, 255, 0.85)); }
+    }
+    @keyframes soundwave {
+      0%, 100% { height: 8px; }
+      50% { height: 28px; }
+    }
+    .orb-pulse { animation: orb-glow 3s ease-in-out infinite; }
+    .pulse-ring-anim { animation: pulse-ring 2.4s ease-in-out infinite; }
+    .wave-bar { animation: soundwave 1.2s ease-in-out infinite; }
+    ::-webkit-scrollbar { display: none; }
+    * { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* Device zoom helper */
+    .zoom-100 { transform: scale(1); }
+    .zoom-90 { transform: scale(0.9); }
+    .zoom-80 { transform: scale(0.82); }
+    .zoom-75 { transform: scale(0.75); }
+
+    /* Light mode simulator overrides when applied to device frame */
+    .app-light-mode {
+      background-color: #FBFBFE !important;
+      color: #1A1729 !important;
+    }
+    .app-light-mode .light-bg-sec {
+      background-color: #FFFFFF !important;
+      border-color: #E4E0F2 !important;
+      color: #1A1729 !important;
+    }
+    .app-light-mode .light-text-sub {
+      color: #6B7280 !important;
+    }
+  </style>
+</head>
+<body class="bg-[#0d0e0c] text-zinc-200 font-sans min-h-screen flex flex-col items-center justify-start p-2 sm:p-5 select-none">
+
+  <!-- ================= TOP CONTROLS & VS CODE EMBED TOOLBAR ================= -->
+  <header class="w-full max-w-[500px] mb-3 flex flex-col gap-2">
+    <div class="flex items-center justify-between px-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span class="text-xs font-bold tracking-wide text-white flex items-center gap-1.5">
+          <span>Puku AI</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#242620] text-[#b0b3fc] border border-[#b0b3fc]/30 font-semibold">Galaxy A54</span>
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Scale Selector -->
+        <div class="flex items-center bg-[#1c1d1a] border border-white/10 rounded-lg p-0.5 text-[11px]">
+          <button onclick="setZoom('100')" id="z-100" class="px-2 py-0.5 rounded font-medium bg-[#b0b3fc] text-[#151614] font-semibold">100%</button>
+          <button onclick="setZoom('90')" id="z-90" class="px-2 py-0.5 rounded font-medium text-zinc-400 hover:text-white">90%</button>
+          <button onclick="setZoom('80')" id="z-80" class="px-2 py-0.5 rounded font-medium text-zinc-400 hover:text-white">80%</button>
+        </div>
+        <!-- Sound Effect Toggle -->
+        <button onclick="toggleAudio()" id="btn-sound" title="Toggle UI Sound" class="p-1.5 rounded-lg bg-[#1c1d1a] border border-white/10 text-xs text-zinc-400 hover:text-white">
+          🔊
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Screen Jump Navigation Pills -->
+    <div class="flex items-center gap-1 overflow-x-auto pb-1 px-1 bg-[#1c1d1a] p-1.5 rounded-xl border border-white/10 text-[11px]">
+      <button onclick="navigateTo('chat')" id="nav-chat" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap bg-[#b0b3fc] text-[#151614] font-semibold shadow-sm">Chat</button>
+      <button onclick="openDrawer()" id="nav-drawer" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">☰ Drawer</button>
+      <button onclick="navigateTo('chats')" id="nav-chats" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Chats</button>
+      <button onclick="navigateTo('projects')" id="nav-projects" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Projects</button>
+      <button onclick="navigateTo('artifacts')" id="nav-artifacts" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Artifacts</button>
+      <button onclick="navigateTo('code')" id="nav-code" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Code</button>
+      <button onclick="navigateTo('remote')" id="nav-remote" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Remote</button>
+      <button onclick="navigateTo('liveVoice')" id="nav-liveVoice" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">🎙️ Voice</button>
+      <button onclick="navigateTo('transcribe')" id="nav-transcribe" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Transcribe</button>
+      <button onclick="navigateTo('settings')" id="nav-settings" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Settings</button>
+      <button onclick="navigateTo('profile')" id="nav-profile" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Profile</button>
+      <button onclick="navigateTo('login')" id="nav-login" class="px-2.5 py-1 rounded-lg font-medium whitespace-nowrap text-zinc-400 hover:text-white hover:bg-white/5">Login</button>
+    </div>
+  </header>
+
+  <!-- ================= SAMSUNG GALAXY A54 PHONE CHASSIS ================= -->
+  <div id="device-wrapper" class="relative transition-transform duration-200 origin-top">
+    <!-- Physical phone frame -->
+    <div id="device-chassis" class="relative w-[380px] h-[780px] bg-[#151614] rounded-[48px] p-2.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9),0_0_20px_rgba(0,0,0,0.5)] border-[8px] border-[#242620] ring-1 ring-white/10 flex flex-col overflow-hidden text-white transition-colors duration-200">
+      
+      <!-- Side Physical Hardware Buttons Simulation -->
+      <div class="absolute -right-[11px] top-28 w-[3px] h-12 bg-[#34362e] rounded-r"></div>
+      <div class="absolute -right-[11px] top-44 w-[3px] h-20 bg-[#34362e] rounded-r"></div>
+
+      <!-- ================= ANDROID STATUS BAR ================= -->
+      <div id="status-bar" class="w-full h-8 pt-1 px-5 flex items-center justify-between text-[11px] font-semibold text-zinc-300 z-40 select-none">
+        <span id="live-clock">10:30</span>
+        
+        <!-- Samsung Center Punch-Hole Camera -->
+        <div class="w-3.5 h-3.5 bg-black rounded-full border border-zinc-800 shadow-[inset_0_1px_3px_rgba(255,255,255,0.2)] flex items-center justify-center">
+          <div class="w-1.5 h-1.5 bg-[#081224] rounded-full"></div>
+        </div>
+
+        <div class="flex items-center gap-1.5 text-xs">
+          <span class="text-[10px] font-bold text-zinc-400">5G</span>
+          <!-- Signal Icon -->
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9z"/></svg>
+          <!-- Battery Icon with % -->
+          <div class="flex items-center gap-0.5">
+            <span class="text-[10px]">98%</span>
+            <div class="w-4 h-2 border border-zinc-400 rounded-sm p-[1px] flex items-center">
+              <div class="w-full h-full bg-emerald-400 rounded-xs"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SCREEN CONTAINER ================= -->
+      <main id="screen-container" class="flex-1 flex flex-col overflow-hidden relative">
+
+        <!-- 1. CHAT SCREEN -->
+        <section id="screen-chat" class="flex-1 flex flex-col overflow-hidden relative">
+          <!-- Chat Header -->
+          <header class="h-12 px-3.5 flex items-center justify-between border-b border-[#34362e]/40 bg-[#151614] z-20">
+            <!-- Sidebar toggle button [|] -->
+            <button onclick="openDrawer()" title="Toggle Sidebar" class="p-1.5 -ml-1 text-[#eeeee5] hover:text-white rounded-lg active:scale-90 transition-transform">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M9 3V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <div class="flex-1"></div>
+            <div class="flex items-center gap-1.5">
+              <!-- Terminal Prompt >_ -->
+              <button onclick="navigateTo('code')" title="Code & Terminal" class="p-1.5 text-[#eeeee5] hover:text-white rounded-lg transition-colors">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 17L10 11L4 5M12 19H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <!-- Sun / Theme Toggle ☼ -->
+              <button onclick="toggleDarkTheme()" title="Toggle Theme" class="p-1.5 text-[#eeeee5] hover:text-white rounded-lg transition-colors">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </header>
+
+          <!-- Incognito Banner -->
+          <div id="incognito-banner" class="hidden px-3 py-1.5 bg-[#242620]/60 border-b border-[#b0b3fc]/20 text-[10px] text-[#b0b3fc] flex items-center justify-between">
+            <span class="flex items-center gap-1">🔒 <strong>Incognito Mode</strong> (Zero-trace session active)</span>
+            <button onclick="toggleIncognito()" class="underline text-zinc-300">Turn Off</button>
+          </div>
+
+          <!-- Messages Scrollable Stream -->
+          <div id="messages-container" class="flex-1 overflow-y-auto px-3.5 py-3 space-y-3">
+            <!-- Initial dynamic messages populated by JS -->
+          </div>
+
+          <!-- Composer Bar -->
+          <div class="p-2.5 bg-[#151614] border-t border-[#34362e]/30 relative">
+            <div class="bg-[#1c1d1a] border border-[#34362e] rounded-2xl p-2.5 flex flex-col gap-2 shadow-[0_0_20px_rgba(176,179,252,0.06)]">
+              <!-- Text input -->
+              <div class="flex items-center gap-2 px-1">
+                <input id="chat-input" type="text" placeholder="A question, a thought, a wild idea…" class="w-full bg-transparent text-xs text-[#eeeee5] placeholder-[#9da193] font-mono outline-none" onkeydown="if(event.key==='Enter')sendMessage()">
+              </div>
+              <!-- Action buttons row -->
+              <div class="flex items-center justify-between pt-1">
+                <div class="flex items-center gap-2">
+                  <button onclick="openAttachmentSheet()" title="Add Attachment" class="p-1 text-[#9da193] hover:text-white active:scale-95 transition-transform">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                  </button>
+                  <button onclick="openModelSheet()" id="composer-model-pill" title="Select AI Model" class="flex items-center gap-1 text-xs font-mono text-[#9da193] hover:text-white active:scale-95 transition-transform">
+                    <span id="composer-model-label" class="text-[#9da193]">Puku-ai 2.8</span>
+                    <span class="text-[10px] text-[#9da193]">⌄</span>
+                  </button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <!-- Native Speech Microphone -->
+                  <button onclick="toggleSpeechMic()" id="btn-mic" title="Voice Input" class="p-1 text-[#9da193] hover:text-white active:scale-90 transition-transform">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                  </button>
+                  <!-- Send Button (Up Arrow inside rounded square) -->
+                  <button onclick="sendMessage()" title="Send Message" class="w-7 h-7 rounded-lg bg-[#242620] border border-[#34362e] text-[#9da193] hover:text-white hover:bg-white/10 active:scale-90 flex items-center justify-center transition-all shadow">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 19V5M5 12l7-7 7 7"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. CHATS HISTORY SCREEN -->
+        <section id="screen-chats" class="flex-1 hidden flex-col overflow-hidden">
+          <header class="h-12 px-3.5 flex items-center justify-between border-b border-white/5 bg-[#151614]">
+            <button onclick="navigateTo('chat')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Back
+            </button>
+            <span class="font-bold text-sm text-white">Conversations</span>
+            <button onclick="toggleChatSelectionMode()" id="chats-select-btn" class="text-xs text-[#b0b3fc] font-semibold">Select</button>
+          </header>
+          <!-- Search box -->
+          <div class="p-3 border-b border-white/5">
+            <div class="flex items-center gap-2 bg-[#1c1d1a] border border-white/10 rounded-xl px-3 py-1.5 text-xs">
+              <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input id="chats-search-input" oninput="filterChats(this.value)" type="text" placeholder="Search conversations..." class="w-full bg-transparent text-white placeholder-zinc-500 outline-none">
+            </div>
+          </div>
+          <!-- Selection Toolbar (hidden by default) -->
+          <div id="chats-select-bar" class="hidden px-3.5 py-2 bg-[#242620]/40 border-b border-white/5 flex items-center justify-between text-xs">
+            <span id="chats-selected-count" class="text-zinc-300">0 selected</span>
+            <div class="flex items-center gap-2">
+              <button onclick="deleteSelectedChats()" class="text-red-400 hover:text-red-300 font-medium">Delete</button>
+              <button onclick="cancelChatSelection()" class="text-zinc-400 hover:text-white">Cancel</button>
+            </div>
+          </div>
+          <!-- List of chats -->
+          <div id="chats-list" class="flex-1 overflow-y-auto p-3 space-y-2">
+            <!-- Populated via JS -->
+          </div>
+          <div class="p-3 border-t border-white/5">
+            <button onclick="createNewConversation()" class="w-full py-2.5 rounded-xl bg-[#b0b3fc] text-[#151614] font-semibold text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform">
+              <span>+</span> New Conversation
+            </button>
+          </div>
+        </section>
+
+        <!-- 3. PROJECTS SCREEN -->
+        <section id="screen-projects" class="flex-1 hidden flex-col overflow-hidden">
+          <header class="h-12 px-3.5 flex items-center justify-between border-b border-white/5 bg-[#151614]">
+            <button onclick="navigateTo('chat')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Back
+            </button>
+            <span class="font-bold text-sm text-white">Projects</span>
+            <button onclick="openNewProjectModal()" class="text-xs text-[#b0b3fc] font-bold">+ New</button>
+          </header>
+          <!-- Project Scope Tabs -->
+          <div class="p-3">
+            <div class="flex bg-[#1c1d1a] p-1 rounded-xl border border-white/5 text-[11px]">
+              <button onclick="setProjectTab('yours')" id="ptab-yours" class="flex-1 py-1 rounded-lg bg-[#242620] text-white font-semibold">Yours</button>
+              <button onclick="setProjectTab('power')" id="ptab-power" class="flex-1 py-1 rounded-lg text-zinc-400">Power</button>
+              <button onclick="setProjectTab('shared')" id="ptab-shared" class="flex-1 py-1 rounded-lg text-zinc-400">Shared</button>
+              <button onclick="setProjectTab('archived')" id="ptab-archived" class="flex-1 py-1 rounded-lg text-zinc-400">Archived</button>
+            </div>
+          </div>
+          <!-- Projects List -->
+          <div id="projects-list" class="flex-1 overflow-y-auto px-3 space-y-2.5">
+            <!-- Populated via JS -->
+          </div>
+        </section>
+
+        <!-- 4. PROJECT DETAILS SCREEN -->
+        <section id="screen-project-details" class="flex-1 hidden flex-col overflow-hidden">
+          <header class="h-12 px-3.5 flex items-center justify-between border-b border-white/5 bg-[#151614]">
+            <button onclick="navigateTo('projects')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Projects
+            </button>
+            <span id="proj-detail-title" class="font-bold text-sm text-white truncate max-w-[180px]">Project Details</span>
+            <button onclick="showToast('Project synced with cloud')" class="text-zinc-400 hover:text-white">⋮</button>
+          </header>
+          <!-- Project Details Tabs -->
+          <div class="flex border-b border-white/5 px-3 text-xs bg-[#1c1d1a]">
+            <button onclick="setProjDetailTab('overview')" id="pdtab-overview" class="py-2.5 px-3 border-b-2 border-[#b0b3fc] text-white font-semibold">Overview</button>
+            <button onclick="setProjDetailTab('tasks')" id="pdtab-tasks" class="py-2.5 px-3 border-b-2 border-transparent text-zinc-400">Tasks (<span id="task-badge-count">3</span>)</button>
+            <button onclick="setProjDetailTab('files')" id="pdtab-files" class="py-2.5 px-3 border-b-2 border-transparent text-zinc-400">Files</button>
+          </div>
+          <!-- Tab Contents -->
+          <div class="flex-1 overflow-y-auto p-3.5 space-y-3">
+            <div id="pd-content-overview" class="space-y-3">
+              <div class="bg-[#1c1d1a] p-3 rounded-xl border border-white/5">
+                <span class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Description</span>
+                <p id="proj-detail-desc" class="text-xs text-zinc-300 mt-1">Architecture and Base UI parity</p>
+              </div>
+              <div class="bg-[#1c1d1a] p-3 rounded-xl border border-white/5">
+                <span class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">System Instructions</span>
+                <p id="proj-detail-inst" class="text-xs text-zinc-400 mt-1 font-mono bg-[#10110f] p-2 rounded border border-white/5">Maintain high performance 120Hz scrolling</p>
+              </div>
+              <div class="bg-[#1c1d1a] p-3 rounded-xl border border-white/5 space-y-2">
+                <div class="flex justify-between text-xs">
+                  <span class="text-zinc-400">Completion</span>
+                  <span id="proj-progress-num" class="font-bold text-emerald-400">66%</span>
+                </div>
+                <div class="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
+                  <div id="proj-progress-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width: 66%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="pd-content-tasks" class="hidden space-y-2">
+              <div class="text-[10px] uppercase font-bold text-zinc-400 px-1">Milestones</div>
+              <div id="tasks-checklist" class="space-y-2">
+                <!-- Checkboxes populated via JS -->
+              </div>
+            </div>
+
+            <div id="pd-content-files" class="hidden space-y-2">
+              <div class="flex items-center justify-between text-xs text-zinc-400 mb-1">
+                <span>Project Knowledge Files</span>
+                <button onclick="showToast('File uploaded successfully')" class="text-[#b0b3fc] font-semibold">+ Add File</button>
+              </div>
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between p-2.5 rounded-lg bg-[#1c1d1a] border border-white/5 text-xs">
+                  <div class="flex items-center gap-2">
+                    <span>📄</span>
+                    <span class="text-white font-medium">App.tsx</span>
+                  </div>
+                  <span class="text-[10px] text-zinc-500">TypeScript</span>
+                </div>
+                <div class="flex items-center justify-between p-2.5 rounded-lg bg-[#1c1d1a] border border-white/5 text-xs">
+                  <div class="flex items-center gap-2">
+                    <span>📑</span>
+                    <span class="text-white font-medium">theme.ts</span>
+                  </div>
+                  <span class="text-[10px] text-zinc-500">Design Tokens</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. ARTIFACTS SCREEN -->
+        <section id="screen-artifacts" class="flex-1 hidden flex-col overflow-hidden">
+          <header class="h-12 px-3.5 flex items-center justify-between border-b border-white/5 bg-[#151614]">
+            <button onclick="navigateTo('chat')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Back
+            </button>
+            <span class="font-bold text-sm text-white">Artifacts</span>
+            <button onclick="showToast('Artifacts refreshed')" class="text-zinc-400 hover:text-white">↻</button>
+          </header>
+          <!-- Artifact Filter Pills -->
+          <div class="p-3 border-b border-white/5">
+            <div class="flex gap-1.5 overflow-x-auto text-[11px]">
+              <button onclick="filterArtifactsType('all')" id="art-pill-all" class="px-3 py-1 rounded-full bg-[#b0b3fc] text-[#151614] font-semibold font-semibold">All</button>
+              <button onclick="filterArtifactsType('code')" id="art-pill-code" class="px-3 py-1 rounded-full bg-[#1c1d1a] text-zinc-400 hover:text-white">Code</button>
+              <button onclick="filterArtifactsType('markdown')" id="art-pill-markdown" class="px-3 py-1 rounded-full bg-[#1c1d1a] text-zinc-400 hover:text-white">Markdown</button>
+              <button onclick="filterArtifactsType('svg')" id="art-pill-svg" class="px-3 py-1 rounded-full bg-[#1c1d1a] text-zinc-400 hover:text-white">SVG</button>
+            </div>
+          </div>
+          <div id="artifacts-list" class="flex-1 overflow-y-auto p-3 space-y-2.5">
+            <!-- Populated by JS -->
+          </div>
+        </section>
+
+        <!-- 6. CODE SCREEN -->
+        <section id="screen-code" class="flex-1 hidden flex-col overflow-hidden">
+          <header class="h-12 px-3.5 flex items-center justify-between border-b border-white/5 bg-[#151614]">
+            <button onclick="navigateTo('chat')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Back
+            </button>
+            <span class="font-bold text-sm text-white">Code Sessions</span>
+            <button onclick="openNewCodeModal()" class="text-xs text-[#b0b3fc] font-bold">+ New</button>
+          </header>
+          <div class="flex-1 overflow-y-auto p-3.5 space-y-3">
+            <!-- Suggested Integrations -->
+            <div class="bg-[#1c1d1a] p-3 rounded-xl border border-white/5 space-y-2">
+              <span class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Integrations</span>
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span class="text-white font-medium">GitHub Repository</span>
+                </div>
+                <span class="text-[10px] text-emerald-400 font-semibold">Connected</span>
+              </div>
+            </div>
+
+            <!-- Code Editor Component -->
+            <div class="bg-[#10110f] rounded-xl border border-white/10 overflow-hidden flex flex-col">
+              <div class="px-3 py-2 bg-[#1c1d1a] border-b border-white/5 flex items-center justify-between">
+                <span class="text-[11px] font-mono text-zinc-300">App.tsx (Interactive)</span>
+                <button onclick="runCodeSessionSimulation()" class="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] flex items-center gap-1 active:scale-95 transition-transform">
+                  <span>▶</span> Run Code
+                </button>
+              </div>
+              <textarea id="code-editor-area" rows="6" class="w-full bg-transparent p-3 font-mono text-[11px] text-emerald-400 outline-none resize-none">import React from 'react';
+import { ChatScreen } from './src/features/chat';
+
+export default function App() {
+  return <ChatScreen />;
+}</textarea>
+            </div>
+
+            <!-- Run Terminal Console Output -->
+            <div class="bg-[#080512] rounded-xl border border-white/5 p-3 font-mono text-[10px] space-y-1">
+              <div class="flex items-center justify-between text-zinc-500 border-b border-white/5 pb-1">
+                <span>TERMINAL OUTPUT</span>
+                <span id="terminal-status" class="text-emerald-400 font-semibold">READY</span>
+              </div>
+              <div id="terminal-log" class="text-zinc-300 pt-1 leading-relaxed">
+                $ npm test --silent<br/>
+                PASS  src/__tests__/App.test.tsx<br/>
+                ✓ 32 components loaded successfully (14ms)
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. REMOTE AGENT RELAY SCREEN -->
+        <section id="screen-remote" class="flex-1 hidden flex-col overflow-hidden">
+          <header class="h-12 px-3.5 flex items-center justify-between border-b border-white/5 bg-[#151614]">
+            <button onclick="navigateTo('chat')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Back
+            </button>
+            <span class="font-bold text-sm text-white">Remote Relay</span>
+            <span class="w-8"></span>
+          </header>
+          <div class="flex-1 overflow-y-auto p-3.5 space-y-3">
+            <div class="bg-[#1c1d1a] p-3.5 rounded-xl border border-white/5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-white">Desktop Pairing</span>
+                <span id="remote-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400">CONNECTED</span>
+              </div>
+              <div>
+                <label class="text-[10px] text-zinc-400 uppercase font-semibold">Session ID</label>
+                <input id="remote-session-id" type="text" value="rel_9421a8f" class="w-full bg-[#10110f] p-2 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none">
+              </div>
+              <div>
+                <label class="text-[10px] text-zinc-400 uppercase font-semibold">Auth Token</label>
+                <input id="remote-token" type="password" value="pk_sec_token_99182" class="w-full bg-[#10110f] p-2 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none">
+              </div>
+              <button onclick="toggleRemoteConnect()" id="btn-remote-toggle" class="w-full py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs">
+                Disconnect Relay
+              </button>
+            </div>
+
+            <!-- Tool Approval Prompt Card -->
+            <div class="bg-[#1b1633] p-3.5 rounded-xl border border-[#b0b3fc]/40 space-y-2">
+              <div class="flex items-center gap-2 text-xs font-bold text-[#b0b3fc]">
+                <span>⚡</span>
+                <span>Agent Execution Request</span>
+              </div>
+              <p class="text-[11px] text-zinc-300">
+                VS Code Agent requested approval to run command:
+                <code class="block bg-black/40 p-1.5 rounded mt-1 font-mono text-[10px] text-emerald-400">git commit -m "build: release Samsung A54 build"</code>
+              </p>
+              <div class="flex gap-2 pt-1">
+                <button onclick="respondTool(true)" class="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-transform">
+                  Approve
+                </button>
+                <button onclick="respondTool(false)" class="flex-1 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-zinc-300 text-xs font-bold">
+                  Deny
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 8. TRANSCRIBE SCREEN -->
+        <section id="screen-transcribe" class="flex-1 hidden flex-col overflow-hidden">
+          <header class="h-12 px-3.5 flex items-center justify-between border-b border-white/5 bg-[#151614]">
+            <button onclick="navigateTo('chat')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Back
+            </button>
+            <span class="font-bold text-sm text-white">Voice Transcribe</span>
+            <button onclick="copyTranscript()" class="text-xs text-[#b0b3fc] font-semibold">Copy</button>
+          </header>
+          <div class="flex-1 flex flex-col p-4 justify-between">
+            <!-- Waveform Animation -->
+            <div class="h-28 bg-[#1c1d1a] rounded-2xl border border-white/5 flex flex-col items-center justify-center p-3">
+              <div id="transcribe-waves" class="flex items-center gap-1.5 h-10">
+                <div class="w-1 bg-[#b0b3fc] rounded-full wave-bar" style="animation-delay: 0.1s"></div>
+                <div class="w-1 bg-[#b0b3fc] rounded-full wave-bar" style="animation-delay: 0.3s"></div>
+                <div class="w-1 bg-[#b0b3fc] rounded-full wave-bar" style="animation-delay: 0.2s"></div>
+                <div class="w-1 bg-[#b0b3fc] rounded-full wave-bar" style="animation-delay: 0.5s"></div>
+                <div class="w-1 bg-[#b0b3fc] rounded-full wave-bar" style="animation-delay: 0.4s"></div>
+                <div class="w-1 bg-[#b0b3fc] rounded-full wave-bar" style="animation-delay: 0.25s"></div>
+              </div>
+              <span id="transcribe-timer" class="font-mono text-xs text-zinc-400 mt-2">00:14</span>
+            </div>
+
+            <!-- Transcript Output Box -->
+            <div class="flex-1 bg-[#1c1d1a] rounded-2xl border border-white/5 p-3.5 my-3 overflow-y-auto">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] uppercase font-bold text-zinc-500">Live Transcript</span>
+                <span id="transcribe-word-count" class="text-[10px] text-zinc-400">18 words</span>
+              </div>
+              <p id="transcribe-text" class="text-xs text-zinc-200 leading-relaxed">
+                Puku AI provides seamless React Native to Android compilation with Samsung Galaxy A54 native hardware integration.
+              </p>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center justify-between px-4">
+              <button onclick="sendTranscriptToChat()" class="px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold hover:bg-white/20 active:scale-95 transition-transform">
+                Send to Chat
+              </button>
+              <!-- Big Record Button -->
+              <button onclick="toggleTranscribeRecord()" id="btn-transcribe-record" class="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+              </button>
+              <button onclick="clearTranscript()" class="px-4 py-2 rounded-xl bg-white/5 text-zinc-400 text-xs hover:text-white">
+                Clear
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 9. LIVE VOICE SCREEN (IMMERSIVE OLED BLACK) -->
+        <section id="screen-liveVoice" class="flex-1 hidden flex-col justify-between p-4 bg-[#10110f] relative overflow-hidden">
+          <!-- Top Bar -->
+          <div class="flex items-center justify-between z-20">
+            <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-[11px] font-bold text-[#b0b3fc]">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>LIVE CONVERSATION</span>
+            </div>
+            <button onclick="navigateTo('chat')" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white active:scale-90 transition-transform">
+              ✕
+            </button>
+          </div>
+
+          <!-- Pulsing Glowing Orb -->
+          <div class="relative flex flex-col items-center justify-center my-auto">
+            <!-- Pulsing outer ripples -->
+            <div class="absolute w-56 h-56 rounded-full bg-[#b0b3fc]/20 pulse-ring-anim"></div>
+            <div class="absolute w-44 h-44 rounded-full bg-[#b0b3fc]/20 pulse-ring-anim" style="animation-delay: 0.8s"></div>
+            
+            <!-- Central multi-tone gradient orb -->
+            <div class="w-32 h-32 rounded-full bg-gradient-to-tr from-[#242620] via-[#b0b3fc] to-[#b0b3fc] shadow-[0_0_50px_rgba(108,71,235,0.8)] orb-pulse flex items-center justify-center">
+              <svg class="w-12 h-12 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+            </div>
+
+            <!-- Dynamic Voice Status Text -->
+            <div class="mt-8 text-center">
+              <p id="voice-status-text" class="text-sm font-semibold text-white tracking-wide">Puku is listening...</p>
+              <p class="text-[10px] text-zinc-400 mt-1">Speak naturally in any language</p>
+            </div>
+          </div>
+
+          <!-- Bottom Voice Controls -->
+          <div class="flex items-center justify-around pb-2 z-20">
+            <!-- Mute mic -->
+            <button onclick="toggleVoiceMute()" id="btn-voice-mute" class="p-4 rounded-full bg-white/10 hover:bg-white/20 text-white active:scale-95 transition-transform" title="Mute Microphone">
+              <svg id="icon-voice-mic" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+            </button>
+            <!-- Speaker output toggle -->
+            <button onclick="toggleVoiceSpeaker()" id="btn-voice-speaker" class="p-4 rounded-full bg-white/10 hover:bg-white/20 text-white active:scale-95 transition-transform" title="Speaker Output">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+            </button>
+            <!-- End Call -->
+            <button onclick="navigateTo('chat')" class="p-4 rounded-full bg-red-600 hover:bg-red-500 text-white active:scale-95 transition-transform shadow-lg" title="End Live Voice">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <!-- 10. SETTINGS SCREEN -->
+        <section id="screen-settings" class="flex-1 hidden flex-col overflow-y-auto p-4 space-y-4">
+          <header class="flex items-center justify-between pb-2 border-b border-white/5">
+            <button onclick="navigateTo('chat')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Back
+            </button>
+            <span class="font-bold text-sm text-white">Settings</span>
+            <button onclick="openInfoModal()" class="text-zinc-400 hover:text-white">ⓘ</button>
+          </header>
+
+          <!-- User Card -->
+          <div onclick="navigateTo('profile')" class="bg-[#1c1d1a] p-3.5 rounded-2xl border border-white/5 flex items-center justify-between cursor-pointer active:scale-98 transition-transform">
+            <div class="flex items-center gap-3">
+              <div id="settings-avatar-letter" class="w-10 h-10 rounded-full bg-[#b0b3fc] flex items-center justify-center font-bold text-sm text-white shadow">
+                PK
+              </div>
+              <div>
+                <div id="settings-user-name" class="font-semibold text-xs text-white">Iftakhar</div>
+                <div id="settings-user-email" class="text-[10px] text-zinc-400">iftakhar@poridhi.com</div>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-[#e8b187]/20 text-[#e8b187] text-[10px] font-bold">POWER</span>
+          </div>
+
+          <!-- Preferences Switch Card -->
+          <div class="bg-[#1c1d1a] p-3.5 rounded-2xl border border-white/5 space-y-3.5">
+            <!-- AMOLED Dark Theme Toggle -->
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-white">Dark Theme</div>
+                <div class="text-[10px] text-zinc-400">AMOLED high-contrast black</div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="setting-dark-theme" checked onchange="toggleDarkTheme(this.checked)" class="sr-only peer">
+                <div class="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#b0b3fc]"></div>
+              </label>
+            </div>
+            <div class="h-px bg-white/5"></div>
+            <!-- Haptic Feedback -->
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-white">Haptic Feedback</div>
+                <div class="text-[10px] text-zinc-400">Tactile vibrations on actions</div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked onchange="showToast('Haptic setting saved')" class="sr-only peer">
+                <div class="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#b0b3fc]"></div>
+              </label>
+            </div>
+            <div class="h-px bg-white/5"></div>
+            <!-- Sound Effects -->
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-white">Sound Effects</div>
+                <div class="text-[10px] text-zinc-400">Chime on send and receive</div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="setting-sound-effects" checked onchange="toggleAudioSetting(this.checked)" class="sr-only peer">
+                <div class="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#b0b3fc]"></div>
+              </label>
+            </div>
+            <div class="h-px bg-white/5"></div>
+            <!-- Speech Recognition Engine -->
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-white">Native Android Speech</div>
+                <div class="text-[10px] text-zinc-400">Samsung SpeechRecognizer API</div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked onchange="showToast('Speech engine active')" class="sr-only peer">
+                <div class="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#b0b3fc]"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- API Bearer Token Card -->
+          <div class="bg-[#1c1d1a] p-3.5 rounded-2xl border border-white/5 space-y-2">
+            <span class="text-xs font-semibold text-white">API Token (Cloud Sync)</span>
+            <div class="flex gap-2">
+              <input id="settings-token-input" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI..." class="flex-1 bg-[#10110f] p-2 rounded-lg border border-white/10 text-xs text-white outline-none">
+              <button onclick="saveApiToken()" class="px-3 py-2 rounded-lg bg-[#b0b3fc] text-[#151614] font-semibold text-xs font-bold active:scale-95 transition-transform">
+                Save
+              </button>
+            </div>
+          </div>
+
+          <!-- Logout Button -->
+          <button onclick="confirmLogout()" class="w-full py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold border border-red-500/20 active:scale-95 transition-transform">
+            Log Out of Puku AI
+          </button>
+
+          <div class="text-center pt-1">
+            <p class="text-[11px] text-zinc-500">Puku AI v1.0.0 (Build 34)</p>
+            <p class="text-[10px] text-zinc-600">Samsung Galaxy A54 5G Edition</p>
+          </div>
+        </section>
+
+        <!-- 11. PROFILE SCREEN -->
+        <section id="screen-profile" class="flex-1 hidden flex-col overflow-y-auto p-4 space-y-4">
+          <header class="flex items-center justify-between pb-2 border-b border-white/5">
+            <button onclick="navigateTo('settings')" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1">
+              <span>‹</span> Settings
+            </button>
+            <span class="font-bold text-sm text-white">User Profile</span>
+            <span class="w-8"></span>
+          </header>
+
+          <div class="flex flex-col items-center py-2">
+            <div id="profile-big-avatar" class="w-16 h-16 rounded-full bg-[#b0b3fc] flex items-center justify-center font-bold text-xl text-white shadow-xl">
+              PK
+            </div>
+            <span class="mt-2 text-xs font-bold text-[#b0b3fc]">Power Plan Member</span>
+          </div>
+
+          <div class="bg-[#1c1d1a] p-3.5 rounded-2xl border border-white/5 space-y-3">
+            <div>
+              <label class="text-[10px] uppercase font-bold text-zinc-400">Full Name</label>
+              <input id="prof-input-name" type="text" value="Iftakhar" class="w-full bg-[#10110f] p-2 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none">
+            </div>
+            <div>
+              <label class="text-[10px] uppercase font-bold text-zinc-400">Email Address</label>
+              <input id="prof-input-email" type="email" value="iftakhar@poridhi.com" class="w-full bg-[#10110f] p-2 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none">
+            </div>
+            <div>
+              <label class="text-[10px] uppercase font-bold text-zinc-400">Organization</label>
+              <input id="prof-input-org" type="text" value="Poridhi Lab" class="w-full bg-[#10110f] p-2 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none">
+            </div>
+            <button onclick="saveUserProfile()" class="w-full py-2.5 rounded-xl bg-[#b0b3fc] text-[#151614] font-semibold text-xs font-bold active:scale-95 transition-transform">
+              Save Profile
+            </button>
+          </div>
+        </section>
+
+        <!-- 12. LOGIN SCREEN -->
+        <section id="screen-login" class="flex-1 hidden flex-col justify-between p-5 bg-[#151614]">
+          <div class="pt-4 text-center">
+            <div class="w-12 h-12 rounded-2xl bg-[#b0b3fc] text-[#151614] font-semibold font-extrabold text-xl flex items-center justify-center mx-auto shadow-lg">
+              PK
+            </div>
+            <h2 class="text-lg font-bold text-white mt-3">Welcome to Puku AI</h2>
+            <p class="text-xs text-zinc-400 mt-1">Sign in with your enterprise account</p>
+          </div>
+
+          <div class="bg-[#1c1d1a] p-4 rounded-2xl border border-white/5 space-y-3">
+            <div>
+              <label class="text-[10px] uppercase font-bold text-zinc-400">Email</label>
+              <input id="login-email" type="email" value="iftakhar@poridhi.com" class="w-full bg-[#10110f] p-2.5 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none">
+            </div>
+            <div>
+              <label class="text-[10px] uppercase font-bold text-zinc-400">Password</label>
+              <div class="relative">
+                <input id="login-password" type="password" value="••••••••••••" class="w-full bg-[#10110f] p-2.5 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none pr-8">
+                <button onclick="togglePasswordVisibility()" class="absolute right-2 top-3 text-xs text-zinc-400">👁</button>
+              </div>
+            </div>
+            <button onclick="performLogin()" class="w-full py-2.5 rounded-xl bg-[#b0b3fc] text-[#151614] font-semibold text-xs font-bold active:scale-95 transition-transform shadow-md">
+              Sign In
+            </button>
+            <div class="relative my-2 text-center">
+              <span class="text-[10px] text-zinc-500 uppercase px-2 bg-[#1c1d1a]">or</span>
+            </div>
+            <button onclick="performGoogleSSO()" class="w-full py-2 rounded-xl bg-white text-black text-xs font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform">
+              <span>G</span> Continue with Google
+            </button>
+          </div>
+
+          <div class="text-center pb-2">
+            <button onclick="navigateTo('chat')" class="text-xs text-[#b0b3fc] hover:underline">
+              Continue as Guest ➔
+            </button>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- ================= APP DRAWER (SLIDE-OVER SIDEBAR) ================= -->
+      <div id="drawer-panel" class="absolute inset-0 bg-black/65 z-50 flex transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div id="drawer-content" class="w-[84%] h-full bg-[#151614] p-4 flex flex-col justify-between transform -translate-x-full transition-transform duration-300 shadow-2xl border-r border-white/10">
+          <div>
+            <!-- Drawer Brand Header -->
+            <div class="flex items-center justify-between mb-5 pt-1">
+              <span class="text-2xl font-extrabold tracking-tight text-white">Puku</span>
+              <button onclick="closeDrawer()" class="p-1 text-zinc-400 hover:text-white text-sm">✕</button>
+            </div>
+
+            <!-- Top Navigation Items -->
+            <nav class="space-y-1 mb-5">
+              <button onclick="navigateTo('chat'); closeDrawer()" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold bg-[#1c1d1a] text-white active:scale-95 transition-transform">
+                <span class="text-[#b0b3fc]">💬</span>
+                <span>Active Chat</span>
+              </button>
+              <button onclick="navigateTo('chats'); closeDrawer()" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">
+                <span>📁</span>
+                <span>All Chats</span>
+              </button>
+              <button onclick="navigateTo('projects'); closeDrawer()" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">
+                <span>📂</span>
+                <span>Projects</span>
+              </button>
+              <button onclick="navigateTo('artifacts'); closeDrawer()" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">
+                <span>🎨</span>
+                <span>Artifacts</span>
+              </button>
+              <button onclick="navigateTo('code'); closeDrawer()" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">
+                <span>💻</span>
+                <span>Code Sessions</span>
+              </button>
+              <button onclick="navigateTo('remote'); closeDrawer()" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">
+                <span>🖥️</span>
+                <span>Remote Relay</span>
+              </button>
+              <button onclick="navigateTo('liveVoice'); closeDrawer()" class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">
+                <span>🎙️</span>
+                <span>Live Voice Call</span>
+              </button>
+            </nav>
+
+            <!-- RECENTS Section -->
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 px-3 mb-2">Recents</div>
+              <div id="drawer-recents-list" class="space-y-0.5">
+                <!-- Populated via JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Drawer Footer -->
+          <div class="flex items-center justify-between pt-3 border-t border-white/10">
+            <div onclick="navigateTo('settings'); closeDrawer()" class="flex items-center gap-2.5 cursor-pointer">
+              <div id="drawer-avatar-letter" class="w-9 h-9 rounded-full bg-[#b0b3fc] flex items-center justify-center font-bold text-xs text-white">
+                PK
+              </div>
+              <div class="flex flex-col">
+                <span id="drawer-user-name" class="text-xs font-semibold text-white">Iftakhar</span>
+                <span class="text-[10px] text-zinc-400">Power Plan</span>
+              </div>
+            </div>
+            <button onclick="createNewConversation(); closeDrawer()" class="px-3 py-1.5 rounded-full bg-white text-black font-bold text-xs flex items-center gap-1 active:scale-95 transition-transform shadow">
+              <span>+</span>
+              <span>New</span>
+            </button>
+          </div>
+        </div>
+        <!-- Backdrop click to dismiss -->
+        <div onclick="closeDrawer()" class="flex-1"></div>
+      </div>
+
+      <!-- ================= MODALS & SHEETS ================= -->
+
+      <!-- Model Picker Popover (Floating Menu matching Screenshot) -->
+      <div id="sheet-model" class="absolute inset-0 z-50 transition-opacity duration-150 opacity-0 pointer-events-none" onclick="closeModelSheet()">
+        <div class="relative w-full h-full flex flex-col justify-end pb-[72px] px-3.5 pointer-events-none">
+          <div id="sheet-model-content" class="w-[230px] bg-[#1c1d1a] border border-[#34362e] rounded-xl p-1.5 shadow-2xl space-y-0.5 pointer-events-auto transform translate-y-2 transition-transform duration-150 font-mono text-xs" onclick="event.stopPropagation()">
+            <button onclick="selectModel('Puku-ai 2.8')" class="w-full px-2.5 py-2 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors">
+              <span class="flex items-center gap-2">
+                <span id="check-puku-28" class="text-white w-3 text-xs font-bold">✓</span>
+                <span class="text-[#eeeee5] font-semibold">Puku-ai 2.8</span>
+              </span>
+              <span class="text-[11px] text-[#9da193]">Fast</span>
+            </button>
+            <button onclick="selectModel('Puku-ai 2.7')" class="w-full px-2.5 py-2 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors">
+              <span class="flex items-center gap-2">
+                <span id="check-puku-27" class="text-white w-3 text-xs font-bold invisible">✓</span>
+                <span class="text-[#eeeee5] font-semibold">Puku-ai 2.7</span>
+              </span>
+              <span class="text-[11px] text-[#9da193]">Fast</span>
+            </button>
+            <button onclick="selectModel('Opus 4.8')" class="w-full px-2.5 py-2 rounded-lg hover:bg-white/5 flex items-center justify-between transition-colors">
+              <span class="flex items-center gap-2">
+                <span id="check-opus" class="text-white w-3 text-xs font-bold invisible">✓</span>
+                <span class="text-[#eeeee5] font-semibold">Opus 4.8</span>
+              </span>
+              <span class="text-[11px] text-[#9da193]">High</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attachment Sheet -->
+      <div id="sheet-attachment" class="absolute inset-0 bg-black/60 z-50 flex flex-col justify-end transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div id="sheet-attachment-content" class="bg-[#1c1d1a] rounded-t-3xl p-4 space-y-3 transform translate-y-full transition-transform duration-300 border-t border-white/10">
+          <div class="w-10 h-1 bg-zinc-600 rounded-full mx-auto mb-1"></div>
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-white">Add Attachment</span>
+            <button onclick="closeAttachmentSheet()" class="text-xs text-zinc-400 hover:text-white">✕</button>
+          </div>
+          <div class="grid grid-cols-4 gap-2 text-center text-xs pt-1">
+            <button onclick="attachItem('Camera')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-white/5 hover:bg-white/10">
+              <span class="text-xl">📷</span>
+              <span class="text-[10px] text-zinc-300">Camera</span>
+            </button>
+            <button onclick="attachItem('Photos')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-white/5 hover:bg-white/10">
+              <span class="text-xl">🖼️</span>
+              <span class="text-[10px] text-zinc-300">Gallery</span>
+            </button>
+            <button onclick="attachItem('Document')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-white/5 hover:bg-white/10">
+              <span class="text-xl">📄</span>
+              <span class="text-[10px] text-zinc-300">Document</span>
+            </button>
+            <button onclick="attachItem('Code')" class="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-white/5 hover:bg-white/10">
+              <span class="text-xl">💻</span>
+              <span class="text-[10px] text-zinc-300">Code File</span>
+            </button>
+          </div>
+        </div>
+        <div onclick="closeAttachmentSheet()" class="flex-1"></div>
+      </div>
+
+      <!-- New Project Modal -->
+      <div id="modal-new-project" class="absolute inset-0 bg-black/70 z-50 flex items-center justify-center p-4 transition-opacity duration-200 opacity-0 pointer-events-none">
+        <div class="w-full bg-[#1c1d1a] rounded-2xl p-4 border border-white/10 space-y-3 shadow-2xl">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-white">Create New Project</span>
+            <button onclick="closeNewProjectModal()" class="text-xs text-zinc-400 hover:text-white">✕</button>
+          </div>
+          <div>
+            <label class="text-[10px] uppercase font-bold text-zinc-400">Project Name</label>
+            <input id="new-proj-name" type="text" placeholder="e.g., Vision Classifier" class="w-full bg-[#10110f] p-2 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none">
+          </div>
+          <div>
+            <label class="text-[10px] uppercase font-bold text-zinc-400">Description</label>
+            <input id="new-proj-desc" type="text" placeholder="Brief project summary..." class="w-full bg-[#10110f] p-2 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none">
+          </div>
+          <div>
+            <label class="text-[10px] uppercase font-bold text-zinc-400">Instructions</label>
+            <textarea id="new-proj-inst" rows="2" placeholder="Custom instructions for AI..." class="w-full bg-[#10110f] p-2 mt-1 rounded-lg border border-white/10 text-xs text-white outline-none resize-none"></textarea>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button onclick="submitNewProject()" class="flex-1 py-2 rounded-xl bg-[#b0b3fc] text-[#151614] font-semibold text-xs font-bold active:scale-95 transition-transform">
+              Create Project
+            </button>
+            <button onclick="closeNewProjectModal()" class="px-4 py-2 rounded-xl bg-white/10 text-zinc-300 text-xs">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Artifact Inspector Modal -->
+      <div id="modal-artifact" class="absolute inset-0 bg-black/75 z-50 flex items-center justify-center p-3 transition-opacity duration-200 opacity-0 pointer-events-none">
+        <div class="w-full max-h-[90%] bg-[#1c1d1a] rounded-2xl p-4 border border-white/10 flex flex-col space-y-2.5 shadow-2xl overflow-hidden">
+          <div class="flex items-center justify-between pb-1 border-b border-white/5">
+            <div>
+              <span id="modal-art-title" class="font-bold text-xs text-white">Artifact Title</span>
+              <span id="modal-art-type" class="ml-2 px-1.5 py-0.5 rounded text-[9px] bg-[#b0b3fc]/20 text-[#b0b3fc] font-semibold">CODE</span>
+            </div>
+            <button onclick="closeArtifactModal()" class="text-xs text-zinc-400 hover:text-white">✕</button>
+          </div>
+          <div class="flex-1 overflow-y-auto bg-[#10110f] p-3 rounded-xl border border-white/5 font-mono text-[11px] text-zinc-200 whitespace-pre-wrap">
+            <code id="modal-art-content">...</code>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button onclick="copyArtifactModalContent()" class="flex-1 py-2 rounded-xl bg-[#b0b3fc] text-[#151614] font-semibold text-xs font-bold active:scale-95 transition-transform">
+              Copy Content
+            </button>
+            <button onclick="closeArtifactModal()" class="px-4 py-2 rounded-xl bg-white/10 text-zinc-300 text-xs">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Info Modal -->
+      <div id="modal-info" class="absolute inset-0 bg-black/70 z-50 flex items-center justify-center p-4 transition-opacity duration-200 opacity-0 pointer-events-none">
+        <div class="w-full bg-[#1c1d1a] rounded-2xl p-4 border border-white/10 space-y-3 shadow-2xl">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-white">About Puku AI</span>
+            <button onclick="closeInfoModal()" class="text-xs text-zinc-400 hover:text-white">✕</button>
+          </div>
+          <p class="text-xs text-zinc-300 leading-relaxed">
+            Puku AI mobile client runs on React Native 0.87 with 100% feature parity to the native Flutter version. Built with Base UI design tokens, native Android SpeechRecognizer, and cloud state synchronization.
+          </p>
+          <div class="bg-[#10110f] p-2.5 rounded-xl border border-white/5 text-[10px] text-zinc-400 space-y-1">
+            <div>Device: <strong>Samsung Galaxy A54 5G</strong></div>
+            <div>Screen DPI: <strong>450 dpi (1080 x 2340)</strong></div>
+            <div>Runtime: <strong>Hermes Engine</strong></div>
+          </div>
+          <button onclick="closeInfoModal()" class="w-full py-2 rounded-xl bg-white/10 text-white text-xs font-semibold">
+            Close
+          </button>
+        </div>
+      </div>
+
+      <!-- ================= SAMSUNG GESTURE NAVIGATION PILL ================= -->
+      <div class="w-full h-5 flex items-center justify-center z-40 select-none">
+        <div onclick="navigateTo('chat')" title="Android Home Gesture" class="w-32 h-1 bg-zinc-600 hover:bg-zinc-400 rounded-full cursor-pointer transition-colors active:scale-90"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 bg-[#1f1a38] text-white border border-[#b0b3fc]/50 px-4 py-2.5 rounded-2xl shadow-2xl text-xs flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+    <span class="text-emerald-400 font-bold">✓</span>
+    <span id="toast-text">Action completed</span>
+  </div>
+
+  <!-- ================= INTERACTIVE APPLICATION JAVASCRIPT ================= -->
+  <script>
+    // Audio synthesizer for UI button clicks
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function playBeep(freq = 600, duration = 0.04) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function toggleAudio() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('btn-sound');
+      btn.textContent = soundEnabled ? '🔊' : '🔇';
+      showToast(soundEnabled ? 'UI Sound Effects: Enabled' : 'UI Sound Effects: Muted');
+    }
+
+    function toggleAudioSetting(enabled) {
+      soundEnabled = enabled;
+      const btn = document.getElementById('btn-sound');
+      btn.textContent = soundEnabled ? '🔊' : '🔇';
+      showToast(soundEnabled ? 'Sound effects enabled' : 'Sound effects muted');
+    }
+
+    // ================= STATE STORE =================
+    const state = {
+      activeRoute: 'chat',
+      selectedModel: 'puku-ai-2.7',
+      isIncognito: false,
+      isDarkMode: true,
+      user: {
+        name: 'Iftakhar',
+        email: 'iftakhar@poridhi.com',
+        org: 'Poridhi Lab',
+        plan: 'Power'
+      },
+      conversations: [
+        {
+          id: 'c1',
+          title: 'New Chat',
+          timestamp: 'Just now',
+          model: 'Puku-ai 2.8',
+          messages: []
+        },
+        {
+          id: 'c2',
+          title: 'which model are you used?',
+          timestamp: '9h ago',
+          model: 'Puku-ai 2.8',
+          messages: [
+            { id: 'm1', role: 'user', text: 'which model are you used?' },
+            { id: 'm2', role: 'assistant', text: 'I am running Puku-ai 2.8, the edge-optimized reasoning model designed for ultra-low latency and multi-modal intelligence.' }
+          ]
+        },
+        {
+          id: 'c3',
+          title: 'What is ai?',
+          timestamp: '9h ago',
+          model: 'Puku-ai 2.8',
+          messages: [
+            { id: 'm3', role: 'user', text: 'What is ai?' },
+            { id: 'm4', role: 'assistant', text: 'Artificial Intelligence (AI) is the simulation of human intelligence processes by computer systems.' }
+          ]
+        },
+        {
+          id: 'c4',
+          title: 'What is ai?',
+          timestamp: '15h ago',
+          model: 'Puku-ai 2.7',
+          messages: [
+            { id: 'm5', role: 'user', text: 'What is ai?' },
+            { id: 'm6', role: 'assistant', text: 'AI systems work by ingesting labeled training data, analyzing it for correlations, and making predictions.' }
+          ]
+        }
+      ],
+      activeChatId: 'c1',
+      projects: [
+        {
+          id: 'p1',
+          name: 'Puku Mobile App',
+          desc: 'React Native 0.87 architecture with Puku Design System',
+          instructions: 'Maintain 100% parity with Flutter mobile app',
+          scope: 'yours',
+          status: 'Ready',
+          progress: 80,
+          tasks: [
+            { id: 't1', text: 'Implement Base UI Switch & Accordion', done: true },
+            { id: 't2', text: 'Integrate native SpeechModule.kt', done: true },
+            { id: 't3', text: 'Verify Samsung Galaxy A54 layout bounds', done: true },
+            { id: 't4', text: 'Automate GitHub Actions release APK', done: false }
+          ]
+        },
+        {
+          id: 'p2',
+          name: 'Speech Engine v2',
+          desc: 'Native Kotlin Android SpeechRecognizer with multi-language',
+          instructions: 'High accuracy voice-to-text with partial results',
+          scope: 'yours',
+          status: 'Active',
+          progress: 50,
+          tasks: [
+            { id: 't5', text: 'Add RECORD_AUDIO permission checks', done: true },
+            { id: 't6', text: 'Optimize silence timeout thresholds', done: false }
+          ]
+        },
+        {
+          id: 'p3',
+          name: 'Cloud Relay Bridge',
+          desc: 'Websocket bridge for remote desktop coding sessions',
+          instructions: 'Secure HMAC token validation',
+          scope: 'power',
+          status: 'Active',
+          progress: 30,
+          tasks: [
+            { id: 't7', text: 'Configure SSH reverse tunnel', done: true },
+            { id: 't8', text: 'Tool authorization prompt UI', done: false }
+          ]
+        }
+      ],
+      activeProjectId: 'p1',
+      artifacts: [
+        {
+          id: 'a1',
+          title: 'AppDrawer.tsx',
+          type: 'code',
+          date: 'Sep 27',
+          content: `// Puku AI App Drawer Component\nimport React from 'react';\nimport { Sidebar, SidebarNavItem } from '../ui';\n\nexport function AppDrawer() {\n  return (\n    <Sidebar>\n      <SidebarNavItem icon={<ChatIcon />}>Chats</SidebarNavItem>\n      <SidebarNavItem icon={<FolderIcon />}>Projects</SidebarNavItem>\n    </Sidebar>\n  );\n}`
+        },
+        {
+          id: 'a2',
+          title: 'Release Notes v1.0.0',
+          type: 'markdown',
+          date: 'Sep 26',
+          content: `# Puku AI Mobile Release v1.0.0\n\n- ✨ Full React Native 0.87 Rewrite\n- 🎨 Complete Base UI Component Kit\n- 🎙️ Android Native Speech Engine\n- 📱 Optimized for Samsung Galaxy A54`
+        },
+        {
+          id: 'a3',
+          title: 'Architecture Diagram.svg',
+          type: 'svg',
+          date: 'Sep 25',
+          content: `<svg viewBox="0 0 300 120" xmlns="http://www.w3.org/2000/svg">\n  <rect width="300" height="120" rx="10" fill="#1c1d1a"/>\n  <circle cx="60" cy="60" r="30" fill="#b0b3fc"/>\n  <text x="60" y="65" fill="#fff" text-anchor="middle" font-size="12">Client</text>\n  <path d="M100 60 L200 60" stroke="#b0b3fc" stroke-width="2"/>\n  <rect x="210" y="35" width="70" height="50" rx="6" fill="#242620"/>\n  <text x="245" y="65" fill="#fff" text-anchor="middle" font-size="12">API Engine</text>\n</svg>`
+        }
+      ],
+      activeArtifactFilter: 'all'
+    };
+
+    // ================= REAL-TIME CLOCK =================
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      let minutes = now.getMinutes();
+      minutes = minutes < 10 ? '0' + minutes : minutes;
+      const el = document.getElementById('live-clock');
+      if (el) el.textContent = `${hours}:${minutes}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ================= NAVIGATION =================
+    function navigateTo(routeName) {
+      playBeep(700, 0.03);
+      state.activeRoute = routeName;
+
+      // List of all screen sections
+      const screens = [
+        'chat', 'chats', 'projects', 'project-details',
+        'artifacts', 'code', 'remote', 'transcribe',
+        'liveVoice', 'settings', 'profile', 'login'
+      ];
+
+      screens.forEach(s => {
+        const el = document.getElementById('screen-' + s);
+        if (el) el.classList.add('hidden');
+      });
+
+      const target = document.getElementById('screen-' + routeName);
+      if (target) {
+        target.classList.remove('hidden');
+      }
+
+      // Update toolbar navigation pills
+      screens.forEach(s => {
+        const pill = document.getElementById('nav-' + s);
+        if (pill) {
+          pill.classList.remove('bg-[#b0b3fc]', 'text-white', 'shadow-sm');
+          pill.classList.add('text-zinc-400');
+        }
+      });
+      const activePill = document.getElementById('nav-' + routeName);
+      if (activePill) {
+        activePill.classList.remove('text-zinc-400');
+        activePill.classList.add('bg-[#b0b3fc]', 'text-white', 'shadow-sm');
+      }
+
+      // Trigger screen-specific rendering
+      if (routeName === 'chat') renderMessages();
+      if (routeName === 'chats') renderChatsList();
+      if (routeName === 'projects') renderProjectsList();
+      if (routeName === 'artifacts') renderArtifactsList();
+    }
+
+    // ================= DRAWER =================
+    function openDrawer() {
+      playBeep(520, 0.04);
+      renderDrawerRecents();
+      const panel = document.getElementById('drawer-panel');
+      const content = document.getElementById('drawer-content');
+      panel.classList.remove('opacity-0', 'pointer-events-none');
+      panel.classList.add('opacity-100');
+      content.classList.remove('-translate-x-full');
+    }
+
+    function closeDrawer() {
+      playBeep(450, 0.03);
+      const panel = document.getElementById('drawer-panel');
+      const content = document.getElementById('drawer-content');
+      content.classList.add('-translate-x-full');
+      panel.classList.add('opacity-0', 'pointer-events-none');
+      panel.classList.remove('opacity-100');
+    }
+
+    function renderDrawerRecents() {
+      const container = document.getElementById('drawer-recents-list');
+      if (!container) return;
+      container.innerHTML = state.conversations.map(c => `
+        <div onclick="loadConversation('${c.id}'); closeDrawer()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-zinc-300 hover:bg-white/5 cursor-pointer active:scale-98 transition-transform">
+          <span class="text-zinc-500">⇄</span>
+          <span class="truncate ${c.id === state.activeChatId ? 'text-[#b0b3fc] font-semibold' : ''}">${c.title}</span>
+        </div>
+      `).join('');
+    }
+
+    // ================= CHAT LOGIC =================
+    function getActiveChat() {
+      return state.conversations.find(c => c.id === state.activeChatId) || state.conversations[0];
+    }
+
+    function setPromptAndSend(text) {
+      const input = document.getElementById('chat-input');
+      if (input) {
+        input.value = text;
+        sendMessage();
+      }
+    }
+
+    function renderMessages() {
+      const container = document.getElementById('messages-container');
+      if (!container) return;
+      const chat = getActiveChat();
+
+      if (!chat || !chat.messages || chat.messages.length === 0) {
+        container.innerHTML = `
+          <div class="flex flex-col min-h-[380px] py-3 px-1 select-none animate-fade-in font-mono">
+            <!-- Hero Row: Heading on Left + Macintosh on Right -->
+            <div class="flex items-start justify-between mb-8 pt-2">
+              <h2 class="text-xl font-bold text-[#eeeee5] tracking-tight leading-snug">
+                Where will your<br>
+                curiosity take<br>
+                you?
+              </h2>
+
+              <!-- Vintage Macintosh Illustration with Keyboard & Mouse -->
+              <div class="shrink-0 w-28 h-28 ml-2">
+                <svg viewBox="0 0 160 170" class="w-full h-full drop-shadow-md">
+                  <!-- Case Body -->
+                  <rect x="22" y="14" width="90" height="105" rx="10" fill="#D4CDB7" stroke="#B5AC94" stroke-width="2"/>
+                  <!-- Top Handle Inset -->
+                  <rect x="48" y="16" width="38" height="4" rx="2" fill="#B3A990"/>
+                  <!-- CRT Bezel Chamfer -->
+                  <rect x="30" y="25" width="74" height="65" rx="6" fill="#262822" stroke="#A89E84" stroke-width="1.5"/>
+                  <!-- CRT Screen -->
+                  <rect x="34" y="29" width="66" height="57" rx="8" fill="#0B130E" stroke="#1C2E20" stroke-width="1.5"/>
+                  <!-- Scanlines -->
+                  <line x1="36" y1="39" x2="98" y2="39" stroke="#16291B" stroke-width="1" opacity="0.5"/>
+                  <line x1="36" y1="49" x2="98" y2="49" stroke="#16291B" stroke-width="1" opacity="0.5"/>
+                  <line x1="36" y1="59" x2="98" y2="59" stroke="#16291B" stroke-width="1" opacity="0.5"/>
+                  <line x1="36" y1="69" x2="98" y2="69" stroke="#16291B" stroke-width="1" opacity="0.5"/>
+                  <!-- PUKU on CRT -->
+                  <text x="67" y="56" fill="#4ADE80" font-size="10" font-weight="900" font-family="monospace" text-anchor="middle" letter-spacing="1.5">_PUKU_</text>
+                  <text x="67" y="70" fill="#22C55E" font-size="6" font-family="monospace" text-anchor="middle">READY</text>
+                  <!-- Floppy Drive Slot -->
+                  <rect x="42" y="96" width="38" height="3" rx="1.5" fill="#1A1B17"/>
+                  <circle cx="86" cy="97.5" r="1.2" fill="#EF4444"/>
+                  <!-- Badge -->
+                  <rect x="32" y="95" width="5" height="5" rx="1" fill="#EAB308"/>
+                  <!-- Keyboard -->
+                  <path d="M12 125 L122 125 L128 144 L6 144 Z" fill="#D4CDB7" stroke="#B5AC94" stroke-width="1.5"/>
+                  <rect x="16" y="128" width="102" height="12" rx="2" fill="#B3A990"/>
+                  <line x1="20" y1="132" x2="114" y2="132" stroke="#D4CDB7" stroke-width="1" stroke-dasharray="4 2"/>
+                  <!-- Mouse with cord -->
+                  <path d="M124 135 C136 135, 134 140, 140 142" stroke="#8F8772" stroke-width="1.2" fill="none"/>
+                  <rect x="136" y="132" width="14" height="20" rx="4" fill="#D4CDB7" stroke="#B5AC94" stroke-width="1.2"/>
+                  <line x1="138" y1="138" x2="148" y2="138" stroke="#B5AC94" stroke-width="1"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Recent Conversations List -->
+            <div class="mt-4">
+              <div class="text-[11px] font-semibold text-[#9da193] mb-2 tracking-wide">Recent conversations</div>
+              <div class="border-t border-[#34362e]">
+                <button onclick="setPromptAndSend('which model are you used?')" class="w-full py-2.5 flex items-center justify-between text-left text-xs border-b border-[#34362e] hover:bg-white/5 transition-colors group">
+                  <span class="text-[#eeeee5] truncate group-hover:text-white">which model are you used?</span>
+                  <span class="flex items-center gap-1.5 text-[#9da193] text-[11px] shrink-0 ml-2">9h ago <span class="text-xs">↗</span></span>
+                </button>
+                <button onclick="setPromptAndSend('What is ai?')" class="w-full py-2.5 flex items-center justify-between text-left text-xs border-b border-[#34362e] hover:bg-white/5 transition-colors group">
+                  <span class="text-[#eeeee5] truncate group-hover:text-white">What is ai?</span>
+                  <span class="flex items-center gap-1.5 text-[#9da193] text-[11px] shrink-0 ml-2">9h ago <span class="text-xs">↗</span></span>
+                </button>
+                <button onclick="setPromptAndSend('What is ai?')" class="w-full py-2.5 flex items-center justify-between text-left text-xs border-b border-[#34362e] hover:bg-white/5 transition-colors group">
+                  <span class="text-[#eeeee5] truncate group-hover:text-white">What is ai?</span>
+                  <span class="flex items-center gap-1.5 text-[#9da193] text-[11px] shrink-0 ml-2">15h ago <span class="text-xs">↗</span></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = chat.messages.map(m => {
+        if (m.role === 'assistant') {
+          return `
+            <div class="flex flex-col items-start max-w-[92%] animate-fade-in">
+              <div class="bg-[#1c1d1a] text-zinc-100 rounded-2xl rounded-tl-sm p-3.5 text-xs leading-relaxed border border-white/5 shadow-sm w-full">
+                <p class="font-semibold text-[#b0b3fc] mb-1">Puku AI</p>
+                <div class="space-y-2 whitespace-pre-wrap">${m.text}</div>
+                ${m.code ? `
+                  <div class="mt-2 bg-[#10110f] p-2.5 rounded-lg border border-white/10 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+                    ${m.code}
+                  </div>
+                ` : ''}
+              </div>
+              <div class="mt-1 flex items-center gap-2 pl-1">
+                <button onclick="copyToClipboard('${(m.text || '').replace(/'/g, "\\'")}')" class="text-zinc-500 hover:text-zinc-300 text-[10px] flex items-center gap-1">
+                  <span>📋</span> Copy
+                </button>
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="flex flex-col items-end self-end ml-auto max-w-[85%]">
+              <div class="bg-[#242620] text-white rounded-2xl rounded-tr-sm p-3 text-xs leading-relaxed border border-[#b0b3fc]/30 shadow-sm">
+                ${m.text}
+              </div>
+              <div class="mt-1 flex items-center gap-2 pr-1">
+                <button onclick="copyToClipboard('${(m.text || '').replace(/'/g, "\\'")}')" class="text-zinc-500 hover:text-zinc-300 text-[10px]">
+                  Copy
+                </button>
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+      playBeep(800, 0.05);
+
+      const chat = getActiveChat();
+      chat.messages.push({
+        id: 'msg_' + Date.now(),
+        role: 'user',
+        text: text
+      });
+      input.value = '';
+      renderMessages();
+
+      // Show typing indicator
+      const container = document.getElementById('messages-container');
+      const typingDiv = document.createElement('div');
+      typingDiv.id = 'typing-indicator';
+      typingDiv.className = 'flex items-center gap-2 p-3 bg-[#1c1d1a] text-zinc-400 text-xs rounded-2xl max-w-[160px] border border-white/5';
+      typingDiv.innerHTML = `
+        <span class="w-1.5 h-1.5 bg-[#b0b3fc] rounded-full animate-bounce"></span>
+        <span class="w-1.5 h-1.5 bg-[#b0b3fc] rounded-full animate-bounce" style="animation-delay: 0.15s"></span>
+        <span class="w-1.5 h-1.5 bg-[#b0b3fc] rounded-full animate-bounce" style="animation-delay: 0.3s"></span>
+        <span class="text-[11px] font-medium text-zinc-400 ml-1">Thinking...</span>
+      `;
+      container.appendChild(typingDiv);
+      container.scrollTop = container.scrollHeight;
+
+      // Simulated assistant response after 800ms
+      setTimeout(() => {
+        const ind = document.getElementById('typing-indicator');
+        if (ind) ind.remove();
+        playBeep(950, 0.06);
+
+        chat.messages.push({
+          id: 'msg_' + Date.now(),
+          role: 'assistant',
+          text: `I have processed your query: **"${text}"** using the **${state.selectedModel}** engine on your Samsung Galaxy A54. All controls and native bridge modules are responsive.`,
+        });
+        renderMessages();
+      }, 700);
+    }
+
+    function createNewConversation() {
+      playBeep(750, 0.04);
+      const newId = 'c_' + Date.now();
+      const newChat = {
+        id: newId,
+        title: 'New Conversation',
+        timestamp: 'Just now',
+        model: state.selectedModel,
+        messages: [
+          {
+            id: 'init_' + Date.now(),
+            role: 'assistant',
+            text: 'Started a fresh session. How can I help you today?'
+          }
+        ]
+      };
+      state.conversations.unshift(newChat);
+      state.activeChatId = newId;
+      navigateTo('chat');
+      showToast('New conversation created');
+    }
+
+    function loadConversation(id) {
+      playBeep(650, 0.03);
+      state.activeChatId = id;
+      navigateTo('chat');
+    }
+
+    function toggleIncognito() {
+      state.isIncognito = !state.isIncognito;
+      playBeep(state.isIncognito ? 900 : 450, 0.05);
+      const btn = document.getElementById('btn-incognito');
+      const banner = document.getElementById('incognito-banner');
+      if (state.isIncognito) {
+        btn.classList.add('text-purple-400');
+        banner.classList.remove('hidden');
+        showToast('Incognito Session Activated (Zero traces recorded)');
+      } else {
+        btn.classList.remove('text-purple-400');
+        banner.classList.add('hidden');
+        showToast('Standard Session Restored');
+      }
+    }
+
+    function toggleSpeechMic() {
+      playBeep(850, 0.06);
+      showToast('Android Speech Recognizer listening 🎙️');
+      const input = document.getElementById('chat-input');
+      input.placeholder = 'Listening to your voice...';
+      const micBtn = document.getElementById('btn-mic');
+      micBtn.classList.add('bg-red-500/20', 'text-red-400');
+
+      setTimeout(() => {
+        input.value = 'How does Puku AI handle high speed speech recognition?';
+        input.placeholder = 'Message Puku AI...';
+        micBtn.classList.remove('bg-red-500/20', 'text-red-400');
+        playBeep(600, 0.04);
+      }, 1600);
+    }
+
+    // ================= MODEL SELECTION POPOVER =================
+    function openModelSheet() {
+      playBeep(550, 0.03);
+      const sheet = document.getElementById('sheet-model');
+      const content = document.getElementById('sheet-model-content');
+      sheet.classList.remove('opacity-0', 'pointer-events-none');
+      sheet.classList.add('opacity-100');
+      content.classList.remove('translate-y-2');
+    }
+
+    function closeModelSheet() {
+      const sheet = document.getElementById('sheet-model');
+      const content = document.getElementById('sheet-model-content');
+      content.classList.add('translate-y-2');
+      sheet.classList.add('opacity-0', 'pointer-events-none');
+      sheet.classList.remove('opacity-100');
+    }
+
+    function selectModel(modelName) {
+      playBeep(700, 0.03);
+      state.selectedModel = modelName;
+      const label = document.getElementById('composer-model-label');
+      if (label) label.textContent = modelName;
+
+      const c28 = document.getElementById('check-puku-28');
+      const c27 = document.getElementById('check-puku-27');
+      const copus = document.getElementById('check-opus');
+
+      if (c28) c28.classList.toggle('invisible', modelName !== 'Puku-ai 2.8');
+      if (c27) c27.classList.toggle('invisible', modelName !== 'Puku-ai 2.7');
+      if (copus) copus.classList.toggle('invisible', modelName !== 'Opus 4.8');
+
+      closeModelSheet();
+      showToast(`Model switched to ${modelName}`);
+    }
+
+    // ================= ATTACHMENT SHEET =================
+    function openAttachmentSheet() {
+      playBeep(550, 0.03);
+      const sheet = document.getElementById('sheet-attachment');
+      const content = document.getElementById('sheet-attachment-content');
+      sheet.classList.remove('opacity-0', 'pointer-events-none');
+      sheet.classList.add('opacity-100');
+      content.classList.remove('translate-y-full');
+    }
+
+    function closeAttachmentSheet() {
+      const sheet = document.getElementById('sheet-attachment');
+      const content = document.getElementById('sheet-attachment-content');
+      content.classList.add('translate-y-full');
+      sheet.classList.add('opacity-0', 'pointer-events-none');
+      sheet.classList.remove('opacity-100');
+    }
+
+    function attachItem(type) {
+      closeAttachmentSheet();
+      showToast(`Attached ${type} to chat`);
+      const input = document.getElementById('chat-input');
+      input.value = `[Attached ${type}] ` + input.value;
+    }
+
+    // ================= CHATS LIST SCREEN =================
+    let chatSelectMode = false;
+    let selectedChatIds = new Set();
+
+    function renderChatsList() {
+      const container = document.getElementById('chats-list');
+      if (!container) return;
+      container.innerHTML = state.conversations.map(c => `
+        <div onclick="handleChatRowClick('${c.id}')" class="p-3 bg-[#1c1d1a] rounded-xl border border-white/5 flex items-center justify-between cursor-pointer hover:border-white/10 active:scale-98 transition-transform">
+          <div class="flex items-center gap-3">
+            ${chatSelectMode ? `
+              <input type="checkbox" ${selectedChatIds.has(c.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleSelectChat('${c.id}')" class="w-4 h-4 accent-[#b0b3fc]">
+            ` : ''}
+            <div>
+              <div class="font-bold text-xs text-white truncate max-w-[200px]">${c.title}</div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">${c.timestamp} • ${c.model}</div>
+            </div>
+          </div>
+          <span class="text-zinc-500 text-xs">›</span>
+        </div>
+      `).join('');
+    }
+
+    function handleChatRowClick(id) {
+      if (chatSelectMode) {
+        toggleSelectChat(id);
+      } else {
+        loadConversation(id);
+      }
+    }
+
+    function toggleChatSelectionMode() {
+      chatSelectMode = !chatSelectMode;
+      selectedChatIds.clear();
+      document.getElementById('chats-select-btn').textContent = chatSelectMode ? 'Done' : 'Select';
+      document.getElementById('chats-select-bar').classList.toggle('hidden', !chatSelectMode);
+      renderChatsList();
+    }
+
+    function toggleSelectChat(id) {
+      if (selectedChatIds.has(id)) {
+        selectedChatIds.delete(id);
+      } else {
+        selectedChatIds.add(id);
+      }
+      document.getElementById('chats-selected-count').textContent = `${selectedChatIds.size} selected`;
+      renderChatsList();
+    }
+
+    function cancelChatSelection() {
+      toggleChatSelectionMode();
+    }
+
+    function deleteSelectedChats() {
+      if (selectedChatIds.size === 0) return;
+      state.conversations = state.conversations.filter(c => !selectedChatIds.has(c.id));
+      showToast(`Deleted ${selectedChatIds.size} conversation(s)`);
+      selectedChatIds.clear();
+      toggleChatSelectionMode();
+      renderChatsList();
+    }
+
+    function filterChats(query) {
+      const q = query.toLowerCase();
+      const rows = document.querySelectorAll('#chats-list > div');
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? 'flex' : 'none';
+      });
+    }
+
+    // ================= PROJECTS SCREEN =================
+    let currentProjectTab = 'yours';
+
+    function setProjectTab(tab) {
+      playBeep(600, 0.03);
+      currentProjectTab = tab;
+      ['yours', 'power', 'shared', 'archived'].forEach(t => {
+        const btn = document.getElementById('ptab-' + t);
+        if (btn) {
+          btn.classList.remove('bg-[#242620]', 'text-white', 'font-semibold');
+          btn.classList.add('text-zinc-400');
+        }
+      });
+      const activeBtn = document.getElementById('ptab-' + tab);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-zinc-400');
+        activeBtn.classList.add('bg-[#242620]', 'text-white', 'font-semibold');
+      }
+      renderProjectsList();
+    }
+
+    function renderProjectsList() {
+      const container = document.getElementById('projects-list');
+      if (!container) return;
+      const list = state.projects.filter(p => currentProjectTab === 'yours' || p.scope === currentProjectTab);
+
+      container.innerHTML = list.map(p => `
+        <div onclick="openProjectDetails('${p.id}')" class="bg-[#1c1d1a] p-3.5 rounded-xl border border-white/5 cursor-pointer hover:border-white/10 active:scale-98 transition-transform">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-bold text-white">${p.name}</span>
+            <span class="px-2 py-0.5 rounded text-[9px] font-bold ${p.status === 'Ready' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}">${p.status}</span>
+          </div>
+          <p class="text-[11px] text-zinc-400 mb-2 leading-tight">${p.desc}</p>
+          <div class="w-full h-1 bg-black/40 rounded-full overflow-hidden">
+            <div class="h-full bg-[#b0b3fc] rounded-full" style="width: ${p.progress}%;"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openProjectDetails(id) {
+      state.activeProjectId = id;
+      const p = state.projects.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('proj-detail-title').textContent = p.name;
+      document.getElementById('proj-detail-desc').textContent = p.desc;
+      document.getElementById('proj-detail-inst').textContent = p.instructions;
+      document.getElementById('proj-progress-num').textContent = p.progress + '%';
+      document.getElementById('proj-progress-bar').style.width = p.progress + '%';
+      document.getElementById('task-badge-count').textContent = p.tasks.length;
+
+      // Render tasks checklist
+      renderTasksChecklist(p);
+      navigateTo('project-details');
+    }
+
+    function renderTasksChecklist(p) {
+      const container = document.getElementById('tasks-checklist');
+      if (!container) return;
+      container.innerHTML = p.tasks.map(t => `
+        <div onclick="toggleTask('${p.id}', '${t.id}')" class="flex items-center gap-2.5 p-2.5 rounded-lg bg-[#1c1d1a] border border-white/5 cursor-pointer hover:bg-white/5">
+          <input type="checkbox" ${t.done ? 'checked' : ''} class="w-4 h-4 accent-emerald-500 cursor-pointer">
+          <span class="text-xs ${t.done ? 'line-through text-zinc-500' : 'text-zinc-200'}">${t.text}</span>
+        </div>
+      `).join('');
+    }
+
+    function toggleTask(projId, taskId) {
+      const p = state.projects.find(x => x.id === projId);
+      if (!p) return;
+      const t = p.tasks.find(x => x.id === taskId);
+      if (!t) return;
+      t.done = !t.done;
+      playBeep(t.done ? 850 : 500, 0.04);
+
+      // Recalculate progress
+      const completed = p.tasks.filter(x => x.done).length;
+      p.progress = Math.round((completed / p.tasks.length) * 100);
+      document.getElementById('proj-progress-num').textContent = p.progress + '%';
+      document.getElementById('proj-progress-bar').style.width = p.progress + '%';
+      renderTasksChecklist(p);
+    }
+
+    function setProjDetailTab(tab) {
+      playBeep(600, 0.03);
+      ['overview', 'tasks', 'files'].forEach(t => {
+        const btn = document.getElementById('pdtab-' + t);
+        const cont = document.getElementById('pd-content-' + t);
+        if (btn) {
+          btn.classList.remove('border-[#b0b3fc]', 'text-white', 'font-semibold');
+          btn.classList.add('border-transparent', 'text-zinc-400');
+        }
+        if (cont) cont.classList.add('hidden');
+      });
+      const activeBtn = document.getElementById('pdtab-' + tab);
+      const activeCont = document.getElementById('pd-content-' + tab);
+      if (activeBtn) {
+        activeBtn.classList.remove('border-transparent', 'text-zinc-400');
+        activeBtn.classList.add('border-[#b0b3fc]', 'text-white', 'font-semibold');
+      }
+      if (activeCont) activeCont.classList.remove('hidden');
+    }
+
+    // Modal New Project
+    function openNewProjectModal() {
+      playBeep(650, 0.04);
+      const m = document.getElementById('modal-new-project');
+      m.classList.remove('opacity-0', 'pointer-events-none');
+      m.classList.add('opacity-100');
+    }
+
+    function closeNewProjectModal() {
+      const m = document.getElementById('modal-new-project');
+      m.classList.add('opacity-0', 'pointer-events-none');
+      m.classList.remove('opacity-100');
+    }
+
+    function submitNewProject() {
+      const name = document.getElementById('new-proj-name').value.trim();
+      const desc = document.getElementById('new-proj-desc').value.trim();
+      const inst = document.getElementById('new-proj-inst').value.trim();
+      if (!name) return;
+      playBeep(900, 0.05);
+
+      state.projects.unshift({
+        id: 'p_' + Date.now(),
+        name: name,
+        desc: desc || 'Newly created project',
+        instructions: inst || 'Default system prompt',
+        scope: 'yours',
+        status: 'Active',
+        progress: 10,
+        tasks: [
+          { id: 't_init', text: 'Initialize project workspace', done: false }
+        ]
+      });
+
+      document.getElementById('new-proj-name').value = '';
+      document.getElementById('new-proj-desc').value = '';
+      document.getElementById('new-proj-inst').value = '';
+      closeNewProjectModal();
+      renderProjectsList();
+      showToast(`Created project: ${name}`);
+    }
+
+    // ================= ARTIFACTS SCREEN =================
+    function filterArtifactsType(type) {
+      playBeep(600, 0.03);
+      state.activeArtifactFilter = type;
+      ['all', 'code', 'markdown', 'svg'].forEach(t => {
+        const pill = document.getElementById('art-pill-' + t);
+        if (pill) {
+          pill.classList.remove('bg-[#b0b3fc]', 'text-white', 'font-semibold');
+          pill.classList.add('bg-[#1c1d1a]', 'text-zinc-400');
+        }
+      });
+      const activePill = document.getElementById('art-pill-' + type);
+      if (activePill) {
+        activePill.classList.remove('bg-[#1c1d1a]', 'text-zinc-400');
+        activePill.classList.add('bg-[#b0b3fc]', 'text-white', 'font-semibold');
+      }
+      renderArtifactsList();
+    }
+
+    function renderArtifactsList() {
+      const container = document.getElementById('artifacts-list');
+      if (!container) return;
+      const list = state.artifacts.filter(a => state.activeArtifactFilter === 'all' || a.type === state.activeArtifactFilter);
+
+      container.innerHTML = list.map(a => `
+        <div onclick="openArtifactModal('${a.id}')" class="p-3 bg-[#1c1d1a] rounded-xl border border-white/5 flex items-center justify-between cursor-pointer hover:border-white/10 active:scale-98 transition-transform">
+          <div class="flex items-center gap-3">
+            <span class="text-lg">${a.type === 'code' ? '💻' : a.type === 'svg' ? '🎨' : '📄'}</span>
+            <div>
+              <div class="font-bold text-xs text-white">${a.title}</div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">${a.date} • ${a.type.toUpperCase()}</div>
+            </div>
+          </div>
+          <span class="text-zinc-500 text-xs">View ➔</span>
+        </div>
+      `).join('');
+    }
+
+    function openArtifactModal(id) {
+      playBeep(650, 0.03);
+      const a = state.artifacts.find(x => x.id === id);
+      if (!a) return;
+      document.getElementById('modal-art-title').textContent = a.title;
+      document.getElementById('modal-art-type').textContent = a.type.toUpperCase();
+      document.getElementById('modal-art-content').textContent = a.content;
+      const m = document.getElementById('modal-artifact');
+      m.classList.remove('opacity-0', 'pointer-events-none');
+      m.classList.add('opacity-100');
+    }
+
+    function closeArtifactModal() {
+      const m = document.getElementById('modal-artifact');
+      m.classList.add('opacity-0', 'pointer-events-none');
+      m.classList.remove('opacity-100');
+    }
+
+    function copyArtifactModalContent() {
+      const content = document.getElementById('modal-art-content').textContent;
+      copyToClipboard(content);
+      closeArtifactModal();
+    }
+
+    // ================= CODE SCREEN =================
+    function runCodeSessionSimulation() {
+      playBeep(850, 0.05);
+      const statusEl = document.getElementById('terminal-status');
+      const logEl = document.getElementById('terminal-log');
+      statusEl.textContent = 'RUNNING...';
+      statusEl.className = 'text-amber-400 font-semibold';
+      logEl.innerHTML = `> Bundling TypeScript (Target: Android)...<br/>> Building Hermes bytecode bundle...`;
+
+      setTimeout(() => {
+        playBeep(950, 0.06);
+        statusEl.textContent = 'SUCCESS (0 Errors)';
+        statusEl.className = 'text-emerald-400 font-semibold';
+        logEl.innerHTML = `> Build finished in 184ms<br/>> Memory: 28MB heap allocated<br/>> Rendered 12 UI widgets to Samsung Galaxy A54 canvas`;
+      }, 700);
+    }
+
+    function openNewCodeModal() {
+      showToast('New code session opened');
+      document.getElementById('code-editor-area').value = `// New Session\nexport function Solution() {\n  return "Ready";\n}`;
+    }
+
+    // ================= REMOTE RELAY SCREEN =================
+    let remoteConnected = true;
+
+    function toggleRemoteConnect() {
+      remoteConnected = !remoteConnected;
+      playBeep(remoteConnected ? 800 : 450, 0.05);
+      const badge = document.getElementById('remote-status-badge');
+      const btn = document.getElementById('btn-remote-toggle');
+
+      if (remoteConnected) {
+        badge.textContent = 'CONNECTED';
+        badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400';
+        btn.textContent = 'Disconnect Relay';
+        btn.className = 'w-full py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs';
+        showToast('Relay connected to VS Code Desktop (24ms latency)');
+      } else {
+        badge.textContent = 'DISCONNECTED';
+        badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/20 text-zinc-400';
+        btn.textContent = 'Connect Relay';
+        btn.className = 'w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs';
+        showToast('Relay disconnected');
+      }
+    }
+
+    function respondTool(approved) {
+      playBeep(approved ? 800 : 400, 0.05);
+      showToast(approved ? 'Tool execution APPROVED ✓' : 'Tool execution DENIED ✕');
+    }
+
+    // ================= TRANSCRIBE SCREEN =================
+    let isTranscribing = false;
+    let transcribeSecs = 14;
+
+    function toggleTranscribeRecord() {
+      isTranscribing = !isTranscribing;
+      playBeep(isTranscribing ? 900 : 500, 0.06);
+      const btn = document.getElementById('btn-transcribe-record');
+      const waves = document.getElementById('transcribe-waves');
+
+      if (isTranscribing) {
+        btn.classList.add('animate-pulse', 'ring-4', 'ring-red-400/50');
+        showToast('Transcribing audio in real time...');
+      } else {
+        btn.classList.remove('animate-pulse', 'ring-4', 'ring-red-400/50');
+        showToast('Transcription paused');
+      }
+    }
+
+    function sendTranscriptToChat() {
+      const text = document.getElementById('transcribe-text').textContent.trim();
+      navigateTo('chat');
+      document.getElementById('chat-input').value = text;
+      showToast('Transcript inserted into chat composer');
+    }
+
+    function copyTranscript() {
+      const text = document.getElementById('transcribe-text').textContent.trim();
+      copyToClipboard(text);
+    }
+
+    function clearTranscript() {
+      document.getElementById('transcribe-text').textContent = 'Press the microphone below to begin live speech transcription.';
+      document.getElementById('transcribe-word-count').textContent = '0 words';
+      showToast('Transcript cleared');
+    }
+
+    // ================= LIVE VOICE SCREEN =================
+    let voiceStatusIndex = 0;
+    const voiceStatuses = [
+      'Puku is listening...',
+      'Puku is thinking...',
+      'Puku is responding...',
+      'Start talking...'
+    ];
+
+    setInterval(() => {
+      if (state.activeRoute === 'liveVoice') {
+        voiceStatusIndex = (voiceStatusIndex + 1) % voiceStatuses.length;
+        const el = document.getElementById('voice-status-text');
+        if (el) el.textContent = voiceStatuses[voiceStatusIndex];
+      }
+    }, 3500);
+
+    let isVoiceMuted = false;
+    function toggleVoiceMute() {
+      isVoiceMuted = !isVoiceMuted;
+      playBeep(isVoiceMuted ? 400 : 800, 0.04);
+      const btn = document.getElementById('btn-voice-mute');
+      btn.classList.toggle('bg-red-500/20', isVoiceMuted);
+      btn.classList.toggle('text-red-400', isVoiceMuted);
+      showToast(isVoiceMuted ? 'Microphone Muted' : 'Microphone Active');
+    }
+
+    let isVoiceSpeaker = true;
+    function toggleVoiceSpeaker() {
+      isVoiceSpeaker = !isVoiceSpeaker;
+      playBeep(650, 0.04);
+      showToast(isVoiceSpeaker ? 'Speaker Output: Active' : 'Speaker Output: Earpiece');
+    }
+
+    // ================= SETTINGS & PROFILE =================
+    function toggleDarkTheme(isDark) {
+      state.isDarkMode = isDark;
+      playBeep(isDark ? 800 : 600, 0.04);
+      const chassis = document.getElementById('device-chassis');
+      if (!isDark) {
+        chassis.classList.add('app-light-mode');
+        chassis.setAttribute('data-puku-theme', 'light');
+        document.documentElement.setAttribute('data-puku-theme', 'light');
+        showToast('Light Theme Activated');
+      } else {
+        chassis.classList.remove('app-light-mode');
+        chassis.setAttribute('data-puku-theme', 'dark');
+        document.documentElement.setAttribute('data-puku-theme', 'dark');
+        showToast('AMOLED Dark Theme Activated');
+      }
+    }
+
+    function saveApiToken() {
+      playBeep(850, 0.04);
+      showToast('API Bearer Token saved to secure storage');
+    }
+
+    function saveUserProfile() {
+      playBeep(850, 0.04);
+      state.user.name = document.getElementById('prof-input-name').value.trim() || 'Iftakhar';
+      state.user.email = document.getElementById('prof-input-email').value.trim() || 'iftakhar@poridhi.com';
+      state.user.org = document.getElementById('prof-input-org').value.trim() || 'Poridhi Lab';
+
+      // Update UI references
+      const initial = state.user.name[0].toUpperCase();
+      document.getElementById('settings-avatar-letter').textContent = initial;
+      document.getElementById('settings-user-name').textContent = state.user.name;
+      document.getElementById('settings-user-email').textContent = state.user.email;
+      document.getElementById('drawer-avatar-letter').textContent = initial;
+      document.getElementById('drawer-user-name').textContent = state.user.name;
+      document.getElementById('profile-big-avatar').textContent = initial;
+
+      showToast('Profile updated successfully');
+      navigateTo('settings');
+    }
+
+    function confirmLogout() {
+      if (confirm('Are you sure you want to log out of Puku AI?')) {
+        playBeep(400, 0.05);
+        showToast('Logged out of session');
+        navigateTo('login');
+      }
+    }
+
+    function openInfoModal() {
+      playBeep(650, 0.03);
+      const m = document.getElementById('modal-info');
+      m.classList.remove('opacity-0', 'pointer-events-none');
+      m.classList.add('opacity-100');
+    }
+
+    function closeInfoModal() {
+      const m = document.getElementById('modal-info');
+      m.classList.add('opacity-0', 'pointer-events-none');
+      m.classList.remove('opacity-100');
+    }
+
+    // ================= LOGIN SCREEN =================
+    function togglePasswordVisibility() {
+      const inp = document.getElementById('login-password');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    function performLogin() {
+      playBeep(850, 0.05);
+      showToast('Authenticated as ' + document.getElementById('login-email').value);
+      navigateTo('chat');
+    }
+
+    function performGoogleSSO() {
+      playBeep(850, 0.05);
+      showToast('Google OAuth 2.0 PKCE Session Verified');
+      navigateTo('chat');
+    }
+
+    // ================= DEVICE CONTROLS =================
+    function setZoom(scalePercent) {
+      playBeep(700, 0.03);
+      const wrapper = document.getElementById('device-wrapper');
+      wrapper.className = 'relative transition-transform duration-200 origin-top zoom-' + scalePercent;
+
+      ['100', '90', '80'].forEach(s => {
+        const btn = document.getElementById('z-' + s);
+        if (btn) {
+          btn.classList.remove('bg-[#b0b3fc]', 'text-white');
+          btn.classList.add('text-zinc-400');
+        }
+      });
+      const activeBtn = document.getElementById('z-' + scalePercent);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-zinc-400');
+        activeBtn.classList.add('bg-[#b0b3fc]', 'text-white');
+      }
+    }
+
+    // ================= UTILITIES =================
+    function copyToClipboard(text) {
+      navigator.clipboard?.writeText(text);
+      showToast('Copied to clipboard!');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const text = document.getElementById('toast-text');
+      text.textContent = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2200);
+    }
+
+    // Initialize application on load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderMessages();
+      renderChatsList();
+      renderProjectsList();
+      renderArtifactsList();
+    });
+  </script>
+</body>
+</html>
