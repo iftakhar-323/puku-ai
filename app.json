@@ -4,7 +4,6 @@
     "slug": "puku-ai",
     "owner": "iftakhar-alam",
     "version": "1.0.0",
-
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -30,18 +29,19 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/4b79ef0a-57a2-4e38-8e45-a7faa9589749"
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "web": {
-      "bundler": "metro"
-    },
     "plugins": [
       "expo-updates"
-    ]
-  },
-  "name": "PukuAI",
-  "displayName": "Puku AI"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4b79ef0a-57a2-4e38-8e45-a7faa9589749"
+      }
+    }
+  }
 }

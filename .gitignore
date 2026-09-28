@@ -46,6 +46,11 @@ yarn-error.log
 .env.local
 .env.*.local
 
+# Expo & Metro export outputs
+.expo/
+dist/
+
+
 # fastlane
 #
 # It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
