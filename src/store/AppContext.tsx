@@ -324,11 +324,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
                   return {
                     id: raw.id,
-                    title: raw.title || existing?.title || 'New Chat',
                     activityDate:
-                      formatActivityDate(raw.updatedAt || raw.createdAt) ||
-                      existing?.activityDate ||
-                      'Recent',
+                      formatActivityDate(
+                        raw.updated_at ||
+                        raw.updatedAt ||
+                        raw.created_at ||
+                        raw.createdAt ||
+                        existing?.updatedAtTimestamp ||
+                        ts
+                      ),
                     projectId: raw.projectId || existing?.projectId,
                     messages,
                     model: raw.model ? mapApiToModel(raw.model) : existing?.model || 'puku-ai-2.7',
@@ -638,11 +642,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
             return {
               id: raw.id,
-              title: raw.title || existing?.title || 'New Chat',
               activityDate:
-                formatActivityDate(raw.updatedAt || raw.createdAt) ||
-                existing?.activityDate ||
-                'Recent',
+                formatActivityDate(
+                  raw.updated_at ||
+                  raw.updatedAt ||
+                  raw.created_at ||
+                  raw.createdAt ||
+                  existing?.updatedAtTimestamp ||
+                  ts
+                ),
               projectId: raw.projectId || existing?.projectId,
               messages,
               model: raw.model ? mapApiToModel(raw.model) : existing?.model || 'puku-ai-2.7',

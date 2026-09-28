@@ -28,17 +28,30 @@ export function ChatEmptyState({
   // If user has real conversations, show top 3; otherwise show matching sample conversations from screenshot
   const displayItems =
     conversations.length > 0
-      ? conversations.slice(0, 3).map(c => ({
-          id: c.id,
-          title: c.title || 'Untitled conversation',
-          time: formatActivityDate((c as any).activityDate || c.updatedAtTimestamp || c.createdAt),
-          isReal: true,
-        }))
+      ? conversations.slice(0, 3).map(c => {
+          const rawTime =
+            (c as any).updated_at ||
+            (c as any).created_at ||
+            c.updatedAtTimestamp ||
+            (c as any).updatedAt ||
+            (c as any).createdAt ||
+            c.activityDate;
+          let formatted = formatActivityDate(rawTime);
+          if (!formatted || formatted === 'Recent') {
+            formatted = 'Just now';
+          }
+          return {
+            id: c.id,
+            title: c.title || 'Untitled conversation',
+            time: formatted,
+            isReal: true,
+          };
+        })
       : [
           {
             id: 'sample-1',
             title: 'df',
-            time: '20m ago',
+            time: '38m ago',
             isReal: false,
           },
           {

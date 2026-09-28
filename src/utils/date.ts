@@ -5,18 +5,17 @@
 
 export function getConversationTimestamp(raw: any): number {
   if (!raw) return 0;
-  const val = raw.updatedAt || raw.createdAt || raw.timestamp || raw;
 
-  if (typeof val === 'number') {
+  if (typeof raw === 'number') {
     // If in seconds (10 digits), convert to millis
-    if (val > 0 && val < 10000000000) {
-      return val * 1000;
+    if (raw > 0 && raw < 10000000000) {
+      return raw * 1000;
     }
-    return val;
+    return raw;
   }
 
-  if (typeof val === 'string') {
-    const num = Number(val);
+  if (typeof raw === 'string') {
+    const num = Number(raw);
     if (!isNaN(num) && num > 0) {
       if (num < 10000000000) {
         return num * 1000;
@@ -24,43 +23,70 @@ export function getConversationTimestamp(raw: any): number {
       return num;
     }
 
-    const parsed = Date.parse(val);
+    const parsed = Date.parse(raw);
     if (!isNaN(parsed)) {
       return parsed;
     }
   }
 
-  if (val instanceof Date) {
-    return val.getTime();
+  if (raw instanceof Date) {
+    return raw.getTime();
+  }
+
+  // Handle object fields
+  const val =
+    raw.updated_at ||
+    raw.created_at ||
+    raw.updatedAt ||
+    raw.createdAt ||
+    raw.timestamp ||
+    raw.updatedAtTimestamp ||
+    raw.time ||
+    raw.date ||
+    raw.lastModified ||
+    raw.last_modified;
+
+  if (val && val !== raw) {
+    return getConversationTimestamp(val);
   }
 
   return 0;
 }
 
 export function formatActivityDate(rawDate: any): string {
-  if (!rawDate) return 'Recent';
+  if (!rawDate) return 'Just now';
 
-  // If it's already a relative word
+  // Never return the literal placeholder word 'Recent'
+  if (rawDate === 'Recent' || rawDate === 'recent') {
+    return 'Just now';
+  }
+
+  // If it's already a relative word/time
   if (
     typeof rawDate === 'string' &&
     (rawDate === 'Just now' ||
       rawDate === 'Yesterday' ||
-      rawDate === 'Recent' ||
-      rawDate.endsWith('ago'))
+      rawDate.endsWith('ago') ||
+      rawDate.includes('m ago') ||
+      rawDate.includes('h ago') ||
+      rawDate.includes('d ago'))
   ) {
     return rawDate;
   }
 
   const timestamp = getConversationTimestamp(rawDate);
   if (timestamp <= 0) {
-    return typeof rawDate === 'string' && rawDate.trim() ? rawDate : 'Recent';
+    if (typeof rawDate === 'string' && rawDate.trim() && rawDate !== 'Recent') {
+      return rawDate;
+    }
+    return 'Just now';
   }
 
   const now = Date.now();
   const diffMs = now - timestamp;
 
-  // Future or right now
-  if (diffMs < 0 || diffMs < 60 * 1000) {
+  // Future or within last minute
+  if (diffMs <= 0 || diffMs < 60 * 1000) {
     return 'Just now';
   }
 
