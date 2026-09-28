@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -34,9 +36,11 @@ import {
 import { pukuApi } from '../../services/api';
 import { useApp } from '../../store/AppContext';
 import { AppColors } from '../../theme/colors';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 export function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { keyboardHeight } = useKeyboardHeight();
   const {
     theme,
     profile,
@@ -404,7 +408,14 @@ export function SettingsScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setInfoModalVisible(false)}>
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={[
+            styles.modalBackdrop,
+            Platform.OS === 'android' && keyboardHeight > 0
+              ? { paddingBottom: keyboardHeight + 20, justifyContent: 'flex-end' }
+              : null,
+          ]}>
           <View
             style={[
               styles.modalCard,
@@ -469,7 +480,7 @@ export function SettingsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

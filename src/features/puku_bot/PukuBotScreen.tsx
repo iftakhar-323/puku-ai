@@ -23,6 +23,7 @@ import {
 } from '../../components/common/Icons';
 import { NativeClipboard } from '../../services/nativeModules';
 import { useApp } from '../../store/AppContext';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -64,33 +65,20 @@ export function PukuBotScreen() {
   const [messages, setMessages] = useState<BotMessage[]>([]);
   const [inputVal, setInputVal] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
+  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
 
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
+  // Automatically scroll to bottom when keyboard opens
   useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
-        setIsKeyboardVisible(true);
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 80);
-      }
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setIsKeyboardVisible(false);
-      }
-    );
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
+    if (keyboardHeight > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 60);
+    }
+  }, [keyboardHeight]);
 
   const handleEditMessage = (text: string) => {
     setInputVal(text);
@@ -171,7 +159,10 @@ export function PukuBotScreen() {
         {
           backgroundColor: theme.background,
           paddingTop: Math.max(insets.top, 12),
-          paddingBottom: isKeyboardVisible ? 6 : Math.max(insets.bottom, 12),
+          paddingBottom:
+            Platform.OS === 'android'
+              ? (keyboardHeight > 0 ? keyboardHeight : Math.max(insets.bottom, 12))
+              : Math.max(insets.bottom, 12),
         },
       ]}>
       {/* Authentic Header */}

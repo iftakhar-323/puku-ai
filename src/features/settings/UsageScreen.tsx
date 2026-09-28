@@ -20,9 +20,11 @@ import {
   TerminalPromptIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 export function UsageScreen() {
   const insets = useSafeAreaInsets();
+  const { keyboardHeight } = useKeyboardHeight();
   const { theme, isDark, updateSettings, setDrawerOpen, navigate } = useApp();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fromDate, setFromDate] = useState('');
@@ -97,9 +99,15 @@ export function UsageScreen() {
       </View>
 
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(insets.bottom, 28) },
+          {
+            paddingBottom:
+              Platform.OS === 'android' && keyboardHeight > 0
+                ? keyboardHeight + 28
+                : Math.max(insets.bottom, 28),
+          },
         ]}
         showsVerticalScrollIndicator={false}>
         {/* Top Title & Refresh Row */}

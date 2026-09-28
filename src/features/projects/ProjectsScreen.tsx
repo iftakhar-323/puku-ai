@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,10 +22,12 @@ import {
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { ProjectScope } from '../../types';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 export function ProjectsScreen() {
   const insets = useSafeAreaInsets();
   const { theme, projects, createProject, selectProject, refreshProjects } = useApp();
+  const { keyboardHeight } = useKeyboardHeight();
 
   const [activeTab, setActiveTab] = useState<ProjectScope>('yours');
   const [searchQuery, setSearchQuery] = useState('');
@@ -201,88 +206,100 @@ export function ProjectsScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setShowCreateModal(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowCreateModal(false)}>
-          <View style={styles.modalBackdrop} />
-        </TouchableWithoutFeedback>
-        <View
-          style={[
-            styles.modalContent,
-            {
-              backgroundColor: theme.secondaryBackground,
-              paddingBottom: Math.max(insets.bottom, 20),
-            },
-          ]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-              New Project
-            </Text>
-            <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-              <CloseIcon size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableWithoutFeedback onPress={() => setShowCreateModal(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: theme.secondaryBackground,
+                paddingBottom:
+                  Platform.OS === 'android' && keyboardHeight > 0
+                    ? keyboardHeight + 16
+                    : Math.max(insets.bottom, 20),
+              },
+            ]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+                New Project
+              </Text>
+              <TouchableOpacity onPress={() => setShowCreateModal(false)}>
+                <CloseIcon size={20} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                Name
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.background,
+                    color: theme.textPrimary,
+                    borderColor: theme.border,
+                  },
+                ]}
+                placeholder="My project"
+                placeholderTextColor={theme.placeholderText}
+                value={name}
+                onChangeText={setName}
+              />
+
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                Description (Optional)
+              </Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.background,
+                    color: theme.textPrimary,
+                    borderColor: theme.border,
+                  },
+                ]}
+                placeholder="Optional short description"
+                placeholderTextColor={theme.placeholderText}
+                value={description}
+                onChangeText={setDescription}
+              />
+
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+                Custom Instructions
+              </Text>
+              <TextInput
+                style={[
+                  styles.textArea,
+                  {
+                    backgroundColor: theme.background,
+                    color: theme.textPrimary,
+                    borderColor: theme.border,
+                  },
+                ]}
+                placeholder="Tell Puku how to behave in this project..."
+                placeholderTextColor={theme.placeholderText}
+                value={instructions}
+                onChangeText={setInstructions}
+                multiline
+                numberOfLines={4}
+              />
+
+              <TouchableOpacity
+                onPress={handleCreate}
+                style={[styles.createBtn, { backgroundColor: theme.primary }]}>
+                <Text style={styles.createBtnText}>Create Project</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-
-          <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-            Name
-          </Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.background,
-                color: theme.textPrimary,
-                borderColor: theme.border,
-              },
-            ]}
-            placeholder="My project"
-            placeholderTextColor={theme.placeholderText}
-            value={name}
-            onChangeText={setName}
-          />
-
-          <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-            Description (Optional)
-          </Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.background,
-                color: theme.textPrimary,
-                borderColor: theme.border,
-              },
-            ]}
-            placeholder="Optional short description"
-            placeholderTextColor={theme.placeholderText}
-            value={description}
-            onChangeText={setDescription}
-          />
-
-          <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-            Custom Instructions
-          </Text>
-          <TextInput
-            style={[
-              styles.textArea,
-              {
-                backgroundColor: theme.background,
-                color: theme.textPrimary,
-                borderColor: theme.border,
-              },
-            ]}
-            placeholder="Tell Puku how to behave in this project..."
-            placeholderTextColor={theme.placeholderText}
-            value={instructions}
-            onChangeText={setInstructions}
-            multiline
-            numberOfLines={4}
-          />
-
-          <TouchableOpacity
-            onPress={handleCreate}
-            style={[styles.createBtn, { backgroundColor: theme.primary }]}>
-            <Text style={styles.createBtnText}>Create Project</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

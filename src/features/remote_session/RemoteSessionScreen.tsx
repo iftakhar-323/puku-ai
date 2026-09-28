@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,9 +16,11 @@ import {
   RemoteIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 export function RemoteSessionScreen() {
   const insets = useSafeAreaInsets();
+  const { keyboardHeight } = useKeyboardHeight();
   const {
     theme,
     remoteSession,
@@ -55,9 +58,15 @@ export function RemoteSessionScreen() {
       />
 
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(insets.bottom, 24) },
+          {
+            paddingBottom:
+              Platform.OS === 'android' && keyboardHeight > 0
+                ? keyboardHeight + 24
+                : Math.max(insets.bottom, 24),
+          },
         ]}>
         {/* Pairing / Connection Card */}
         <View

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,9 +20,11 @@ import {
   PlusIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 export function ProjectDetailsScreen() {
   const insets = useSafeAreaInsets();
+  const { keyboardHeight } = useKeyboardHeight();
   const {
     theme,
     activeProject,
@@ -255,47 +259,54 @@ export function ProjectDetailsScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setShowInstructionsModal(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowInstructionsModal(false)}>
-          <View style={styles.modalBackdrop} />
-        </TouchableWithoutFeedback>
-        <View
-          style={[
-            styles.modalContent,
-            {
-              backgroundColor: theme.secondaryBackground,
-              paddingBottom: Math.max(insets.bottom, 20),
-            },
-          ]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-              Custom Instructions
-            </Text>
-            <TouchableOpacity onPress={() => setShowInstructionsModal(false)}>
-              <CloseIcon size={20} color={theme.textSecondary} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableWithoutFeedback onPress={() => setShowInstructionsModal(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: theme.secondaryBackground,
+                paddingBottom:
+                  Platform.OS === 'android' && keyboardHeight > 0
+                    ? keyboardHeight + 16
+                    : Math.max(insets.bottom, 20),
+              },
+            ]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+                Custom Instructions
+              </Text>
+              <TouchableOpacity onPress={() => setShowInstructionsModal(false)}>
+                <CloseIcon size={20} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[
+                styles.instructionsInput,
+                {
+                  backgroundColor: theme.background,
+                  color: theme.textPrimary,
+                  borderColor: theme.border,
+                },
+              ]}
+              placeholder="e.g. You are a senior React Native engineer. Respond concisely with code examples..."
+              placeholderTextColor={theme.placeholderText}
+              value={instructionsText}
+              onChangeText={setInstructionsText}
+              multiline
+              numberOfLines={6}
+            />
+            <TouchableOpacity
+              onPress={handleSaveInstructions}
+              style={[styles.saveBtn, { backgroundColor: theme.primary }]}>
+              <Text style={styles.saveBtnText}>Save Instructions</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={[
-              styles.instructionsInput,
-              {
-                backgroundColor: theme.background,
-                color: theme.textPrimary,
-                borderColor: theme.border,
-              },
-            ]}
-            placeholder="e.g. You are a senior React Native engineer. Respond concisely with code examples..."
-            placeholderTextColor={theme.placeholderText}
-            value={instructionsText}
-            onChangeText={setInstructionsText}
-            multiline
-            numberOfLines={6}
-          />
-          <TouchableOpacity
-            onPress={handleSaveInstructions}
-            style={[styles.saveBtn, { backgroundColor: theme.primary }]}>
-            <Text style={styles.saveBtnText}>Save Instructions</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Add Knowledge Modal */}
@@ -304,45 +315,52 @@ export function ProjectDetailsScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setShowAddContentModal(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowAddContentModal(false)}>
-          <View style={styles.modalBackdrop} />
-        </TouchableWithoutFeedback>
-        <View
-          style={[
-            styles.modalContent,
-            {
-              backgroundColor: theme.secondaryBackground,
-              paddingBottom: Math.max(insets.bottom, 20),
-            },
-          ]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-              Add Knowledge Content
-            </Text>
-            <TouchableOpacity onPress={() => setShowAddContentModal(false)}>
-              <CloseIcon size={20} color={theme.textSecondary} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableWithoutFeedback onPress={() => setShowAddContentModal(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: theme.secondaryBackground,
+                paddingBottom:
+                  Platform.OS === 'android' && keyboardHeight > 0
+                    ? keyboardHeight + 16
+                    : Math.max(insets.bottom, 20),
+              },
+            ]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+                Add Knowledge Content
+              </Text>
+              <TouchableOpacity onPress={() => setShowAddContentModal(false)}>
+                <CloseIcon size={20} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[
+                styles.fileNameInput,
+                {
+                  backgroundColor: theme.background,
+                  color: theme.textPrimary,
+                  borderColor: theme.border,
+                },
+              ]}
+              placeholder="File name (e.g. API-Spec.md)"
+              placeholderTextColor={theme.placeholderText}
+              value={newFileName}
+              onChangeText={setNewFileName}
+            />
+            <TouchableOpacity
+              onPress={handleAddKnowledge}
+              style={[styles.saveBtn, { backgroundColor: theme.primary }]}>
+              <Text style={styles.saveBtnText}>Attach to Project</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={[
-              styles.fileNameInput,
-              {
-                backgroundColor: theme.background,
-                color: theme.textPrimary,
-                borderColor: theme.border,
-              },
-            ]}
-            placeholder="File name (e.g. API-Spec.md)"
-            placeholderTextColor={theme.placeholderText}
-            value={newFileName}
-            onChangeText={setNewFileName}
-          />
-          <TouchableOpacity
-            onPress={handleAddKnowledge}
-            style={[styles.saveBtn, { backgroundColor: theme.primary }]}>
-            <Text style={styles.saveBtnText}>Attach to Project</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

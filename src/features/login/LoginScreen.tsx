@@ -36,6 +36,7 @@ import { AppColors } from '../../theme/colors';
 import { ENV } from '../../config/env';
 import { extractJwtData, fetchAuthenticUserInfo } from '../../utils/auth';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 // Standard pure JS SHA-256 for PKCE S256 challenge calculation
 function sha256(ascii: string): Uint8Array {
@@ -154,6 +155,7 @@ function generateRandomString(length: number): string {
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { navigate, updateProfile, refreshConversations } = useApp();
+  const { keyboardHeight } = useKeyboardHeight();
 
   // SnackBar state matching Flutter's ScaffoldMessenger
   const [snackBarMessage, setSnackBarMessage] = useState<string | null>(null);
@@ -649,104 +651,114 @@ export function LoginScreen() {
         onRequestClose={() => setIsEmailModalOpen(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            {/* Header */}
-            <View style={styles.modalHeaderRow}>
-              <View style={styles.modalTitleBadge}>
-                <EmailIcon size={18} color={AppColors.blueLite} />
-                <Text style={styles.modalTitleText}>Sign in with Email</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setIsEmailModalOpen(false)}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <CloseIcon size={20} color={AppColors.coolGrey} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSubtitleText}>
-              Enter your account email to access your Puku workspace and AI models.
-            </Text>
-
-            {/* Error Message */}
-            {emailErrorMessage && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{emailErrorMessage}</Text>
-              </View>
-            )}
-
-            {/* Email Field */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-              <View style={styles.inputWrapper}>
-                <EmailIcon size={18} color={AppColors.coolGrey} />
-                <TextInput
-                  style={styles.textInputField}
-                  value={emailInput}
-                  onChangeText={t => {
-                    setEmailInput(t);
-                    if (emailErrorMessage) setEmailErrorMessage(null);
-                  }}
-                  placeholder="you@domain.com"
-                  placeholderTextColor={AppColors.coolGrey}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-
-            {/* Password / Access Token Field */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>PASSWORD OR ACCESS TOKEN</Text>
-              <View style={styles.inputWrapper}>
-                <LockIcon size={18} color={AppColors.coolGrey} />
-                <TextInput
-                  style={[styles.textInputField, { flex: 1 }]}
-                  value={passwordInput}
-                  onChangeText={setPasswordInput}
-                  placeholder="Enter password or token"
-                  placeholderTextColor={AppColors.coolGrey}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                />
+          style={[
+            styles.modalBackdrop,
+            Platform.OS === 'android' && keyboardHeight > 0
+              ? { paddingBottom: keyboardHeight + 10, justifyContent: 'flex-end' }
+              : null,
+          ]}>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            <View style={styles.modalCard}>
+              {/* Header */}
+              <View style={styles.modalHeaderRow}>
+                <View style={styles.modalTitleBadge}>
+                  <EmailIcon size={18} color={AppColors.blueLite} />
+                  <Text style={styles.modalTitleText}>Sign in with Email</Text>
+                </View>
                 <TouchableOpacity
-                  onPress={() => setShowPassword(p => !p)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  {showPassword ? (
-                    <EyeOffIcon size={18} color={AppColors.paleSky} />
-                  ) : (
-                    <EyeIcon size={18} color={AppColors.coolGrey} />
-                  )}
+                  onPress={() => setIsEmailModalOpen(false)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <CloseIcon size={20} color={AppColors.coolGrey} />
                 </TouchableOpacity>
               </View>
-            </View>
 
-            {/* Primary Sign In Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleEmailSignIn}
-              disabled={isEmailSubmitting}
-              style={styles.primaryModalBtn}>
-              {isEmailSubmitting ? (
-                <ActivityIndicator size="small" color={AppColors.white} />
-              ) : (
-                <Text style={styles.primaryModalBtnText}>Sign In with Email</Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Web Magic Link Fallback */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                Linking.openURL(`${ENV.AUTH_BASE_URL}/email-login`).catch(() => {});
-              }}
-              style={styles.webEmailLinkBtn}>
-              <Text style={styles.webEmailLinkText}>
-                Need one-time magic link? Open Puku Web Email →
+              <Text style={styles.modalSubtitleText}>
+                Enter your account email to access your Puku workspace and AI models.
               </Text>
-            </TouchableOpacity>
-          </View>
+
+              {/* Error Message */}
+              {emailErrorMessage && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{emailErrorMessage}</Text>
+                </View>
+              )}
+
+              {/* Email Field */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                <View style={styles.inputWrapper}>
+                  <EmailIcon size={18} color={AppColors.coolGrey} />
+                  <TextInput
+                    style={styles.textInputField}
+                    value={emailInput}
+                    onChangeText={t => {
+                      setEmailInput(t);
+                      if (emailErrorMessage) setEmailErrorMessage(null);
+                    }}
+                    placeholder="you@domain.com"
+                    placeholderTextColor={AppColors.coolGrey}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              </View>
+
+              {/* Password / Access Token Field */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>PASSWORD OR ACCESS TOKEN</Text>
+                <View style={styles.inputWrapper}>
+                  <LockIcon size={18} color={AppColors.coolGrey} />
+                  <TextInput
+                    style={[styles.textInputField, { flex: 1 }]}
+                    value={passwordInput}
+                    onChangeText={setPasswordInput}
+                    placeholder="Enter password or token"
+                    placeholderTextColor={AppColors.coolGrey}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(p => !p)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    {showPassword ? (
+                      <EyeOffIcon size={18} color={AppColors.paleSky} />
+                    ) : (
+                      <EyeIcon size={18} color={AppColors.coolGrey} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Primary Sign In Button */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleEmailSignIn}
+                disabled={isEmailSubmitting}
+                style={styles.primaryModalBtn}>
+                {isEmailSubmitting ? (
+                  <ActivityIndicator size="small" color={AppColors.white} />
+                ) : (
+                  <Text style={styles.primaryModalBtnText}>Sign In with Email</Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Web Magic Link Fallback */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  Linking.openURL(`${ENV.AUTH_BASE_URL}/email-login`).catch(() => {});
+                }}
+                style={styles.webEmailLinkBtn}>
+                <Text style={styles.webEmailLinkText}>
+                  Need one-time magic link? Open Puku Web Email →
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -759,87 +771,99 @@ export function LoginScreen() {
           setIsGoogleModalOpen(false);
           setIsOAuthWaiting(false);
         }}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.googleCircle}>
-              <GoogleIcon size={32} color={AppColors.black} />
-            </View>
-
-            <Text style={styles.browserDialogTitle}>Google Sign-In</Text>
-
-            <Text style={styles.browserDialogDesc}>
-              {authStatusMessage}
-            </Text>
-
-            {isOAuthWaiting && (
-              <ActivityIndicator
-                size="large"
-                color={AppColors.blue}
-                style={{ marginVertical: 14 }}
-              />
-            )}
-
-            {/* Direct manual paste fallback in case browser does not auto-redirect */}
-            <View style={{ width: '100%', marginTop: 6, marginBottom: 12 }}>
-              <Text style={styles.inputLabel}>OR PASTE REDIRECT URL / AUTH CODE</Text>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.textInputField}
-                  value={manualCodeInput}
-                  onChangeText={setManualCodeInput}
-                  placeholder="Paste callback URL or code here"
-                  placeholderTextColor={AppColors.coolGrey}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={[
+            styles.modalBackdrop,
+            Platform.OS === 'android' && keyboardHeight > 0
+              ? { paddingBottom: keyboardHeight + 10, justifyContent: 'flex-end' }
+              : null,
+          ]}>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            <View style={styles.modalCard}>
+              <View style={styles.googleCircle}>
+                <GoogleIcon size={32} color={AppColors.black} />
               </View>
-              {manualCodeInput.trim().length > 0 && (
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    const inputVal = manualCodeInput.trim();
-                    setManualCodeInput('');
-                    handleOAuthCallbackUrl(inputVal);
-                  }}
-                  style={[styles.primaryModalBtn, { marginTop: 8, height: 42 }]}>
-                  <Text style={styles.primaryModalBtnText}>Verify & Sign In</Text>
-                </TouchableOpacity>
+
+              <Text style={styles.browserDialogTitle}>Google Sign-In</Text>
+
+              <Text style={styles.browserDialogDesc}>
+                {authStatusMessage}
+              </Text>
+
+              {isOAuthWaiting && (
+                <ActivityIndicator
+                  size="large"
+                  color={AppColors.blue}
+                  style={{ marginVertical: 14 }}
+                />
               )}
+
+              {/* Direct manual paste fallback in case browser does not auto-redirect */}
+              <View style={{ width: '100%', marginTop: 6, marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>OR PASTE REDIRECT URL / AUTH CODE</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.textInputField}
+                    value={manualCodeInput}
+                    onChangeText={setManualCodeInput}
+                    placeholder="Paste callback URL or code here"
+                    placeholderTextColor={AppColors.coolGrey}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+                {manualCodeInput.trim().length > 0 && (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      const inputVal = manualCodeInput.trim();
+                      setManualCodeInput('');
+                      handleOAuthCallbackUrl(inputVal);
+                    }}
+                    style={[styles.primaryModalBtn, { marginTop: 8, height: 42 }]}>
+                    <Text style={styles.primaryModalBtnText}>Verify & Sign In</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleGoogleSignIn}
+                style={styles.openBrowserBtn}>
+                <Text style={styles.openBrowserBtnText}>
+                  🌐 Re-open Google OAuth
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setIsGoogleModalOpen(false);
+                  setIsOAuthWaiting(false);
+                  setIsEmailModalOpen(true);
+                }}
+                style={styles.switchModalBtn}>
+                <Text style={styles.switchModalText}>
+                  Prefer Token or Email? Sign in manually instead
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setIsGoogleModalOpen(false);
+                  setIsOAuthWaiting(false);
+                }}
+                style={styles.cancelAuthBtn}>
+                <Text style={styles.cancelAuthText}>Cancel</Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleGoogleSignIn}
-              style={styles.openBrowserBtn}>
-              <Text style={styles.openBrowserBtnText}>
-                🌐 Re-open Google OAuth
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setIsGoogleModalOpen(false);
-                setIsOAuthWaiting(false);
-                setIsEmailModalOpen(true);
-              }}
-              style={styles.switchModalBtn}>
-              <Text style={styles.switchModalText}>
-                Prefer Token or Email? Sign in manually instead
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setIsGoogleModalOpen(false);
-                setIsOAuthWaiting(false);
-              }}
-              style={styles.cancelAuthBtn}>
-              <Text style={styles.cancelAuthText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

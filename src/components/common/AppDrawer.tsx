@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../store/AppContext';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 import {
   ArchiveBoxIcon,
   ChatBubbleOutlineIcon,
@@ -35,6 +36,7 @@ import {
 
 export function AppDrawer() {
   const insets = useSafeAreaInsets();
+  const { keyboardHeight } = useKeyboardHeight();
   const {
     isDrawerOpen,
     setDrawerOpen,
@@ -433,7 +435,13 @@ export function AppDrawer() {
       {/* 1:1 Find a conversation overlay matching media_1790585790051.png */}
       {isFindModalOpen && (
         <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
-          <View style={styles.findModalBackdrop}>
+          <View
+            style={[
+              styles.findModalBackdrop,
+              Platform.OS === 'android' && keyboardHeight > 0
+                ? { paddingBottom: keyboardHeight + 20, justifyContent: 'flex-end' }
+                : null,
+            ]}>
             <TouchableWithoutFeedback onPress={() => setIsFindModalOpen(false)}>
               <View style={StyleSheet.absoluteFill} />
             </TouchableWithoutFeedback>

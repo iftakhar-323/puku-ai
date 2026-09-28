@@ -23,6 +23,7 @@ import { MessageBubble } from './components/MessageBubble';
 import { TypingIndicator } from './components/TypingIndicator';
 import { NativeClipboard, NativeSpeech } from '../../services/nativeModules';
 import { useToast } from '../../components/ui/Toast';
+import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 function getModelLabel(model: ChatModelType): string {
   switch (model) {
@@ -61,10 +62,10 @@ export function ChatScreen() {
   const [inputVal, setInputVal] = useState('');
   const [showModelSheet, setShowModelSheet] = useState(false);
   const [showAttachmentSheet, setShowAttachmentSheet] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
+  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
 
   const activeMessages = activeConversation?.messages || [];
   const rawMessages = isIncognito ? incognitoMessages : activeMessages;
@@ -92,6 +93,15 @@ export function ChatScreen() {
       };
     }
   }, [activeConversation?.id, isLoadingConversation]);
+
+  // Scroll to bottom when keyboard opens
+  useEffect(() => {
+    if (keyboardHeight > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 60);
+    }
+  }, [keyboardHeight]);
 
   // Handle native speech recognition for microphone
   useEffect(() => {
@@ -138,28 +148,6 @@ export function ChatScreen() {
     }
   };
 
-  useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
-        setIsKeyboardVisible(true);
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 80);
-      }
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setIsKeyboardVisible(false);
-      }
-    );
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
   const handleSend = () => {
     if (!inputVal.trim() || isGenerating) return;
     sendMessage(inputVal.trim());
@@ -194,7 +182,10 @@ export function ChatScreen() {
         {
           backgroundColor: theme.background,
           paddingTop: Math.max(insets.top, 12),
-          paddingBottom: isKeyboardVisible ? 6 : Math.max(insets.bottom, 12),
+          paddingBottom:
+            Platform.OS === 'android'
+              ? (keyboardHeight > 0 ? keyboardHeight : Math.max(insets.bottom, 12))
+              : Math.max(insets.bottom, 12),
         },
       ]}>
       {/* 1:1 Authentic Header with SidebarToggle, Terminal, Bot, and Theme toggle */}
@@ -239,6 +230,7 @@ export function ChatScreen() {
             data={messages}
             keyExtractor={item => item.id}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={styles.listContent}
             onLayout={() => {
               if (messages.length > 0) {
