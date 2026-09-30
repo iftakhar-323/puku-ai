@@ -704,31 +704,33 @@ export function PukuBotScreen() {
       ]}>
       {/* Authentic Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
-          onPress={() => setDrawerOpen(true)}
-          style={styles.leadingBtn}>
-          <SidebarToggleIcon size={20} color={theme.textPrimary} />
-        </TouchableOpacity>
-
-        <View style={styles.titleContainer}>
-          <PukuBotGradientIcon size={20} />
-          <Text style={[styles.screenTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-            puku bot
-          </Text>
+        <View style={styles.headerLeft}>
           <TouchableOpacity
             activeOpacity={0.7}
-            disabled={!isAuthenticated || availableBots.length <= 1}
-            onPress={() => setShowBotModal(true)}
-            style={[styles.badge, { backgroundColor: isDark ? '#262925' : '#E4E5DB', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-            <Text style={[styles.badgeText, { color: isDark ? '#35D6B4' : '#1A1D18', fontFamily: monoFont }]}>
-              {isAuthenticated ? (availableBots.find(b => b.id === selectedBotId)?.name || 'LIVE') : 'AI'}
-            </Text>
-            {isAuthenticated && availableBots.length > 1 && (
-              <ChevronDownIcon size={10} color={isDark ? '#35D6B4' : '#1A1D18'} />
-            )}
+            hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
+            onPress={() => setDrawerOpen(true)}
+            style={styles.leadingBtn}>
+            <SidebarToggleIcon size={20} color={theme.textPrimary} />
           </TouchableOpacity>
+
+          <View style={styles.titleContainer}>
+            <PukuBotGradientIcon size={20} />
+            <Text style={[styles.screenTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+              puku bot
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              disabled={!isAuthenticated || availableBots.length <= 1}
+              onPress={() => setShowBotModal(true)}
+              style={[styles.badge, { backgroundColor: isDark ? '#262925' : '#E4E5DB', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+              <Text style={[styles.badgeText, { color: isDark ? '#35D6B4' : '#1A1D18', fontFamily: monoFont }]}>
+                {isAuthenticated ? (availableBots.find(b => b.id === selectedBotId)?.name || 'LIVE') : 'AI'}
+              </Text>
+              {isAuthenticated && availableBots.length > 1 && (
+                <ChevronDownIcon size={10} color={isDark ? '#35D6B4' : '#1A1D18'} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.trailingGroup}>
@@ -899,30 +901,32 @@ export function PukuBotScreen() {
             <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
 
             {displayBotConversations.map(conv => (
-              <TouchableOpacity
-                key={conv.id}
-                activeOpacity={0.7}
-                onPress={() => {
-                  if (conv.isReal) {
-                    handleSelectRecentConv(conv.id);
-                  } else {
-                    handleSend(conv.title);
-                  }
-                }}
-                style={styles.botRecentItemRow}>
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={[styles.botRecentItemTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                  {conv.title}
-                </Text>
-                <View style={styles.botRecentRightWrap}>
-                  <Text style={[styles.botRecentItemTime, { color: theme.textMuted, fontFamily: monoFont }]}>
-                    {conv.time}
+              <View key={conv.id}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (conv.isReal) {
+                      handleSelectRecentConv(conv.id);
+                    } else {
+                      handleSend(conv.title);
+                    }
+                  }}
+                  style={styles.botRecentItemRow}>
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={[styles.botRecentItemTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                    {conv.title}
                   </Text>
-                  <ArrowUpRightIcon size={14} color={theme.textMuted} />
-                </View>
-              </TouchableOpacity>
+                  <View style={styles.botRecentRightWrap}>
+                    <Text style={[styles.botRecentItemTime, { color: theme.textMuted, fontFamily: monoFont }]}>
+                      {conv.time}
+                    </Text>
+                    <ArrowUpRightIcon size={14} color={theme.textMuted} />
+                  </View>
+                </TouchableOpacity>
+                <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
+              </View>
             ))}
           </View>
 
@@ -1495,6 +1499,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
+  headerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginRight: 8,
+  },
   leadingBtn: {
     width: 22,
     height: 36,
@@ -1526,8 +1537,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   screenTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
+    letterSpacing: -0.4,
   },
   badge: {
     paddingHorizontal: 6,
@@ -1769,20 +1781,22 @@ const styles = StyleSheet.create({
   },
   composerCard: {
     marginHorizontal: 16,
-    marginTop: 6,
-    marginBottom: 6,
-    borderRadius: 16,
+    marginBottom: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
     flexShrink: 0,
   },
   composerInput: {
-    fontSize: 14,
-    minHeight: 40,
-    maxHeight: 100,
-    padding: 0,
-    marginBottom: 8,
+    fontSize: 15.5,
+    lineHeight: 22,
+    minHeight: 48,
+    maxHeight: 140,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 8,
   },
   composerBottomRow: {
     flexDirection: 'row',
@@ -1999,15 +2013,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emptyScrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 24,
   },
   botHeroRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 32,
+    marginTop: 8,
   },
   botHeadlineWrapper: {
     flex: 1,
@@ -2027,52 +2042,50 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   botComputerWrapper: {
-    width: 130,
-    height: 122,
+    width: 120,
+    height: 112,
     alignItems: 'center',
     justifyContent: 'center',
   },
   botComputerImage: {
-    width: 130,
-    height: 122,
+    width: 120,
+    height: 112,
   },
   botRecentsSection: {
+    marginTop: 8,
     marginBottom: 24,
   },
   botRecentsTitle: {
     fontSize: 13,
-    marginBottom: 8,
+    marginBottom: 10,
     letterSpacing: 0.2,
   },
   botDivider: {
     height: 1,
     width: '100%',
-    marginBottom: 8,
   },
   botRecentItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    paddingVertical: 14,
   },
   botRecentItemTitle: {
     flex: 1,
-    fontSize: 13.5,
-    marginRight: 10,
+    fontSize: 14,
+    marginRight: 12,
   },
   botRecentRightWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   botRecentItemTime: {
-    fontSize: 11,
+    fontSize: 12,
   },
   composerIconBtn: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
@@ -2081,9 +2094,9 @@ const styles = StyleSheet.create({
   attachmentPreviewWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 4,
+    marginHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,

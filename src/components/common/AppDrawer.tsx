@@ -465,7 +465,7 @@ export function AppDrawer() {
           <View style={styles.drawerHeader}>
             <View style={styles.brandRow}>
               <PukuLogoIcon size={24} />
-              <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku Chat</Text>
+              <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku AI</Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.7}

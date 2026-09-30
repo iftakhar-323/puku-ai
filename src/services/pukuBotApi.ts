@@ -738,6 +738,110 @@ export class PukuBotApiClient {
     }).catch(() => {});
   }
 
+  /**
+   * Resumes a reply's event stream (GET /conversations/:id/events).
+   * Reconnects to pick up the SSE stream where it left off.
+   */
+  public resumeEventsStream(
+    conversationId: string,
+    onEvent: (event: PukuBotTurnEvent) => void
+  ): { abort: () => void } {
+    let isAborted = false;
+    const xhr = new XMLHttpRequest();
+
+    const abort = () => {
+      isAborted = true;
+      try {
+        xhr.abort();
+      } catch {}
+    };
+
+    const targetUrl = `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/events`;
+    xhr.open('GET', targetUrl, true);
+    xhr.setRequestHeader('Accept', 'text/event-stream');
+    if (this.token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${this.token}`);
+    }
+
+    let processedIndex = 0;
+
+    const parseBuffer = (chunk: string) => {
+      const parts = chunk.split(/\r?\n\r?\n/);
+      const completeParts = parts.slice(0, -1);
+      const remaining = parts[parts.length - 1];
+
+      for (const block of completeParts) {
+        if (!block.trim()) continue;
+        const lines = block.split(/\r?\n/);
+        let eventType = '';
+        let dataStr = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            eventType = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            const val = line.slice(5).trim();
+            dataStr = dataStr ? `${dataStr}\n${val}` : val;
+          }
+        }
+
+        if (eventType === 'ping') continue;
+
+        if (dataStr) {
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (!parsed.type && eventType) {
+              parsed.type = eventType;
+            }
+            onEvent(parsed);
+          } catch (e) {
+            console.warn('[PukuBotApi] Failed to parse SSE event data:', dataStr, e);
+          }
+        }
+      }
+
+      return chunk.length - remaining.length;
+    };
+
+    xhr.onprogress = () => {
+      if (isAborted) return;
+      const textSoFar = xhr.responseText || '';
+      const newChunk = textSoFar.slice(processedIndex);
+      if (newChunk) {
+        const advanced = parseBuffer(newChunk);
+        processedIndex += advanced;
+      }
+    };
+
+    xhr.onload = () => {
+      if (isAborted) return;
+      if (xhr.status === 401) {
+        this.signOut();
+        onEvent({
+          type: 'turn.failed',
+          code: 'error',
+          message: 'Session expired. Please sign in again.',
+        });
+        return;
+      }
+
+      const textSoFar = xhr.responseText || '';
+      const remainingChunk = textSoFar.slice(processedIndex);
+      if (remainingChunk.trim()) {
+        parseBuffer(`${remainingChunk}\n\n`);
+      }
+    };
+
+    xhr.onerror = () => {
+      if (isAborted) return;
+      this.pollTurnUntilDone(conversationId, onEvent);
+    };
+
+    xhr.send();
+
+    return { abort };
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // COMPUTER & HUMAN-IN-THE-LOOP CONTROL
   // ══════════════════════════════════════════════════════════════════════════

@@ -400,9 +400,9 @@ const styles = StyleSheet.create({
   attachmentPreviewWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 4,
+    marginHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
