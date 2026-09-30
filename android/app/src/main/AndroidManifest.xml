@@ -67,6 +67,13 @@
                 android:scheme="puku"
                 android:host="callback"
                 android:pathPrefix="/" />
+            <data
+                android:scheme="pukubot"
+                android:host="auth"
+                android:pathPrefix="/callback" />
+            <data
+                android:scheme="pukubot"
+                android:host="callback" />
         </intent-filter>
       </activity>
     </application>

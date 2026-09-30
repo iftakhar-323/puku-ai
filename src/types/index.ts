@@ -141,3 +141,112 @@ export type AppRoute =
   | 'profile'
   | 'usage'
   | 'login';
+
+// ══════════════════════════════════════════════════════════════════════════
+// PUKU BOT API (v1) DATA MODELS
+// ══════════════════════════════════════════════════════════════════════════
+
+export interface PukuBotUser {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  role?: 'user' | 'admin';
+  onboarding?: { step: number; completedAt: string | null } | null;
+}
+
+export interface PukuBotItem {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  avatarSeed: string;
+}
+
+export interface PukuBotConversation {
+  id: string;
+  botId: string | null;
+  title: string;
+  lastMessage: string | null;
+  lastMessageAt: string | null;
+  pinned: boolean;
+  createdAt: string | null;
+  lastReadAt: string | null;
+  unread: boolean;
+}
+
+export interface PukuBotAttachment {
+  id: string;
+  name?: string | null;
+  kind?: 'image' | 'document';
+  mimeType?: string;
+  url?: string;
+}
+
+export interface PukuBotToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, any>;
+  status: 'completed' | 'pending';
+  result?: any;
+}
+
+export interface PukuBotMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  attachments?: PukuBotAttachment[];
+  toolCalls?: PukuBotToolCall[];
+}
+
+export interface PukuBotControlState {
+  holder: 'bot' | 'human';
+  since: string;
+  requested: boolean;
+  reason?: string;
+  secretWanted?: string;
+  desktop?: boolean;
+}
+
+export interface PukuBotComputerInfo {
+  status: {
+    botId: string;
+    state: 'absent' | 'starting' | 'ready' | 'unreachable';
+    reason?: string;
+  };
+  control: PukuBotControlState | null;
+  desktopSocket?: string;
+  pageSocket?: string;
+}
+
+export type PukuBotTurnEventType =
+  | 'turn.started'
+  | 'message.started'
+  | 'message.delta'
+  | 'message.completed'
+  | 'tool.started'
+  | 'tool.completed'
+  | 'needs_person'
+  | 'turn.completed'
+  | 'turn.failed'
+  | 'ping';
+
+export interface PukuBotTurnEvent {
+  type: PukuBotTurnEventType;
+  turnId?: string;
+  conversationId?: string;
+  messageId?: string;
+  delta?: string;
+  text?: string;
+  toolCallId?: string;
+  name?: string;
+  arguments?: Record<string, any>;
+  ok?: boolean;
+  result?: any;
+  kind?: 'help' | 'secret';
+  botId?: string;
+  reason?: string;
+  label?: string;
+  code?: 'busy' | 'stopped' | 'too_many_steps' | 'timeout' | 'error';
+  message?: string;
+}

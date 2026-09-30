@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppDrawer } from './src/components/common/AppDrawer';
 import { ArtifactsScreen } from './src/features/artifacts/ArtifactsScreen';
@@ -26,9 +26,10 @@ import { TranscribeScreen } from './src/features/transcribe/TranscribeScreen';
 import { AppProvider, useApp } from './src/store/AppContext';
 import { ToastProvider } from './src/components/ui/Toast';
 import { UpdateService } from './src/services/updateService';
+import { pukuBotApi } from './src/services/pukuBotApi';
 
 function MainNavigator(): React.JSX.Element {
-  const { activeRoute, isDark, isRestoringSession } = useApp();
+  const { activeRoute, isDark, isRestoringSession, navigate } = useApp();
 
   useEffect(() => {
     try {
@@ -36,7 +37,31 @@ function MainNavigator(): React.JSX.Element {
     } catch {
       // Ignored
     }
-  }, []);
+
+    const handleDeepLink = async (url: string | null) => {
+      if (!url) return;
+      if (url.startsWith('pukubot://')) {
+        try {
+          await pukuBotApi.handleAuthCallback(url);
+          navigate('pukuBot');
+        } catch (e) {
+          console.warn('[PukuBot] Deep link auth callback failed:', e);
+        }
+      }
+    };
+
+    const sub = Linking.addEventListener('url', event => {
+      handleDeepLink(event.url);
+    });
+
+    Linking.getInitialURL().then(initialUrl => {
+      if (initialUrl) handleDeepLink(initialUrl);
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, [navigate]);
 
   if (isRestoringSession) {
     return (

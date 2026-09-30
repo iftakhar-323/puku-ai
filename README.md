@@ -20,7 +20,7 @@
 
 - [Overview](#-overview)
 - [Key Features](#-key-features)
-- [Architecture & Tech Stack](#-architecture--tech-stack)
+- [Architecture &amp; Tech Stack](#-architecture--tech-stack)
 - [Project Structure](#-project-structure)
 - [Getting Started](#-getting-started)
 - [Available Scripts](#-available-scripts)
@@ -38,18 +38,17 @@
 
 ## ⚡ Key Features
 
-| Feature | Description |
-| :--- | :--- |
-| **Multi-Model AI Chat** | Real-time chat powered by `puku-ai-2.8` (Fast), `puku-ai-2.7` (Fast), and `opus-4.8` (Deep Reasoning) with streaming tokens and thinking indicators. |
-| **Inline Prompt Editing** | Edit previously sent user prompts directly from chat bubbles with instant auto-regeneration. |
-| **Puku Bot** | Unrestricted, candid AI assistant with mode toggles: **🔥 Fun Mode**, **⚡ Fast Mode**, and **🧠 Deep Reason**. |
-| **Incognito Chat** | Zero-persistence ephemeral chat mode for sensitive or temporary queries. |
-| **Projects & Custom Instructions** | Organize work into projects with persistent custom system prompts and attached knowledge items. |
-| **Desktop Remote Session** | Pair with your workstation running `puku-cli` via secure relay WebSocket and approve terminal commands on mobile. |
-| **Universal Soft-Keyboard Clearance** | Hardware-accelerated `useKeyboardHeight` hook ensuring input fields and modals never get buried beneath the Android/iOS virtual keyboard. |
-| **Retro Theme System** | Cream (`#FAF7EE`) & Dark (`#151614`) colorways styled with monospaced Courier typography and custom SVG icons. |
-| **Dual Authentication** | Google OAuth 2.0 with PKCE (RFC 7636) via in-app browser tabs, alongside direct Email/Password & Bearer Token authentication. |
-| **Zero-Downtime EAS OTA Updates** | Automatic Over-The-Air deployment directly to devices on every push to `main`. |
+| Feature                                     | Description                                                                                                                                               |
+| :------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Multi-Model AI Chat**               | Real-time chat powered by`puku-ai-2.8` (Fast), `puku-ai-2.7` (Fast), and `opus-4.8` (Deep Reasoning) with streaming tokens and thinking indicators. |
+| **Puku Bot (v1 API)**                | Unrestricted AI assistant with live SSE turn streaming, server-side tool execution, computer screen monitor & control, human-in-the-loop assistance/secret handoff, and PKCE OAuth. Modes: **🔥 Fun Mode**, **⚡ Fast Mode**, and **🧠 Deep Reason**. |
+| **Incognito Chat**                    | Zero-persistence ephemeral chat mode for sensitive or temporary queries.                                                                                  |
+| **Projects & Custom Instructions**    | Organize work into projects with persistent custom system prompts and attached knowledge items.                                                           |
+| **Desktop Remote Session**            | Pair with your workstation running`puku-cli` via secure relay WebSocket and approve terminal commands on mobile.                                        |
+| **Universal Soft-Keyboard Clearance** | Hardware-accelerated`useKeyboardHeight` hook ensuring input fields and modals never get buried beneath the Android/iOS virtual keyboard.                |
+| **Retro Theme System**                | Cream (`#FAF7EE`) & Dark (`#151614`) colorways styled with monospaced Courier typography and custom SVG icons.                                        |
+| **Dual Authentication**               | Google OAuth 2.0 with PKCE (RFC 7636) via in-app browser tabs, alongside direct Email/Password & Bearer Token authentication.                             |
+| **Zero-Downtime EAS OTA Updates**     | Automatic Over-The-Air deployment directly to devices on every push to`main`.                                                                           |
 
 ---
 
@@ -145,26 +144,26 @@ npm run ios
 
 ## 📜 Available Scripts
 
-| Command | Description |
-| :--- | :--- |
-| `npm start` | Starts the Metro development bundler with cache reset options |
-| `npm run android` | Builds and deploys the debug build to a connected Android device |
-| `npm run ios` | Builds and deploys the debug build to the iOS Simulator |
-| `npm test` | Runs the Jest unit test suite (41 unit tests) |
-| `npm run type-check` | Runs `tsc --noEmit` to verify 100% TypeScript type safety |
+| Command                    | Description                                                                   |
+| :------------------------- | :---------------------------------------------------------------------------- |
+| `npm start`              | Starts the Metro development bundler with cache reset options                 |
+| `npm run android`        | Builds and deploys the debug build to a connected Android device              |
+| `npm run ios`            | Builds and deploys the debug build to the iOS Simulator                       |
+| `npm test`               | Runs the Jest unit test suite (41 unit tests)                                 |
+| `npm run type-check`     | Runs`tsc --noEmit` to verify 100% TypeScript type safety                    |
 | `npm run bundle:android` | Generates offline production JS bundle for Android (`index.android.bundle`) |
-| `npm run bundle:ios` | Generates offline production JS bundle for iOS (`main.jsbundle`) |
-| `npm run build:android` | Bundles assets and executes `./gradlew assembleRelease` |
+| `npm run bundle:ios`     | Generates offline production JS bundle for iOS (`main.jsbundle`)            |
+| `npm run build:android`  | Bundles assets and executes`./gradlew assembleRelease`                      |
 
 ---
 
 ## 🔄 Over-The-Air (OTA) Updates
 
-Puku AI is configured with **EAS Updates** on channel `main`. 
+Puku AI is configured with **EAS Updates** on channel `main`.
 
 Whenever code is merged or pushed to the `main` branch, the GitHub Actions workflow `.github/workflows/eas-update.yml` automatically bundles and publishes the update to the Expo cloud. User devices receive the new version instantly on cold boot or background refresh without reinstalling the APK.
 
-For full setup and troubleshooting, refer to [**docs/OTA_UPDATES.md**](file:///home/iftakhar/Poridhi/puku%20ai/docs/OTA_UPDATES.md).
+For full setup and troubleshooting, refer to [**docs/OTA_UPDATES.md**](<file:///home/iftakhar/Poridhi/puku%20ai/docs/OTA_UPDATES.md>).
 
 ---
 
@@ -185,14 +184,14 @@ cd ..
 # android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
 ```
 
-For more details on Android architecture, signing, and permissions, see [**android/README.md**](file:///home/iftakhar/Poridhi/puku%20ai/android/README.md).
+For more details on Android architecture, signing, and permissions, see [**android/README.md**](<file:///home/iftakhar/Poridhi/puku%20ai/android/README.md>).
 
 ---
 
 ## 📚 Documentation Index
 
-- [**System Architecture & Components**](file:///home/iftakhar/Poridhi/puku%20ai/docs/ARCHITECTURE.md) — State management, keyboard avoidance engine, routing, and UI design tokens.
-- [**Over-The-Air (OTA) Updates Guide**](file:///home/iftakhar/Poridhi/puku%20ai/docs/OTA_UPDATES.md) — EAS configuration, GitHub Actions workflow, and device update lifecycles.
-- [**API, Authentication & Desktop Relay**](file:///home/iftakhar/Poridhi/puku%20ai/docs/API_AND_AUTH.md) — OAuth PKCE protocol, session tokens, and desktop command-line pairing.
-- [**Android Native Guide**](file:///home/iftakhar/Poridhi/puku%20ai/android/README.md) — Gradle build commands, APK generation, and soft-keyboard IME handling.
-- [**iOS Native Guide**](file:///home/iftakhar/Poridhi/puku%20ai/ios/README.md) — CocoaPods setup, URL schemes, and Simulator execution.
+- [**System Architecture & Components**](<file:///home/iftakhar/Poridhi/puku%20ai/docs/ARCHITECTURE.md>) — State management, keyboard avoidance engine, routing, and UI design tokens.
+- [**Over-The-Air (OTA) Updates Guide**](<file:///home/iftakhar/Poridhi/puku%20ai/docs/OTA_UPDATES.md>) — EAS configuration, GitHub Actions workflow, and device update lifecycles.
+- [**API, Authentication & Desktop Relay**](<file:///home/iftakhar/Poridhi/puku%20ai/docs/API_AND_AUTH.md>) — OAuth PKCE protocol, session tokens, and desktop command-line pairing.
+- [**Android Native Guide**](<file:///home/iftakhar/Poridhi/puku%20ai/android/README.md>) — Gradle build commands, APK generation, and soft-keyboard IME handling.
+- [**iOS Native Guide**](<file:///home/iftakhar/Poridhi/puku%20ai/ios/README.md>) — CocoaPods setup, URL schemes, and Simulator execution.
