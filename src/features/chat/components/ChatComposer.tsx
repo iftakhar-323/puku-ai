@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Platform,
   StyleSheet,
@@ -13,7 +14,9 @@ import {
 import {
   CheckmarkIcon,
   ChevronDownIcon,
+  CloseIcon,
   MicIcon,
+  PaperclipIcon,
   PlusIcon,
   UpArrowIcon,
 } from '../../../components/common/Icons';
@@ -33,6 +36,8 @@ interface ChatComposerProps {
   onSubmitTap: () => void;
   onMicrophoneTap?: () => void;
   inputRef?: any;
+  pendingAttachment?: { uri: string; name: string; type: string; size?: number } | null;
+  onRemoveAttachment?: () => void;
 }
 
 const AVAILABLE_MODELS: { id: ChatModelType; label: string; badge: string }[] = [
@@ -54,10 +59,12 @@ export function ChatComposer({
   onSubmitTap,
   onMicrophoneTap,
   inputRef,
+  pendingAttachment,
+  onRemoveAttachment,
 }: ChatComposerProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const canSubmit = inputVal.trim().length > 0;
+  const canSubmit = inputVal.trim().length > 0 || !!pendingAttachment;
 
   const currentModelObj =
     AVAILABLE_MODELS.find(m => m.id === selectedModel) || AVAILABLE_MODELS[0];
@@ -123,6 +130,34 @@ export function ChatComposer({
             borderWidth: isFocused ? 1.5 : 1,
           },
         ]}>
+        {/* Pending Attachment Preview (Any File / Photo) */}
+        {pendingAttachment && (
+          <View style={[styles.attachmentPreviewWrap, { backgroundColor: theme.pillBackground, borderColor: theme.border }]}>
+            {pendingAttachment.type.startsWith('image/') ? (
+              <Image source={{ uri: pendingAttachment.uri }} style={styles.attachmentThumb} resizeMode="cover" />
+            ) : (
+              <View style={[styles.docIconWrap, { backgroundColor: theme.secondaryBackground }]}>
+                <PaperclipIcon size={16} color={theme.textPrimary} />
+              </View>
+            )}
+            <View style={styles.attachmentInfoWrap}>
+              <Text numberOfLines={1} style={[styles.attachmentName, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                {pendingAttachment.name}
+              </Text>
+              {pendingAttachment.size ? (
+                <Text style={[styles.attachmentSize, { color: theme.textMuted, fontFamily: monoFont }]}>
+                  {Math.round(pendingAttachment.size / 1024)} KB
+                </Text>
+              ) : null}
+            </View>
+            {onRemoveAttachment && (
+              <TouchableOpacity onPress={onRemoveAttachment} style={styles.removeAttBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <CloseIcon size={14} color={theme.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {/* Top Multiline Input */}
         <TextInput
           ref={inputRef}
@@ -361,5 +396,44 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 2,
     backgroundColor: '#FFFFFF',
+  },
+  attachmentPreviewWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 10,
+  },
+  attachmentThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+  },
+  docIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentInfoWrap: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  attachmentName: {
+    fontSize: 12.5,
+    fontWeight: '500',
+  },
+  attachmentSize: {
+    fontSize: 10.5,
+    marginTop: 2,
+  },
+  removeAttBtn: {
+    padding: 4,
   },
 });

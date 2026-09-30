@@ -369,13 +369,50 @@ export class PukuApiService {
     }
   }
 
+  // Upload attachment file (photo or document) to conversation
+  async uploadAttachment(
+    conversationId: string,
+    file: { uri: string; name: string; type: string }
+  ): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type || 'image/jpeg',
+    } as any);
+
+    let token = await tokenManager.ensureValidToken();
+    if (!token) {
+      token = await this.initAuthToken();
+    }
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${this.baseUrl}/v1/chat/conversations/${conversationId}/attachments`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Failed to upload attachment: ${errText || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.attachment || data;
+  }
+
   // Generate model response via authentic Puku AI cloud endpoints with 401 recovery
   async generateResponse(
     prompt: string,
     model: ChatModelType,
     conversationId?: string | null,
     onDelta?: (chunk: string) => void,
-    isIncognito?: boolean
+    isIncognito?: boolean,
+    attachments?: any[]
   ): Promise<{
     text: string;
     thinking?: string;
@@ -412,7 +449,7 @@ export class PukuApiService {
       action: 'send',
       content: prompt,
       model: apiModel,
-      attachments: [],
+      attachments: attachments && attachments.length > 0 ? attachments : [],
     };
     const streamUrl = `${this.baseUrl}/v1/chat/conversations/${realConvId}/messages`;
 

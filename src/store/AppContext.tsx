@@ -7,6 +7,7 @@ import {
   Artifact,
   BotConversation,
   BotItem,
+  ChatAttachment,
   ChatMessage,
   ChatModelType,
   CodeSession,
@@ -40,7 +41,11 @@ interface AppContextValue {
   startNewChat: (projectId?: string) => void;
   deleteConversations: (ids: string[]) => void;
   refreshConversations: () => Promise<void>;
-  sendMessage: (text: string, modelOverride?: ChatModelType) => void;
+  sendMessage: (
+    text: string,
+    modelOverride?: ChatModelType,
+    attachment?: { uri: string; name: string; type: string; size?: number }
+  ) => Promise<void> | void;
   isGenerating: boolean;
   isLoadingConversation: boolean;
   selectedModel: ChatModelType;
@@ -877,18 +882,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const sendMessage = async (text: string, modelOverride?: ChatModelType) => {
-    if (!text.trim()) return;
+  const sendMessage = async (
+    text: string,
+    modelOverride?: ChatModelType,
+    attachment?: { uri: string; name: string; type: string; size?: number }
+  ) => {
+    const trimmed = text.trim();
+    if (!trimmed && !attachment) return;
+    const effectiveText = trimmed || (attachment ? `Analyze this attachment: ${attachment.name}` : '');
     const modelToUse = modelOverride || selectedModel;
+
+    const chatAttachment: ChatAttachment | undefined = attachment
+      ? {
+          id: 'att_' + Date.now(),
+          name: attachment.name,
+          type: attachment.type.startsWith('image/') ? 'image' : 'file',
+          uri: attachment.uri,
+          size: attachment.size,
+        }
+      : undefined;
 
     // Ephemeral Incognito / Temporary Chat handling
     if (isIncognito) {
       const userMsg: ChatMessage = {
         id: 'incog_' + Date.now(),
         role: 'user',
-        content: text,
+        content: effectiveText,
         model: modelToUse,
         createdAt: 'Just now',
+        attachments: chatAttachment ? [chatAttachment] : undefined,
       };
       const aiMsgId = 'incog_' + (Date.now() + 1);
       const initialAiMsg: ChatMessage = {
@@ -920,12 +942,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
 
       try {
+        let uploadedList: any[] = [];
+        const incogId = incognitoConversationIdRef.current || incognitoConversationId;
+        if (attachment && incogId) {
+          try {
+            const up = await pukuApi.uploadAttachment(incogId, attachment);
+            if (up) uploadedList = [up];
+          } catch {}
+        }
         const response = await pukuApi.generateResponse(
-          text,
+          effectiveText,
           modelToUse,
-          incognitoConversationIdRef.current || incognitoConversationId,
+          incogId,
           handleDelta,
-          true
+          true,
+          uploadedList
         );
         accumulatedText = response.text;
         flushIncog();
@@ -960,8 +991,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const userMsg: ChatMessage = {
       id: 'msg_' + Date.now(),
       role: 'user',
-      content: text,
+      content: effectiveText,
       createdAt: 'Just now',
+      attachments: chatAttachment ? [chatAttachment] : undefined,
     };
 
     const aiMsgId = 'msg_' + (Date.now() + 1);
@@ -978,7 +1010,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!targetConvId) {
       const newConv: Conversation = {
         id: 'conv_' + Date.now(),
-        title: text.length > 30 ? text.slice(0, 30) + '...' : text,
+        title: effectiveText.length > 30 ? effectiveText.slice(0, 30) + '...' : effectiveText,
         activityDate: 'Just now',
         model: modelToUse,
         projectId: activeProjectId || undefined,
@@ -1035,11 +1067,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     try {
+      let uploadedList: any[] = [];
+      if (attachment) {
+        let serverConvId: string | null = targetConvId;
+        if (!serverConvId || serverConvId.startsWith('conv_')) {
+          serverConvId = await pukuApi.createConversation(modelToUse, effectiveText.slice(0, 40) || attachment.name);
+          if (serverConvId) {
+            targetConvId = serverConvId;
+            setActiveConversationId(serverConvId);
+          }
+        }
+        if (serverConvId) {
+          try {
+            const uploaded = await pukuApi.uploadAttachment(serverConvId, attachment);
+            if (uploaded) uploadedList = [uploaded];
+          } catch (uploadErr) {
+            console.warn('Failed to upload attachment:', uploadErr);
+          }
+        }
+      }
+
       const response = await pukuApi.generateResponse(
-        text,
+        effectiveText,
         modelToUse,
         targetConvId,
-        handleDelta
+        handleDelta,
+        false,
+        uploadedList
       );
       accumulatedText = response.text;
       flushPersistent();

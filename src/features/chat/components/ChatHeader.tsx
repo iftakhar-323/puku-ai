@@ -6,6 +6,8 @@ import {
   CloseIcon,
   GhostIcon,
   MoonIcon,
+  PukuBotGradientIcon,
+  PukuLogoIcon,
   SidebarToggleIcon,
   SunIcon,
   TerminalPromptIcon,
@@ -62,12 +64,19 @@ export function ChatHeader({
             )}
           </TouchableOpacity>
 
+          <View style={styles.brandTitleWrap}>
+            <PukuLogoIcon size={20} />
+            <Text style={[styles.brandTitleText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+              puku ai
+            </Text>
+          </View>
+
           {title ? (
             <Text
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={[styles.topBarTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-              {title}
+              style={[styles.topBarTitle, { color: theme.textMuted, fontFamily: monoFont }]}>
+              • {title}
             </Text>
           ) : null}
         </View>
@@ -106,7 +115,7 @@ export function ChatHeader({
               activeOpacity={0.7}
               onPress={onBotTap}
               style={styles.actionBtn}>
-              <BotIcon size={19} color={theme.textSecondary} />
+              <PukuBotGradientIcon size={20} />
             </TouchableOpacity>
           )}
 
@@ -160,10 +169,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.2,
   },
+  brandTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  brandTitleText: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+  },
   topBarTitle: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '400',
   },
   actionBtn: {
     width: 32,

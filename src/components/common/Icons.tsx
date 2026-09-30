@@ -1041,6 +1041,35 @@ export function BotIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
 }
 
 /**
+ * Puku Bot Logo with authentic Puku AI gradient colors
+ */
+export function PukuBotGradientIcon({ size = 20 }: { size?: number }) {
+  const gradId = 'botGrad_' + size;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Defs>
+        <LinearGradient id={gradId} x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#0718D2" />
+          <Stop offset="0.48" stopColor="#D08BFF" />
+          <Stop offset="1" stopColor="#A4ABFF" />
+        </LinearGradient>
+      </Defs>
+      {/* Antenna */}
+      <Path d="M12 2V5M10 2H14" stroke={`url(#${gradId})`} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Robot Head */}
+      <Rect x="4" y="5" width="16" height="14" rx="4" stroke={`url(#${gradId})`} strokeWidth="1.8" />
+      {/* Eyes */}
+      <Circle cx="8.5" cy="11.5" r="1.5" fill={`url(#${gradId})`} />
+      <Circle cx="15.5" cy="11.5" r="1.5" fill={`url(#${gradId})`} />
+      {/* Mouth */}
+      <Path d="M8.5 15.5H15.5" stroke={`url(#${gradId})`} strokeWidth="1.6" strokeLinecap="round" />
+      {/* Ears */}
+      <Path d="M2 10.5V13.5M22 10.5V13.5" stroke={`url(#${gradId})`} strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/**
  * Attachment / Paperclip Icon for Add Sheet
  */
 export function PaperclipIcon({ size = 20, color = '#ECEEEC' }: IconProps) {

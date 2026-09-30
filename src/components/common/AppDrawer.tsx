@@ -27,6 +27,7 @@ import {
   PencilIcon,
   PinIcon,
   PlusIcon,
+  PukuBotGradientIcon,
   PukuLogoIcon,
   SearchIcon,
   SettingsIcon,
@@ -681,6 +682,7 @@ export function AppDrawer() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
+                selectBotConversation(null as any);
                 setDrawerOpen(false);
                 navigate('pukuBot');
               }}
@@ -692,7 +694,7 @@ export function AppDrawer() {
                 },
               ]}>
               <View style={styles.switchHubLeft}>
-                <BotIcon size={18} color={isDark ? '#35D6B4' : theme.textPrimary} />
+                <PukuBotGradientIcon size={20} />
                 <View style={styles.switchHubTextWrap}>
                   <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
                     Switch to Puku Bot

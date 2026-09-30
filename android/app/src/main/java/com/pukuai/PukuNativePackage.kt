@@ -10,7 +10,8 @@ class PukuNativePackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
         return listOf(
             ClipboardModule(reactContext),
-            SpeechModule(reactContext)
+            SpeechModule(reactContext),
+            PickerModule(reactContext)
         )
     }
 

@@ -68,16 +68,16 @@ function MainNavigator(): React.JSX.Element {
       <View
         style={{
           flex: 1,
-          backgroundColor: '#F6F4EE',
+          backgroundColor: '#000000',
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle="light-content" />
         <Text
           style={{
             fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
             fontSize: 16,
-            color: '#1A1D18',
+            color: '#FFFFFF',
             letterSpacing: -0.2,
           }}>
           Opening workspace...
@@ -158,11 +158,11 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <SafeAreaProvider>
-          <StatusBar barStyle="dark-content" />
+          <StatusBar barStyle="light-content" />
           <View
             style={{
               flex: 1,
-              backgroundColor: '#F6F4EE',
+              backgroundColor: '#000000',
               alignItems: 'center',
               justifyContent: 'center',
               padding: 24,
@@ -171,7 +171,7 @@ class ErrorBoundary extends React.Component<
               style={{
                 fontSize: 18,
                 fontWeight: '700',
-                color: '#1A1D18',
+                color: '#FFFFFF',
                 marginBottom: 8,
                 fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
               }}>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -22,7 +23,7 @@ import { ChatIncognitoView } from './components/ChatIncognitoView';
 import { ChatModelSelectionSheet } from './components/ChatModelSelectionSheet';
 import { MessageBubble } from './components/MessageBubble';
 import { TypingIndicator } from './components/TypingIndicator';
-import { NativeClipboard, NativeSpeech } from '../../services/nativeModules';
+import { NativeClipboard, NativePicker, NativeSpeech, PickedMedia } from '../../services/nativeModules';
 import { useToast } from '../../components/ui/Toast';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
@@ -65,6 +66,7 @@ export function ChatScreen() {
   const [showModelSheet, setShowModelSheet] = useState(false);
   const [showAttachmentSheet, setShowAttachmentSheet] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<PickedMedia | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
   const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
@@ -150,10 +152,23 @@ export function ChatScreen() {
     }
   };
 
+  const handlePickMedia = async () => {
+    setShowAttachmentSheet(false);
+    try {
+      const file = await NativePicker.pickMedia();
+      if (file) {
+        setPendingAttachment(file);
+      }
+    } catch (err: any) {
+      Alert.alert('Upload Error', err?.message || 'Could not pick file');
+    }
+  };
+
   const handleSend = () => {
-    if (!inputVal.trim() || isGenerating) return;
-    sendMessage(inputVal.trim());
+    if ((!inputVal.trim() && !pendingAttachment) || isGenerating) return;
+    sendMessage(inputVal.trim(), undefined, pendingAttachment || undefined);
     setInputVal('');
+    setPendingAttachment(null);
   };
 
   const handleEditPrompt = (text: string) => {
@@ -294,6 +309,8 @@ export function ChatScreen() {
         onSelectModel={model => setSelectedModel(model)}
         isSending={isGenerating}
         isListening={isListening}
+        pendingAttachment={pendingAttachment}
+        onRemoveAttachment={() => setPendingAttachment(null)}
         onFocus={() => {
           setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
@@ -320,8 +337,8 @@ export function ChatScreen() {
         visible={showAttachmentSheet}
         theme={theme}
         onClose={() => setShowAttachmentSheet(false)}
-        onCameraTap={() => setShowAttachmentSheet(false)}
-        onPhotosTap={() => setShowAttachmentSheet(false)}
+        onCameraTap={handlePickMedia}
+        onPhotosTap={handlePickMedia}
         onAddToProjectTap={() => {
           setShowAttachmentSheet(false);
           navigate('projects');

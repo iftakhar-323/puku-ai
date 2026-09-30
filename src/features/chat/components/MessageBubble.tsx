@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   CheckmarkIcon,
   ConnectorsBranchIcon,
   CopyIcon,
+  PaperclipIcon,
   PencilIcon,
   RefreshIcon,
 } from '../../../components/common/Icons';
@@ -60,9 +61,25 @@ export function MessageBubble({
               styles.userBubble,
               { backgroundColor: theme.userBubble },
             ]}>
-            <Text style={[styles.userText, { color: theme.onUserBubble }]}>
-              {message.content}
-            </Text>
+            {message.attachments?.map((att, idx) => (
+              <View key={att.id || idx} style={styles.bubbleAttachmentItem}>
+                {att.type === 'image' && att.uri ? (
+                  <Image source={{ uri: att.uri }} style={styles.bubbleImageAttachment} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.bubbleDocAttachment, { backgroundColor: 'rgba(255, 255, 255, 0.12)' }]}>
+                    <PaperclipIcon size={16} color={theme.onUserBubble} />
+                    <Text numberOfLines={1} style={[styles.bubbleDocName, { color: theme.onUserBubble }]}>
+                      {att.name}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+            {!!message.content && (
+              <Text style={[styles.userText, { color: theme.onUserBubble }]}>
+                {message.content}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
         {!!message.content && (
@@ -227,5 +244,26 @@ const styles = StyleSheet.create({
   actionBtn: {
     padding: 6,
     borderRadius: 6,
+  },
+  bubbleAttachmentItem: {
+    marginBottom: 6,
+  },
+  bubbleImageAttachment: {
+    width: 200,
+    height: 140,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  bubbleDocAttachment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 8,
+  },
+  bubbleDocName: {
+    fontSize: 12.5,
+    fontWeight: '500',
   },
 });

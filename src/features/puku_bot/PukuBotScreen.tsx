@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import {
+  ArrowUpRightIcon,
   BotIcon,
   CheckmarkIcon,
   ChevronDownIcon,
@@ -27,8 +28,10 @@ import {
   EyeOffIcon,
   LockIcon,
   MoonIcon,
+  PaperclipIcon,
   PencilIcon,
   PlusIcon,
+  PukuBotGradientIcon,
   PukuLogoIcon,
   RefreshIcon,
   SettingsIcon,
@@ -39,7 +42,8 @@ import {
 } from '../../components/common/Icons';
 import { ENV } from '../../config/env';
 import { MarkdownRenderer } from '../chat/components/MarkdownRenderer';
-import { NativeClipboard } from '../../services/nativeModules';
+import { NativeClipboard, NativePicker, PickedMedia } from '../../services/nativeModules';
+import { formatActivityDate } from '../../utils/date';
 import { pukuBotApi } from '../../services/pukuBotApi';
 import { useApp } from '../../store/AppContext';
 import {
@@ -59,6 +63,7 @@ interface LocalChatMessage {
   text: string;
   timestamp?: string;
   toolCalls?: PukuBotToolCall[];
+  attachment?: PickedMedia;
 }
 
 interface NeedsPersonState {
@@ -66,6 +71,26 @@ interface NeedsPersonState {
   botId?: string;
   reason?: string;
   label?: string;
+}
+
+function getGreeting(userName?: string): { lead: string; name: string } {
+  const h = new Date().getHours();
+  let lead = 'Good morning,';
+  if (h >= 12 && h < 17) {
+    lead = 'Good afternoon,';
+  } else if (h >= 17 && h < 22) {
+    lead = 'Good evening,';
+  } else if (h >= 22 || h < 5) {
+    lead = 'Back at it,';
+  }
+
+  let name = 'there';
+  if (userName?.trim()) {
+    name = userName.trim().split(/\s+/)[0];
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  return { lead, name };
 }
 
 const STARTER_PROMPTS = [
@@ -108,8 +133,42 @@ export function PukuBotScreen() {
     selectBotConversation,
     createBotConversation,
     addBotMessage,
+    profile,
   } = useApp();
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
+  // Dynamic greeting matching Puku AI
+  const greeting = getGreeting(profile?.name);
+
+  // Bot Recent Conversations matching Puku AI post-login screen 1:1
+  const displayBotConversations =
+    botConversations.length > 0
+      ? botConversations.slice(0, 4).map(c => ({
+          id: c.id,
+          title: c.title || 'Untitled bot session',
+          time: formatActivityDate((c as any).updated_at || (c as any).created_at || (c as any).updatedAt || (c as any).createdAt || (c as any).activityDate) || 'Recent',
+          isReal: true,
+        }))
+      : [
+          {
+            id: 'sample-1',
+            title: 'What are your computer control capabilities?',
+            time: '1h ago',
+            isReal: false,
+          },
+          {
+            id: 'sample-2',
+            title: 'Help me debug my Node.js server',
+            time: '3h ago',
+            isReal: false,
+          },
+          {
+            id: 'sample-3',
+            title: 'Search latest AI news and summarize',
+            time: 'Yesterday',
+            isReal: false,
+          },
+        ];
 
   // UI state
   const [messages, setMessages] = useState<LocalChatMessage[]>([]);
@@ -124,15 +183,19 @@ export function PukuBotScreen() {
   const [selectedBotId, setSelectedBotId] = useState<string>('general-assistant');
   const [activeConversation, setActiveConversation] = useState<PukuBotConversation | null>(null);
 
+  const [pendingAttachment, setPendingAttachment] = useState<PickedMedia | null>(null);
+
   // Sync conversation with AppContext
   useEffect(() => {
     if (!isAuthenticated) {
-      const activeConv = botConversations.find(c => c.id === activeBotConversationId);
-      if (activeConv) {
-        setMessages(activeConv.messages || []);
-      } else if (botConversations.length > 0) {
-        setMessages(botConversations[0].messages || []);
+      if (activeBotConversationId) {
+        const activeConv = botConversations.find(c => c.id === activeBotConversationId);
+        if (activeConv) {
+          setMessages(activeConv.messages || []);
+          return;
+        }
       }
+      setMessages([]);
     }
   }, [activeBotConversationId, botConversations, isAuthenticated]);
 
@@ -212,8 +275,11 @@ export function PukuBotScreen() {
             setBotUser(me);
           }
 
-          // Load conversations and messages
-          await loadActiveConversation(bots[0]?.id || 'general-assistant');
+          // Do not auto-load messages if no conversation was actively selected,
+          // allowing the initial dashboard page to be shown first!
+          if (activeBotConversationId) {
+            await loadActiveConversation(bots[0]?.id || 'general-assistant');
+          }
         } catch (e) {
           console.warn('[PukuBotScreen] API load error:', e);
         }
@@ -239,6 +305,40 @@ export function PukuBotScreen() {
       }
     };
   }, []);
+
+  const handlePickMedia = async () => {
+    try {
+      const file = await NativePicker.pickMedia();
+      if (file) {
+        setPendingAttachment(file);
+      }
+    } catch (err: any) {
+      Alert.alert('Upload Error', err?.message || 'Could not pick file');
+    }
+  };
+
+  const handleSelectRecentConv = async (convId: string) => {
+    selectBotConversation(convId);
+    if (isAuthenticated) {
+      try {
+        const msgRes = await pukuBotApi.getMessages(convId, 50);
+        const mapped: LocalChatMessage[] = msgRes.messages.map(m => ({
+          id: m.id,
+          role: m.role,
+          text: m.text,
+          toolCalls: m.toolCalls,
+        }));
+        setMessages(mapped);
+      } catch (err) {
+        console.warn('[PukuBotScreen] Failed to load messages:', err);
+      }
+    } else {
+      const target = botConversations.find(c => c.id === convId);
+      if (target) {
+        setMessages(target.messages || []);
+      }
+    }
+  };
 
   const loadActiveConversation = async (botId: string) => {
     try {
@@ -267,17 +367,15 @@ export function PukuBotScreen() {
   };
 
   const handleNewConversation = async () => {
-    if (!isAuthenticated || !selectedBotId) return;
-    try {
-      const newConv = await pukuBotApi.createConversation(selectedBotId);
-      setActiveConversation(newConv);
-      setMessages([]);
-      Alert.alert(
-        'New Session',
-        `Started fresh conversation with ${availableBots.find(b => b.id === selectedBotId)?.name || 'Bot'}.`
-      );
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to start new conversation');
+    selectBotConversation(null as any);
+    setActiveConversation(null);
+    setMessages([]);
+    setPendingAttachment(null);
+    if (isAuthenticated && selectedBotId) {
+      try {
+        const newConv = await pukuBotApi.createConversation(selectedBotId);
+        setActiveConversation(newConv);
+      } catch {}
     }
   };
 
@@ -314,18 +412,22 @@ export function PukuBotScreen() {
 
   // Handle Send: Live Puku Bot API (v1) streaming OR Local Fallback
   const handleSend = async (textToSend?: string) => {
-    const query = (textToSend || inputVal).trim();
-    if (!query || isTyping || isStreaming) return;
+    const raw = (textToSend || inputVal).trim();
+    if ((!raw && !pendingAttachment) || isTyping || isStreaming) return;
+    const query = raw || (pendingAttachment ? `Analyze this file: ${pendingAttachment.name}` : '');
+    const currentAttachment = pendingAttachment;
 
     const userMsg: LocalChatMessage = {
       id: Date.now().toString(),
       role: 'user',
       text: query,
       timestamp: 'Just now',
+      attachment: currentAttachment || undefined,
     };
 
     setMessages(prev => [...prev, userMsg]);
     setInputVal('');
+    setPendingAttachment(null);
     setIsTyping(true);
 
     setTimeout(() => {
@@ -333,29 +435,48 @@ export function PukuBotScreen() {
     }, 50);
 
     // If connected to official Puku Bot API, stream via SSE
-    if (isAuthenticated && activeConversation) {
-      setIsStreaming(true);
+    if (isAuthenticated) {
+      let currentConv = activeConversation;
+      if (!currentConv && selectedBotId) {
+        try {
+          currentConv = await pukuBotApi.createConversation(selectedBotId);
+          setActiveConversation(currentConv);
+        } catch (err: any) {
+          console.warn('[PukuBotScreen] Failed to create conv:', err);
+        }
+      }
 
-      const assistantMsgId = (Date.now() + 1).toString();
-      let currentAssistantText = '';
-      const currentToolCalls: PukuBotToolCall[] = [];
+      if (currentConv) {
+        if (currentAttachment) {
+          try {
+            await pukuBotApi.uploadAttachment(currentConv.id, currentAttachment);
+          } catch (attErr) {
+            console.warn('[PukuBotScreen] uploadAttachment error:', attErr);
+          }
+        }
 
-      // Create placeholder assistant message
-      setMessages(prev => [
-        ...prev,
-        {
-          id: assistantMsgId,
-          role: 'assistant',
-          text: '',
-          timestamp: 'Just now',
-          toolCalls: [],
-        },
-      ]);
+        setIsStreaming(true);
 
-      const streamHandle = pukuBotApi.sendMessageStream(
-        activeConversation.id,
-        query,
-        [],
+        const assistantMsgId = (Date.now() + 1).toString();
+        let currentAssistantText = '';
+        const currentToolCalls: PukuBotToolCall[] = [];
+
+        // Create placeholder assistant message
+        setMessages(prev => [
+          ...prev,
+          {
+            id: assistantMsgId,
+            role: 'assistant',
+            text: '',
+            timestamp: 'Just now',
+            toolCalls: [],
+          },
+        ]);
+
+        const streamHandle = pukuBotApi.sendMessageStream(
+          currentConv.id,
+          query,
+          [],
         (event: PukuBotTurnEvent) => {
           switch (event.type) {
             case 'message.delta':
@@ -458,7 +579,8 @@ export function PukuBotScreen() {
       );
 
       activeStreamAbortRef.current = streamHandle.abort;
-    } else {
+    }
+  } else {
       // Local Standby fallback mode
       setTimeout(() => {
         const botReply = generateLocalPukuBotResponse(query);
@@ -591,6 +713,7 @@ export function PukuBotScreen() {
         </TouchableOpacity>
 
         <View style={styles.titleContainer}>
+          <PukuBotGradientIcon size={20} />
           <Text style={[styles.screenTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
             puku bot
           </Text>
@@ -742,32 +865,68 @@ export function PukuBotScreen() {
         </View>
       )}
 
-      {/* Chat Messages or Empty State */}
+      {/* Chat Messages or Initial Dashboard Page (1:1 with Puku AI post-login screen) */}
       {messages.length === 0 ? (
-        <View style={styles.emptyHeroContainer}>
-          <View style={[styles.avatarGlow, { backgroundColor: isDark ? '#1C1D1A' : '#FAF6EC', borderColor: theme.border }]}>
-            <BotIcon size={44} color={theme.textPrimary} />
+        <ScrollView
+          style={styles.emptyScrollView}
+          contentContainerStyle={styles.emptyScrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          {/* 1. Hero Row with Dynamic Greeting & Retro Computer Illustration (1:1 with Puku AI post-login screen) */}
+          <View style={styles.botHeroRow}>
+            <View style={styles.botHeadlineWrapper}>
+              <Text style={[styles.botHeadlineLead, { color: theme.textSecondary }]}>
+                {greeting.lead}
+              </Text>
+              <Text style={[styles.botHeadlineName, { color: theme.textPrimary }]}>
+                {greeting.name}
+              </Text>
+            </View>
+            <View style={styles.botComputerWrapper}>
+              <Image
+                source={require('../../assets/images/retro_puku_computer.png')}
+                style={styles.botComputerImage}
+                resizeMode="contain"
+              />
+            </View>
           </View>
 
-          <Text style={[styles.heroHeadline, { color: theme.textPrimary, fontFamily: monoFont }]}>
-            Puku Bot
-          </Text>
-          <Text style={[styles.heroSubhead, { color: theme.textSecondary, fontFamily: monoFont }]}>
-            Direct, candid, and unrestricted reasoning AI assistant.
-          </Text>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setShowSettingsModal(true)}
-            style={[styles.statusNotice, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-            <Text style={[styles.statusNoticeText, { color: theme.textMuted, fontFamily: monoFont }]}>
-              {isAuthenticated
-                ? `● Connected: ${botUser?.email || 'Official Puku Bot API (v1)'}`
-                : '● Standby • Local reasoning ready. Tap to connect Puku Bot backend.'}
+          {/* 2. Recent Conversations Section matching Puku AI */}
+          <View style={styles.botRecentsSection}>
+            <Text style={[styles.botRecentsTitle, { color: theme.textSecondary, fontFamily: monoFont }]}>
+              Recent conversations
             </Text>
-          </TouchableOpacity>
+            <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
 
-          {/* Prompt Chips */}
+            {displayBotConversations.map(conv => (
+              <TouchableOpacity
+                key={conv.id}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (conv.isReal) {
+                    handleSelectRecentConv(conv.id);
+                  } else {
+                    handleSend(conv.title);
+                  }
+                }}
+                style={styles.botRecentItemRow}>
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={[styles.botRecentItemTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                  {conv.title}
+                </Text>
+                <View style={styles.botRecentRightWrap}>
+                  <Text style={[styles.botRecentItemTime, { color: theme.textMuted, fontFamily: monoFont }]}>
+                    {conv.time}
+                  </Text>
+                  <ArrowUpRightIcon size={14} color={theme.textMuted} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* 3. Prompt Chips */}
           <Text style={[styles.promptChipsTitle, { color: theme.textMuted, fontFamily: monoFont }]}>
             Try asking:
           </Text>
@@ -784,7 +943,7 @@ export function PukuBotScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </ScrollView>
       ) : (
         <View style={styles.chatArea}>
           <FlatList
@@ -898,6 +1057,20 @@ export function PukuBotScreen() {
                           ? [styles.userBubble, { backgroundColor: isDark ? '#22251F' : '#E8E7DF' }]
                           : [styles.botBubble, { backgroundColor: theme.cardBackground, borderColor: theme.border }],
                       ]}>
+                      {isUser && item.attachment && (
+                        <View style={{ marginBottom: 6 }}>
+                          {item.attachment.type.startsWith('image/') ? (
+                            <Image source={{ uri: item.attachment.uri }} style={styles.bubbleImageAttachment} resizeMode="cover" />
+                          ) : (
+                            <View style={[styles.bubbleDocAttachment, { backgroundColor: 'rgba(255, 255, 255, 0.12)' }]}>
+                              <PaperclipIcon size={16} color={theme.textPrimary} />
+                              <Text numberOfLines={1} style={[styles.bubbleDocName, { color: theme.textPrimary }]}>
+                                {item.attachment.name}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
                       {isUser ? (
                         <Text
                           style={[
@@ -963,6 +1136,32 @@ export function PukuBotScreen() {
             borderColor: theme.border,
           },
         ]}>
+        {/* Pending Attachment Preview (Any File / Photo) */}
+        {pendingAttachment && (
+          <View style={[styles.attachmentPreviewWrap, { backgroundColor: theme.pillBackground, borderColor: theme.border }]}>
+            {pendingAttachment.type.startsWith('image/') ? (
+              <Image source={{ uri: pendingAttachment.uri }} style={styles.attachmentThumb} resizeMode="cover" />
+            ) : (
+              <View style={[styles.docIconWrap, { backgroundColor: theme.secondaryBackground }]}>
+                <PaperclipIcon size={16} color={theme.textPrimary} />
+              </View>
+            )}
+            <View style={styles.attachmentInfoWrap}>
+              <Text numberOfLines={1} style={[styles.attachmentName, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                {pendingAttachment.name}
+              </Text>
+              {pendingAttachment.size ? (
+                <Text style={[styles.attachmentSize, { color: theme.textMuted, fontFamily: monoFont }]}>
+                  {Math.round(pendingAttachment.size / 1024)} KB
+                </Text>
+              ) : null}
+            </View>
+            <TouchableOpacity onPress={() => setPendingAttachment(null)} style={styles.removeAttBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <CloseIcon size={14} color={theme.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         <TextInput
           ref={inputRef}
           value={inputVal}
@@ -974,7 +1173,14 @@ export function PukuBotScreen() {
         />
 
         <View style={styles.composerBottomRow}>
-          <View style={styles.composerLeftMeta} />
+          <View style={styles.composerLeftMeta}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handlePickMedia}
+              style={[styles.composerIconBtn, { borderColor: theme.border }]}>
+              <PaperclipIcon size={17} color={theme.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
           {isStreaming ? (
             <TouchableOpacity
@@ -986,19 +1192,19 @@ export function PukuBotScreen() {
           ) : (
             <TouchableOpacity
               activeOpacity={0.7}
-              disabled={!inputVal.trim() || isTyping}
+              disabled={(!inputVal.trim() && !pendingAttachment) || isTyping}
               onPress={() => handleSend()}
               style={[
                 styles.sendBtn,
                 {
-                  backgroundColor: inputVal.trim()
+                  backgroundColor: (inputVal.trim() || pendingAttachment)
                     ? (isDark ? '#E4E8E2' : '#1A1D18')
                     : (isDark ? '#262925' : '#E4E5DB'),
                 },
               ]}>
               <UpArrowIcon
                 size={18}
-                color={inputVal.trim() ? (isDark ? '#141613' : '#FFFFFF') : theme.textMuted}
+                color={(inputVal.trim() || pendingAttachment) ? (isDark ? '#141613' : '#FFFFFF') : theme.textMuted}
               />
             </TouchableOpacity>
           )}
@@ -1788,5 +1994,146 @@ const styles = StyleSheet.create({
   botSelectDesc: {
     fontSize: 11,
     marginTop: 2,
+  },
+  emptyScrollView: {
+    flex: 1,
+  },
+  emptyScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  botHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  botHeadlineWrapper: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  botHeadlineLead: {
+    fontSize: 22,
+    fontWeight: '400',
+    lineHeight: 28,
+  },
+  botHeadlineName: {
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 28,
+    marginTop: 2,
+  },
+  botComputerWrapper: {
+    width: 90,
+    height: 90,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botComputerImage: {
+    width: 90,
+    height: 90,
+  },
+  botRecentsSection: {
+    marginBottom: 24,
+  },
+  botRecentsTitle: {
+    fontSize: 13,
+    marginBottom: 8,
+    letterSpacing: 0.2,
+  },
+  botDivider: {
+    height: 1,
+    width: '100%',
+    marginBottom: 8,
+  },
+  botRecentItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  botRecentItemTitle: {
+    flex: 1,
+    fontSize: 13.5,
+    marginRight: 10,
+  },
+  botRecentRightWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  botRecentItemTime: {
+    fontSize: 11,
+  },
+  composerIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentPreviewWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 10,
+  },
+  attachmentThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+  },
+  docIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentInfoWrap: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  attachmentName: {
+    fontSize: 12.5,
+    fontWeight: '500',
+  },
+  attachmentSize: {
+    fontSize: 10.5,
+    marginTop: 2,
+  },
+  removeAttBtn: {
+    padding: 4,
+  },
+  bubbleAttachmentItem: {
+    marginBottom: 6,
+  },
+  bubbleImageAttachment: {
+    width: 200,
+    height: 140,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  bubbleDocAttachment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 8,
+  },
+  bubbleDocName: {
+    fontSize: 12.5,
+    fontWeight: '500',
   },
 });

@@ -567,7 +567,7 @@ export function LoginScreen() {
   if (isOpeningWorkspace) {
     return (
       <View style={styles.workspaceLoadingContainer}>
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle="light-content" />
         <Text style={[styles.workspaceLoadingText, { fontFamily: monoFont }]}>
           Opening workspace...
         </Text>
@@ -577,7 +577,7 @@ export function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       {/* 1. Top Header: Logo + 'puku' */}
       <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 12) }]}>
         <View style={styles.brandRow}>
@@ -872,17 +872,17 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F6F4EE',
+    backgroundColor: '#0D0D11',
   },
   workspaceLoadingContainer: {
     flex: 1,
-    backgroundColor: '#F6F4EE',
+    backgroundColor: '#0D0D11',
     alignItems: 'center',
     justifyContent: 'center',
   },
   workspaceLoadingText: {
     fontSize: 16,
-    color: '#1A1D18',
+    color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   topHeader: {
@@ -892,8 +892,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E6E2D8',
-    backgroundColor: '#F6F4EE',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#0D0D11',
   },
   brandRow: {
     flexDirection: 'row',
@@ -903,7 +903,7 @@ const styles = StyleSheet.create({
   brandLogoText: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1A1D18',
+    color: '#FFFFFF',
     letterSpacing: -0.5,
   },
   aboutPukuBtn: {
@@ -912,7 +912,7 @@ const styles = StyleSheet.create({
   },
   aboutPukuText: {
     fontSize: 13,
-    color: '#5D625A',
+    color: '#A0A0A8',
     fontWeight: '500',
   },
   scrollContent: {
@@ -937,13 +937,13 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontWeight: '700',
     letterSpacing: -1,
-    color: '#1A1D18',
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   heroSubtitle: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#5D625A',
+    color: '#A0A0A8',
     fontWeight: '400',
   },
   primarySignInBtn: {
@@ -962,13 +962,13 @@ const styles = StyleSheet.create({
   legalBase: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#5D625A',
+    color: '#8E8E93',
     textAlign: 'left',
     marginBottom: 14,
   },
   legalLink: {
     textDecorationLine: 'underline',
-    color: '#1A1D18',
+    color: '#E0E0E6',
     fontWeight: '600',
   },
   devTokenOptionBtn: {
@@ -978,7 +978,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   devTokenOptionText: {
-    color: '#4A54E8',
+    color: '#7B61FF',
     fontSize: 13,
     fontWeight: '500',
   },
@@ -991,7 +991,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   getLocallyText: {
-    color: '#5D625A',
+    color: '#8E8E93',
     fontSize: 13,
     fontWeight: '500',
   },

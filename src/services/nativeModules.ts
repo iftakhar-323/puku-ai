@@ -1,6 +1,27 @@
 import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
 
-const { PukuClipboard, PukuSpeech } = NativeModules;
+const { PukuClipboard, PukuSpeech, PukuPicker } = NativeModules;
+
+export interface PickedMedia {
+  uri: string;
+  name: string;
+  type: string;
+  size: number;
+  base64?: string;
+}
+
+export const NativePicker = {
+  pickMedia: async (options?: any): Promise<PickedMedia | null> => {
+    try {
+      if (PukuPicker && PukuPicker.pickMedia) {
+        return await PukuPicker.pickMedia(options || {});
+      }
+    } catch (e) {
+      console.warn('Failed to pick media', e);
+    }
+    return null;
+  },
+};
 
 export async function requestAudioPermission(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
