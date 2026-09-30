@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -161,6 +162,8 @@ export function ChatModelSelectionSheet({
   );
 }
 
+const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -179,6 +182,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerTitle: {
+    fontFamily: monoFont,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -199,11 +203,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   optionTitle: {
+    fontFamily: monoFont,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 4,
   },
   optionDesc: {
+    fontFamily: monoFont,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -217,6 +223,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   effortTitle: {
+    fontFamily: monoFont,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -226,6 +233,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   effortVal: {
+    fontFamily: monoFont,
     fontSize: 15,
     fontWeight: '500',
   },
@@ -233,6 +241,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   moreModelsText: {
+    fontFamily: monoFont,
     fontSize: 16,
     fontWeight: '700',
   },

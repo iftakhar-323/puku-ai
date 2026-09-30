@@ -1,5 +1,4 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { ChevronDownIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 
@@ -10,12 +9,14 @@ interface ChatModelChipProps {
 }
 
 export function ChatModelChip({ label, theme, onTap }: ChatModelChipProps) {
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onTap}
       style={[styles.container, { backgroundColor: theme.pillBackground }]}>
-      <Text style={[styles.label, { color: theme.textPrimary }]}>
+      <Text style={[styles.label, { color: theme.textPrimary, fontFamily: monoFont }]}>
         {label}
       </Text>
       <ChevronDownIcon size={14} color={theme.textPrimary} />

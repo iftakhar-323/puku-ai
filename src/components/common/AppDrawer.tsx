@@ -538,6 +538,8 @@ export function AppDrawer() {
   );
 }
 
+const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -571,6 +573,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   brandText: {
+    fontFamily: monoFont,
     fontSize: 17,
     fontWeight: '600',
     letterSpacing: -0.3,
@@ -599,6 +602,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   allProjectsText: {
+    fontFamily: monoFont,
     flex: 1,
     fontSize: 13,
   },
@@ -629,6 +633,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   dropdownItemText: {
+    fontFamily: monoFont,
     fontSize: 13,
   },
   searchRow: {
@@ -648,6 +653,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchInput: {
+    fontFamily: monoFont,
     flex: 1,
     fontSize: 13,
     paddingVertical: 0,
@@ -660,6 +666,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   recentHeaderText: {
+    fontFamily: monoFont,
     fontSize: 12,
   },
   conversationsScroll: {
@@ -678,6 +685,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   convTitle: {
+    fontFamily: monoFont,
     flex: 1,
     fontSize: 13,
   },
@@ -710,6 +718,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   contextMenuText: {
+    fontFamily: monoFont,
     fontSize: 13,
   },
   contextDivider: {
@@ -737,6 +746,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   customizeText: {
+    fontFamily: monoFont,
     fontSize: 13,
   },
   rightActionIcons: {
@@ -768,6 +778,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   userNameText: {
+    fontFamily: monoFont,
     fontSize: 14,
   },
   powerMeterRow: {
@@ -783,6 +794,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   powerBtnText: {
+    fontFamily: monoFont,
     fontSize: 12,
   },
   powerTrack: {
@@ -796,6 +808,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   searchInputPlaceholder: {
+    fontFamily: monoFont,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -826,6 +839,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   findModalTitle: {
+    fontFamily: monoFont,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -844,6 +858,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   findInputField: {
+    fontFamily: monoFont,
     flex: 1,
     fontSize: 14,
     paddingVertical: 0,
@@ -856,6 +871,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   findItemText: {
+    fontFamily: monoFont,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -864,6 +880,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   findEmptyText: {
+    fontFamily: monoFont,
     fontSize: 13,
   },
 });

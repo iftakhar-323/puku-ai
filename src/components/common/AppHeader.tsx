@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../store/AppContext';
 import { BackIcon, MenuIcon } from './Icons';
@@ -67,6 +67,8 @@ export function AppHeader({
   );
 }
 
+const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
@@ -91,6 +93,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
+    fontFamily: monoFont,
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,

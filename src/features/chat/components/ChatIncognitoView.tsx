@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IncognitoIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 
@@ -37,6 +37,8 @@ export function ChatIncognitoView({
   );
 }
 
+const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
@@ -49,18 +51,21 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   bodyText: {
+    fontFamily: monoFont,
     fontSize: 14,
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 20,
   },
   noteText: {
+    fontFamily: monoFont,
     fontSize: 14,
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 12,
   },
   learnMore: {
+    fontFamily: monoFont,
     fontSize: 14,
     fontWeight: '600',
     textDecorationLine: 'underline',

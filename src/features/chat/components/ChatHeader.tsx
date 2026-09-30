@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   BackIcon,
   BotIcon,
@@ -41,12 +41,14 @@ export function ChatHeader({
   onShare,
   showShare = false,
 }: ChatHeaderProps) {
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
   return (
     <View style={styles.container}>
       {isIncognitoMode ? (
         <View style={styles.incognitoLeftGroup}>
           <GhostIcon size={20} color={theme.textPrimary} eyeColor={theme.background} />
-          <Text style={[styles.incognitoTitle, { color: theme.textPrimary }]}>
+          <Text style={[styles.incognitoTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
             Incognito chat
           </Text>
         </View>
@@ -64,7 +66,10 @@ export function ChatHeader({
           </TouchableOpacity>
 
           {title ? (
-            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.topBarTitle, { color: theme.textPrimary }]}>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.topBarTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
               {title}
             </Text>
           ) : null}
@@ -91,7 +96,9 @@ export function ChatHeader({
                   backgroundColor: theme.cardBackground,
                 },
               ]}>
-              <Text style={[styles.shareBtnText, { color: theme.textPrimary }]}>Share</Text>
+              <Text style={[styles.shareBtnText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                Share
+              </Text>
             </TouchableOpacity>
           ) : null}
 

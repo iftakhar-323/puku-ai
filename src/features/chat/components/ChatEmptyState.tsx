@@ -1,21 +1,14 @@
 import React from 'react';
 import {
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  ArrowUpRightIcon,
-  CodeIcon,
-  LearnIcon,
-  LifeIcon,
-  PukuLogoIcon,
-  SparkleIcon,
-  WriteIcon,
-} from '../../../components/common/Icons';
+import { ArrowUpRightIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import { Conversation } from '../../../types';
 import { formatActivityDate } from '../../../utils/date';
@@ -28,46 +21,25 @@ interface ChatEmptyStateProps {
   onPromptTap?: (prompt: string) => void;
 }
 
-function getGreetingPrefix(): string {
+function getGreeting(userName?: string): { lead: string; name: string } {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  if (h < 21) return 'Good evening';
-  return 'Back at it';
-}
+  let lead = 'Good morning,';
+  if (h >= 12 && h < 17) {
+    lead = 'Good afternoon,';
+  } else if (h >= 17 && h < 22) {
+    lead = 'Good evening,';
+  } else if (h >= 22 || h < 5) {
+    lead = 'Back at it,';
+  }
 
-function getFirstName(fullName?: string): string {
-  if (!fullName?.trim()) return 'there';
-  return fullName.trim().split(/\s+/)[0];
-}
+  let name = 'there';
+  if (userName?.trim()) {
+    name = userName.trim().split(/\s+/)[0];
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+  }
 
-const SUGGESTIONS = [
-  {
-    label: 'Write',
-    icon: (color: string) => <WriteIcon size={14} color={color} />,
-    prompt: 'Help me write a clear product announcement email.',
-  },
-  {
-    label: 'Learn',
-    icon: (color: string) => <LearnIcon size={14} color={color} />,
-    prompt: 'Explain how transformer attention works with a simple analogy.',
-  },
-  {
-    label: 'Code',
-    icon: (color: string) => <CodeIcon size={14} color={color} />,
-    prompt: 'Write a TypeScript debounce function with types and an example.',
-  },
-  {
-    label: 'Life stuff',
-    icon: (color: string) => <LifeIcon size={14} color={color} />,
-    prompt: 'Give me a weekly meal prep plan for busy weekdays.',
-  },
-  {
-    label: "puku's choice",
-    icon: (color: string) => <SparkleIcon size={14} color={color} />,
-    prompt: 'Surprise me with something useful I might not have thought to ask.',
-  },
-];
+  return { lead, name };
+}
 
 export function ChatEmptyState({
   theme,
@@ -76,13 +48,13 @@ export function ChatEmptyState({
   onSelectConversation,
   onPromptTap,
 }: ChatEmptyStateProps) {
-  const greetingLead = `${getGreetingPrefix()},`;
-  const name = getFirstName(userName);
+  const greeting = getGreeting(userName);
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
-  // If user has real conversations, show top 4; otherwise show sample conversations
+  // If user has real conversations, show top 3; otherwise show matching sample conversations from Image 1
   const displayItems =
     conversations.length > 0
-      ? conversations.slice(0, 4).map(c => {
+      ? conversations.slice(0, 3).map(c => {
           const rawTime =
             (c as any).updated_at ||
             (c as any).created_at ||
@@ -104,20 +76,20 @@ export function ChatEmptyState({
       : [
           {
             id: 'sample-1',
-            title: 'Exploring Transformer Attention',
-            time: '1h ago',
+            title: 'what is ml',
+            time: '3h ago',
             isReal: false,
           },
           {
             id: 'sample-2',
-            title: 'TypeScript Fullstack Architecture',
-            time: '4h ago',
+            title: 'Which model you used??',
+            time: '3h ago',
             isReal: false,
           },
           {
             id: 'sample-3',
-            title: 'Puku AI Model Capabilities',
-            time: '1d ago',
+            title: 'df',
+            time: '5h ago',
             isReal: false,
           },
         ];
@@ -136,50 +108,32 @@ export function ChatEmptyState({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled">
-      {/* 1:1 Authentic Web Greeting Row */}
-      <View style={styles.greetingRow}>
-        <View style={styles.logoWrap}>
+      {/* Hero Header with Dynamic Greeting (Format 2: Bold Sans-Serif) & Retro Computer Illustration (Image 1) */}
+      <View style={styles.heroRow}>
+        <View style={styles.headlineWrapper}>
+          <Text style={[styles.headlineLead, { color: theme.textSecondary }]}>
+            {greeting.lead}
+          </Text>
+          <Text style={[styles.headlineName, { color: theme.textPrimary }]}>
+            {greeting.name}
+          </Text>
+        </View>
+        <View style={styles.computerWrapper}>
           <Image
-            source={require('../../../../assets/images/app_logo.png')}
-            style={styles.logoImage}
+            source={require('../../../../assets/images/retro_puku_computer.png')}
+            style={styles.computerImage}
             resizeMode="contain"
           />
         </View>
-        <Text style={styles.greetingTitle}>
-          <Text style={[styles.greetingMuted, { color: theme.textSecondary }]}>
-            {greetingLead}{' '}
-          </Text>
-          <Text style={[styles.greetingName, { color: theme.textPrimary }]}>
-            {name}!!!
-          </Text>
-        </Text>
       </View>
 
-      {/* Suggestion Chips Row (matching puku-web-chat SUGGESTIONS) */}
-      <View style={styles.suggestionRow}>
-        {SUGGESTIONS.map((item, idx) => (
-          <TouchableOpacity
-            key={idx}
-            activeOpacity={0.7}
-            onPress={() => onPromptTap?.(item.prompt)}
-            style={[
-              styles.suggestionChip,
-              {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
-              },
-            ]}>
-            {item.icon(theme.textSecondary)}
-            <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Recent Conversations Section */}
+      {/* Recent Conversations Section (Format 3: Typewriter monospace font matching Image 3) */}
       <View style={styles.recentsSection}>
-        <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: theme.textSecondary, fontFamily: monoFont },
+          ]}>
           Recent conversations
         </Text>
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -192,11 +146,18 @@ export function ChatEmptyState({
               style={styles.recentItemRow}>
               <Text
                 numberOfLines={1}
-                style={[styles.recentItemTitle, { color: theme.textPrimary }]}>
+                style={[
+                  styles.recentItemTitle,
+                  { color: theme.textPrimary, fontFamily: monoFont },
+                ]}>
                 {item.title}
               </Text>
               <View style={styles.recentItemMeta}>
-                <Text style={[styles.recentItemTime, { color: theme.textSecondary }]}>
+                <Text
+                  style={[
+                    styles.recentItemTime,
+                    { color: theme.textSecondary, fontFamily: monoFont },
+                  ]}>
                   {item.time}
                 </Text>
                 <ArrowUpRightIcon size={14} color={theme.textSecondary} />
@@ -216,64 +177,46 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 24,
+    paddingTop: 12,
     paddingBottom: 24,
   },
-  greetingRow: {
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 24,
-    paddingTop: 8,
+    justifyContent: 'space-between',
+    marginBottom: 32,
+    marginTop: 8,
   },
-  logoWrap: {
-    width: 32,
-    height: 32,
+  headlineWrapper: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  headlineLead: {
+    fontSize: 27,
+    fontWeight: '700',
+    lineHeight: 35,
+    letterSpacing: -0.4,
+  },
+  headlineName: {
+    fontSize: 27,
+    fontWeight: '700',
+    lineHeight: 35,
+    letterSpacing: -0.4,
+  },
+  computerWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoImage: {
-    width: 32,
-    height: 32,
-  },
-  greetingTitle: {
-    fontSize: 26,
-    fontWeight: '400',
-    letterSpacing: -0.4,
-    lineHeight: 32,
-  },
-  greetingMuted: {
-    fontWeight: '400',
-  },
-  greetingName: {
-    fontWeight: '600',
-  },
-  suggestionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 28,
-  },
-  suggestionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  suggestionText: {
-    fontSize: 13,
-    fontWeight: '500',
+  computerImage: {
+    width: 120,
+    height: 112,
   },
   recentsSection: {
-    marginTop: 6,
+    marginTop: 8,
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.1,
+    letterSpacing: 0.2,
     marginBottom: 10,
   },
   divider: {
@@ -289,7 +232,6 @@ const styles = StyleSheet.create({
   recentItemTitle: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '500',
     marginRight: 12,
   },
   recentItemMeta: {

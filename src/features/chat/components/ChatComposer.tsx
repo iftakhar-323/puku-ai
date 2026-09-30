@@ -61,6 +61,7 @@ export function ChatComposer({
 
   const currentModelObj =
     AVAILABLE_MODELS.find(m => m.id === selectedModel) || AVAILABLE_MODELS[0];
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   return (
     <View style={styles.outerWrapper}>
@@ -94,11 +95,16 @@ export function ChatComposer({
                     {
                       color: isSelected ? theme.textPrimary : theme.textSecondary,
                       fontWeight: isSelected ? '600' : '400',
+                      fontFamily: monoFont,
                     },
                   ]}>
                   {modelItem.label}
                 </Text>
-                <Text style={[styles.modelBadgeText, { color: theme.textSecondary }]}>
+                <Text
+                  style={[
+                    styles.modelBadgeText,
+                    { color: theme.textSecondary, fontFamily: monoFont },
+                  ]}>
                   {modelItem.badge}
                 </Text>
               </TouchableOpacity>
@@ -128,13 +134,14 @@ export function ChatComposer({
             onFocus?.();
           }}
           onBlur={() => setIsFocused(false)}
-          placeholder="How can I help you today?"
+          placeholder="Write a message..."
           placeholderTextColor={theme.placeholderText}
           multiline
           style={[
             styles.input,
             {
               color: theme.textPrimary,
+              fontFamily: monoFont,
             },
           ]}
         />
@@ -162,7 +169,7 @@ export function ChatComposer({
                   borderColor: theme.border,
                 },
               ]}>
-              <Text style={[styles.modelPillLabel, { color: theme.textPrimary }]}>
+              <Text style={[styles.modelPillLabel, { color: theme.textPrimary, fontFamily: monoFont }]}>
                 {currentModelObj.label}
               </Text>
               <ChevronDownIcon size={12} color={theme.textSecondary} />
