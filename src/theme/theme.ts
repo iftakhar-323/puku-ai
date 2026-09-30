@@ -35,71 +35,71 @@ export interface ThemeColors {
 }
 
 export const darkTheme: ThemeColors = {
-  background: '#100d1d', // matches --puku-chat-bg-web: #100d1d
-  secondaryBackground: '#151125', // matches --puku-chat-composer-bg: #151125
-  cardBackground: '#151125',
-  chatBarBackground: '#151125',
-  chatBarBorder: 'rgba(255, 255, 255, 0.08)',
-  primary: '#201c59', // matches --puku-chat-send-bg: #201c59
-  primaryLight: '#d699ff', // matches --claude-accent: #d699ff
-  accent: '#d699ff', // matches --claude-accent: #d699ff
-  textPrimary: '#ffffff', // matches --claude-text: #ffffff
-  textSecondary: 'rgba(255, 255, 255, 0.65)', // matches --claude-text-muted: rgba(255, 255, 255, 0.65)
-  textMuted: 'rgba(255, 255, 255, 0.45)', // matches --claude-text-subtle: rgba(255, 255, 255, 0.45)
-  placeholderText: 'rgba(255, 255, 255, 0.45)',
-  border: 'rgba(255, 255, 255, 0.08)', // matches --claude-border
-  outline: 'rgba(255, 255, 255, 0.08)',
+  background: AppColors.background, // #151614 (official Puku deep charcoal black)
+  secondaryBackground: AppColors.secondaryBackground, // #1c1d1a (official Puku panel)
+  cardBackground: AppColors.secondaryBackground, // #1c1d1a
+  chatBarBackground: AppColors.secondaryBackground, // #1c1d1a
+  chatBarBorder: AppColors.outline, // #34362e
+  primary: AppColors.primary, // #242620
+  primaryLight: AppColors.accent, // #b0b3fc
+  accent: AppColors.accent, // #b0b3fc
+  textPrimary: AppColors.primaryText, // #eeeee5
+  textSecondary: AppColors.secondaryText, // #9da193
+  textMuted: '#626759',
+  placeholderText: AppColors.secondaryText, // #9da193
+  border: AppColors.outline, // #34362e
+  outline: AppColors.outline, // #34362e
   buttonBackground: 'rgba(255, 255, 255, 0.06)',
   pillBackground: 'rgba(255, 255, 255, 0.08)',
-  tagText: '#d699ff',
-  menuIcon: '#ffffff',
-  error: '#c73738', // matches --claude-red: #c73738
-  success: '#17aa58', // matches --claude-green: #17aa58
-  warning: '#e8b187',
-  codeBackground: '#161b22', // matches --claude-code-bg: #161b22
+  tagText: AppColors.accent,
+  menuIcon: AppColors.primaryText,
+  error: AppColors.pukuDanger, // #ff9198
+  success: AppColors.pukuSuccess, // #94c7a0
+  warning: AppColors.pukuWarning, // #e8b187
+  codeBackground: AppColors.secondary, // #10110f
   thinkingBackground: 'rgba(255, 255, 255, 0.04)',
-  userBubble: 'rgba(255, 255, 255, 0.08)', // matches --claude-user-bg: rgba(255, 255, 255, 0.08)
-  onUserBubble: '#ffffff',
+  userBubble: 'rgba(255, 255, 255, 0.08)',
+  onUserBubble: AppColors.primaryText, // #eeeee5
   assistantBubble: 'transparent',
-  iconBackground: '#201c59',
-  pumpkin: '#e8b187',
-  blue: '#484fa3',
-  blueLite: '#d699ff',
-  coolGrey: 'rgba(255, 255, 255, 0.65)',
+  iconBackground: AppColors.iconBackground, // #242620
+  pumpkin: AppColors.pumpkin,
+  blue: AppColors.blue,
+  blueLite: AppColors.blueLite,
+  coolGrey: AppColors.coolGrey,
 };
 
 export const lightTheme: ThemeColors = {
-  background: '#faf9f5', // matches --puku-chat-bg-web: #faf9f5
-  secondaryBackground: '#f5f4ed', // matches --claude-sidebar: #f5f4ed
-  cardBackground: '#ffffff', // matches --claude-surface: #ffffff
+  background: '#faf9f5',
+  secondaryBackground: '#f3f1e8',
+  cardBackground: '#ffffff',
   chatBarBackground: '#ffffff',
-  chatBarBorder: 'rgba(0, 0, 0, 0.08)',
-  primary: '#484fa3', // matches --puku-chat-send-bg: #484fa3
-  primaryLight: '#9941d7', // matches --claude-accent: #9941d7
-  accent: '#9941d7',
-  textPrimary: '#1a1915', // matches --claude-text: #1a1915
-  textSecondary: '#73726c', // matches --claude-text-muted: #73726c
-  textMuted: '#a8a69e', // matches --claude-text-subtle: #a8a69e
-  placeholderText: '#a8a69e',
-  border: 'rgba(0, 0, 0, 0.08)', // matches --claude-border: rgba(0, 0, 0, 0.08)
-  outline: 'rgba(0, 0, 0, 0.08)',
+  chatBarBorder: '#d0d4c6',
+  primary: '#111310',
+  primaryLight: '#484dd0',
+  accent: '#111310',
+  textPrimary: '#111310', // Deep black for high contrast & clear legibility
+  textSecondary: '#2b2f27', // Dark charcoal black-like text
+  textMuted: '#4a4f43', // Dark readable muted text
+  placeholderText: '#686e60', // Dark readable placeholder
+  border: '#d0d4c6',
+  outline: '#d0d4c6',
   buttonBackground: '#ffffff',
-  pillBackground: 'rgba(0, 0, 0, 0.04)',
-  tagText: '#9941d7',
-  menuIcon: '#1a1915',
-  error: '#c73738',
-  success: '#17aa58',
+  pillBackground: '#e5e7dc',
+  tagText: '#111310',
+  menuIcon: '#111310',
+  error: '#b5263e',
+  success: '#206b35',
   warning: '#8b4a18',
-  codeBackground: '#f6f8fa', // matches --claude-code-bg: #f6f8fa
-  thinkingBackground: 'rgba(0, 0, 0, 0.04)',
-  userBubble: '#eeede8', // matches --claude-user-bg: #eeede8
-  onUserBubble: '#1a1915',
+  codeBackground: '#edece4',
+  thinkingBackground: '#e7e9df',
+  userBubble: '#e8e7df',
+  onUserBubble: '#111310',
   assistantBubble: 'transparent',
-  iconBackground: 'rgba(0, 0, 0, 0.06)',
+  iconBackground: '#e0e2d7',
   pumpkin: '#8b4a18',
-  blue: '#484fa3',
-  blueLite: '#9941d7',
-  coolGrey: '#73726c',
+  blue: '#2B7FFF',
+  blueLite: '#2B7FFF',
+  coolGrey: '#2b2f27',
 };
 
 export const dimens = {

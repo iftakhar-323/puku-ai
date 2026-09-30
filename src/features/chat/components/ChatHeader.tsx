@@ -64,7 +64,7 @@ export function ChatHeader({
           </TouchableOpacity>
 
           {title ? (
-            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.topBarTitle, { color: theme.textSecondary }]}>
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.topBarTitle, { color: theme.textPrimary }]}>
               {title}
             </Text>
           ) : null}
@@ -100,7 +100,7 @@ export function ChatHeader({
               activeOpacity={0.7}
               onPress={onTrailingTap}
               style={styles.actionBtn}>
-              <GhostIcon size={19} color={theme.textMuted} eyeColor={theme.background} />
+              <GhostIcon size={19} color={theme.textSecondary} eyeColor={theme.background} />
             </TouchableOpacity>
           )}
 
@@ -109,7 +109,7 @@ export function ChatHeader({
               activeOpacity={0.7}
               onPress={onTerminalTap}
               style={styles.actionBtn}>
-              <TerminalPromptIcon size={19} color={theme.textMuted} />
+              <TerminalPromptIcon size={19} color={theme.textSecondary} />
             </TouchableOpacity>
           )}
 
@@ -118,7 +118,7 @@ export function ChatHeader({
               activeOpacity={0.7}
               onPress={onBotTap}
               style={styles.actionBtn}>
-              <BotIcon size={19} color={theme.textMuted} />
+              <BotIcon size={19} color={theme.textSecondary} />
             </TouchableOpacity>
           )}
 
@@ -128,9 +128,9 @@ export function ChatHeader({
               onPress={onThemeTap}
               style={styles.actionBtn}>
               {isDark ? (
-                <SunIcon size={19} color={theme.textMuted} />
+                <SunIcon size={19} color={theme.textSecondary} />
               ) : (
-                <MoonIcon size={19} color={theme.textMuted} />
+                <MoonIcon size={19} color={theme.textSecondary} />
               )}
             </TouchableOpacity>
           )}
@@ -146,19 +146,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
   },
   leftGroup: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     marginRight: 8,
   },
   incognitoLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    paddingLeft: 8,
   },
   incognitoTitle: {
     fontSize: 15,
@@ -191,6 +192,6 @@ const styles = StyleSheet.create({
   trailingGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
 });

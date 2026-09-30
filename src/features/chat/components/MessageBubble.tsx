@@ -76,7 +76,7 @@ export function MessageBubble({
               {isCopied ? (
                 <CheckmarkIcon size={15} color="#52C41A" />
               ) : (
-                <CopyIcon size={15} color={theme.textMuted} />
+                <CopyIcon size={15} color={theme.textSecondary} />
               )}
             </TouchableOpacity>
 
@@ -87,7 +87,7 @@ export function MessageBubble({
                 onPress={() => onEditPrompt(message.content)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={[styles.actionBtn, { marginLeft: 12 }]}>
-                <PencilIcon size={15} color={theme.textMuted} />
+                <PencilIcon size={15} color={theme.textSecondary} />
               </TouchableOpacity>
             )}
           </View>
@@ -136,7 +136,7 @@ export function MessageBubble({
             {isCopied ? (
               <CheckmarkIcon size={15} color="#52C41A" />
             ) : (
-              <CopyIcon size={15} color={theme.textMuted} />
+              <CopyIcon size={15} color={theme.textSecondary} />
             )}
           </TouchableOpacity>
 
@@ -147,7 +147,7 @@ export function MessageBubble({
               onPress={() => onRegenerate(message.id)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={[styles.actionBtn, { marginLeft: 12 }]}>
-              <RefreshIcon size={15} color={theme.textMuted} />
+              <RefreshIcon size={15} color={theme.textSecondary} />
             </TouchableOpacity>
           )}
 
@@ -161,7 +161,7 @@ export function MessageBubble({
               {isBranched ? (
                 <CheckmarkIcon size={15} color="#52C41A" />
               ) : (
-                <ConnectorsBranchIcon size={16} color={theme.textMuted} />
+                <ConnectorsBranchIcon size={16} color={theme.textSecondary} />
               )}
             </TouchableOpacity>
           )}

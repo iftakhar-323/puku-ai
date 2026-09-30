@@ -218,7 +218,7 @@ export function AppDrawer() {
                 setIsFindModalOpen(true);
               }}
               style={[styles.searchBox, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
-              <SearchIcon size={16} color={theme.textMuted} />
+              <SearchIcon size={16} color={theme.textSecondary} />
               <Text style={[styles.searchInputPlaceholder, { color: theme.placeholderText }]}>
                 Search
               </Text>
@@ -238,11 +238,11 @@ export function AppDrawer() {
 
           {/* Recent Section Header */}
           <View style={styles.recentSectionHeader}>
-            <Text style={[styles.recentHeaderText, { color: theme.textMuted }]}>
+            <Text style={[styles.recentHeaderText, { color: theme.textPrimary }]}>
               Recent
             </Text>
             <TouchableOpacity activeOpacity={0.7}>
-              <SortIcon size={14} color={theme.textMuted} />
+              <SortIcon size={14} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -266,13 +266,13 @@ export function AppDrawer() {
                       styles.convItem,
                       isActive && { backgroundColor: theme.pillBackground, borderRadius: 8 },
                     ]}>
-                    <ChatBubbleOutlineIcon size={15} color={isActive ? theme.textPrimary : theme.textMuted} />
+                    <ChatBubbleOutlineIcon size={15} color={isActive ? theme.textPrimary : theme.textSecondary} />
                     <Text
                       numberOfLines={1}
                       style={[
                         styles.convTitle,
                         {
-                          color: isActive ? theme.textPrimary : theme.textSecondary,
+                          color: theme.textPrimary,
                           fontWeight: isActive ? '600' : '400',
                         },
                       ]}>
@@ -285,7 +285,7 @@ export function AppDrawer() {
                         setActiveMenuConvId(prev => (prev === conv.id ? null : conv.id))
                       }
                       style={styles.dotsBtn}>
-                      <ThreeDotsHorizontalIcon size={16} color={theme.textMuted} />
+                      <ThreeDotsHorizontalIcon size={16} color={theme.textSecondary} />
                     </TouchableOpacity>
                   </TouchableOpacity>
 
@@ -378,10 +378,10 @@ export function AppDrawer() {
 
               <View style={styles.rightActionIcons}>
                 <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
-                  <DownloadIcon size={18} color={theme.textMuted} />
+                  <DownloadIcon size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
-                  <HelpCircleIcon size={18} color={theme.textMuted} />
+                  <HelpCircleIcon size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -569,7 +569,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingLeft: 2,
   },
   brandText: {
     fontSize: 17,
@@ -658,7 +657,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
   },
   recentHeaderText: {
     fontSize: 12,
@@ -674,8 +673,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     gap: 10,
+    borderRadius: 8,
   },
   convTitle: {
     flex: 1,
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
-    paddingHorizontal: 2,
+    paddingHorizontal: 0,
   },
   customizeBtn: {
     flexDirection: 'row',
@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginBottom: 12,
-    paddingHorizontal: 2,
+    paddingHorizontal: 0,
   },
   avatarCircle: {
     width: 30,
@@ -774,7 +774,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 2,
+    paddingHorizontal: 0,
   },
   powerBtn: {
     borderWidth: 1,

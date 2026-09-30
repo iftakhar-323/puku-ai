@@ -146,7 +146,7 @@ export function ChatEmptyState({
           />
         </View>
         <Text style={styles.greetingTitle}>
-          <Text style={[styles.greetingMuted, { color: theme.textMuted }]}>
+          <Text style={[styles.greetingMuted, { color: theme.textSecondary }]}>
             {greetingLead}{' '}
           </Text>
           <Text style={[styles.greetingName, { color: theme.textPrimary }]}>
@@ -169,8 +169,8 @@ export function ChatEmptyState({
                 borderColor: theme.border,
               },
             ]}>
-            {item.icon(theme.textMuted)}
-            <Text style={[styles.suggestionText, { color: theme.textSecondary }]}>
+            {item.icon(theme.textSecondary)}
+            <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>
               {item.label}
             </Text>
           </TouchableOpacity>
@@ -179,7 +179,7 @@ export function ChatEmptyState({
 
       {/* Recent Conversations Section */}
       <View style={styles.recentsSection}>
-        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+        <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
           Recent conversations
         </Text>
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -196,10 +196,10 @@ export function ChatEmptyState({
                 {item.title}
               </Text>
               <View style={styles.recentItemMeta}>
-                <Text style={[styles.recentItemTime, { color: theme.textMuted }]}>
+                <Text style={[styles.recentItemTime, { color: theme.textSecondary }]}>
                   {item.time}
                 </Text>
-                <ArrowUpRightIcon size={14} color={theme.textMuted} />
+                <ArrowUpRightIcon size={14} color={theme.textSecondary} />
               </View>
             </TouchableOpacity>
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -227,14 +227,14 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   logoWrap: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoImage: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
   },
   greetingTitle: {
     fontSize: 26,

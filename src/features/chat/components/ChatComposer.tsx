@@ -98,7 +98,7 @@ export function ChatComposer({
                   ]}>
                   {modelItem.label}
                 </Text>
-                <Text style={[styles.modelBadgeText, { color: theme.textMuted }]}>
+                <Text style={[styles.modelBadgeText, { color: theme.textSecondary }]}>
                   {modelItem.badge}
                 </Text>
               </TouchableOpacity>
@@ -150,7 +150,7 @@ export function ChatComposer({
                 onPlusTap();
               }}
               style={styles.actionIconBtn}>
-              <PlusIcon size={18} color={theme.textMuted} />
+              <PlusIcon size={18} color={theme.textPrimary} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -162,10 +162,10 @@ export function ChatComposer({
                   borderColor: theme.border,
                 },
               ]}>
-              <Text style={[styles.modelPillLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.modelPillLabel, { color: theme.textPrimary }]}>
                 {currentModelObj.label}
               </Text>
-              <ChevronDownIcon size={12} color={theme.textMuted} />
+              <ChevronDownIcon size={12} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -180,7 +180,7 @@ export function ChatComposer({
                 styles.actionIconBtn,
                 isListening && { backgroundColor: 'rgba(255, 77, 79, 0.2)', borderRadius: 16 },
               ]}>
-              <MicIcon size={18} color={isListening ? '#FF4D4F' : theme.textMuted} />
+              <MicIcon size={18} color={isListening ? '#FF4D4F' : theme.textPrimary} />
             </TouchableOpacity>
 
             {isSending ? (
