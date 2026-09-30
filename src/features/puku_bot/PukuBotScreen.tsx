@@ -549,9 +549,14 @@ export function PukuBotScreen() {
               setIsTyping(false);
               setIsStreaming(false);
               activeStreamAbortRef.current = null;
-              if (activeBotConversationId) {
-                addBotMessage(activeBotConversationId, { role: 'user', text: query });
-                addBotMessage(activeBotConversationId, {
+              {
+                let convId = activeBotConversationId;
+                if (!convId) {
+                  const created = createBotConversation(activeBotId, query.slice(0, 30));
+                  convId = created.id;
+                }
+                addBotMessage(convId, { role: 'user', text: query });
+                addBotMessage(convId, {
                   role: 'assistant',
                   text: currentAssistantText,
                   toolCalls: currentToolCalls,
@@ -563,15 +568,15 @@ export function PukuBotScreen() {
               setIsTyping(false);
               setIsStreaming(false);
               activeStreamAbortRef.current = null;
-              if (event.message) {
-                setMessages(prev => [
-                  ...prev,
-                  {
-                    id: Date.now().toString(),
-                    role: 'assistant',
-                    text: `⚠️ Turn error: ${event.message}`,
-                  },
-                ]);
+              {
+                const errMsg = event.message || 'Turn could not be completed';
+                setMessages(prev =>
+                  prev.map(m =>
+                    m.id === assistantMsgId
+                      ? { ...m, text: m.text ? `${m.text}\n\n⚠️ ${errMsg}` : `⚠️ ${errMsg}` }
+                      : m
+                  )
+                );
               }
               break;
           }
@@ -579,6 +584,24 @@ export function PukuBotScreen() {
       );
 
       activeStreamAbortRef.current = streamHandle.abort;
+    } else {
+      // Server conversation could not be created or network failure: fallback gracefully to Standby!
+      setIsTyping(false);
+      const botReply = generateLocalPukuBotResponse(query);
+      const botMsg: LocalChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        text: botReply,
+        timestamp: 'Just now',
+      };
+      setMessages(prev => [...prev, botMsg]);
+      let convId = activeBotConversationId;
+      if (!convId) {
+        const created = createBotConversation(activeBotId, query.slice(0, 30));
+        convId = created.id;
+      }
+      addBotMessage(convId, { role: 'user', text: query });
+      addBotMessage(convId, { role: 'assistant', text: botReply });
     }
   } else {
       // Local Standby fallback mode
@@ -593,10 +616,13 @@ export function PukuBotScreen() {
         setMessages(prev => [...prev, botMsg]);
         setIsTyping(false);
 
-        if (activeBotConversationId) {
-          addBotMessage(activeBotConversationId, { role: 'user', text: query });
-          addBotMessage(activeBotConversationId, { role: 'assistant', text: botReply });
+        let convId = activeBotConversationId;
+        if (!convId) {
+          const created = createBotConversation(activeBotId, query.slice(0, 30));
+          convId = created.id;
         }
+        addBotMessage(convId, { role: 'user', text: query });
+        addBotMessage(convId, { role: 'assistant', text: botReply });
 
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
