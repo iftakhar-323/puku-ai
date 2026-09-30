@@ -23,8 +23,6 @@ interface ChatHeaderProps {
   onTerminalTap?: () => void;
   onBotTap?: () => void;
   onThemeTap?: () => void;
-  onShare?: () => void;
-  showShare?: boolean;
 }
 
 export function ChatHeader({
@@ -38,8 +36,6 @@ export function ChatHeader({
   onTerminalTap,
   onBotTap,
   onThemeTap,
-  onShare,
-  showShare = false,
 }: ChatHeaderProps) {
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
@@ -56,8 +52,9 @@ export function ChatHeader({
         <View style={styles.leftGroup}>
           <TouchableOpacity
             activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
             onPress={onLeadingTap}
-            style={styles.actionBtn}>
+            style={styles.leadingBtn}>
             {showsBackButton ? (
               <BackIcon size={20} color={theme.textPrimary} />
             ) : (
@@ -79,29 +76,13 @@ export function ChatHeader({
       {isIncognitoMode ? (
         <TouchableOpacity
           activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 16 }}
           onPress={onTrailingTap}
-          style={styles.actionBtn}>
+          style={styles.trailingBtn}>
           <CloseIcon size={20} color={theme.textPrimary} />
         </TouchableOpacity>
       ) : (
         <View style={styles.trailingGroup}>
-          {showShare && onShare ? (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={onShare}
-              style={[
-                styles.shareBtn,
-                {
-                  borderColor: theme.border,
-                  backgroundColor: theme.cardBackground,
-                },
-              ]}>
-              <Text style={[styles.shareBtnText, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                Share
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-
           {onTrailingTap && (
             <TouchableOpacity
               activeOpacity={0.7}
@@ -132,8 +113,9 @@ export function ChatHeader({
           {onThemeTap && (
             <TouchableOpacity
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
               onPress={onThemeTap}
-              style={styles.actionBtn}>
+              style={styles.trailingBtn}>
               {isDark ? (
                 <SunIcon size={19} color={theme.textSecondary} />
               ) : (
@@ -153,20 +135,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
   },
   leftGroup: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
     marginRight: 8,
+  },
+  leadingBtn: {
+    width: 22,
+    height: 36,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   incognitoLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingLeft: 8,
   },
   incognitoTitle: {
     fontSize: 15,
@@ -174,31 +161,26 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   topBarTitle: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    maxWidth: 160,
   },
   actionBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shareBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginRight: 2,
-  },
-  shareBtnText: {
-    fontSize: 12.5,
-    fontWeight: '500',
+  trailingBtn: {
+    width: 22,
+    height: 32,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   trailingGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
   },
 });

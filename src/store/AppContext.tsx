@@ -5,6 +5,8 @@ import {
   AppRoute,
   AppSettings,
   Artifact,
+  BotConversation,
+  BotItem,
   ChatMessage,
   ChatModelType,
   CodeSession,
@@ -72,6 +74,17 @@ interface AppContextValue {
   connectRemoteSession: (sessionId: string, token: string) => void;
   disconnectRemoteSession: () => void;
   respondToTool: (approved: boolean) => void;
+  // Puku Bot state
+  botConversations: BotConversation[];
+  activeBotConversationId: string | null;
+  activeBotId: string;
+  availableBots: BotItem[];
+  selectBotConversation: (id: string) => void;
+  createBotConversation: (botId?: string, title?: string) => BotConversation;
+  deleteBotConversation: (id: string) => void;
+  renameBotConversation: (id: string, title: string) => void;
+  selectBot: (botId: string) => void;
+  addBotMessage: (convId: string, message: { role: 'user' | 'assistant'; text: string; toolCalls?: any[] }) => void;
   // Profile & Settings
   profile: UserProfile;
   settings: AppSettings;
@@ -79,6 +92,53 @@ interface AppContextValue {
   updateSettings: (updates: Partial<AppSettings>) => void;
   logout: () => void;
 }
+
+export const DEFAULT_AVAILABLE_BOTS: BotItem[] = [
+  { id: 'general-assistant', name: 'General Assistant', description: 'Autonomous agent' },
+  { id: 'coder-bot', name: 'Coder Bot', description: 'Code & debugging specialist' },
+  { id: 'computer-operator', name: 'Computer Operator', description: 'Screen & system operator' },
+];
+
+export const INITIAL_BOT_CONVERSATIONS: BotConversation[] = [
+  {
+    id: 'bot_conv_1',
+    botId: 'general-assistant',
+    title: 'Autonomous System Monitor',
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000).toISOString(),
+    messages: [
+      {
+        id: 'bm1',
+        role: 'user',
+        text: 'What are your computer control capabilities?',
+      },
+      {
+        id: 'bm2',
+        role: 'assistant',
+        text: 'I can run shell commands, interact with applications, automate web browsing, capture live screenshots, and perform tasks directly on your laptop or server environment! 🚀',
+      },
+    ],
+  },
+  {
+    id: 'bot_conv_2',
+    botId: 'coder-bot',
+    title: 'React Native & Bun API Setup',
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 86400000).toISOString(),
+    messages: [
+      {
+        id: 'bm3',
+        role: 'user',
+        text: 'How do I connect from mobile over local WiFi?',
+      },
+      {
+        id: 'bm4',
+        role: 'assistant',
+        text: "Start the Puku Bot server on your laptop (e.g. PORT 3001), find your laptop's local IP via `hostname -I` (like 192.168.0.108), and set the API Base URL in settings to `http://192.168.0.108:3001/api/v1`.",
+      },
+    ],
+  },
+];
 
 const initialProfile: UserProfile = {
   name: '',
@@ -135,6 +195,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const incognitoConversationIdRef = useRef<string | null>(null);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
+  const [botConversations, setBotConversations] = useState<BotConversation[]>(INITIAL_BOT_CONVERSATIONS);
+  const [activeBotConversationId, setActiveBotConversationId] = useState<string | null>(INITIAL_BOT_CONVERSATIONS[0]?.id || null);
+  const [activeBotId, setActiveBotId] = useState<string>('general-assistant');
+  const [availableBots, setAvailableBots] = useState<BotItem[]>(DEFAULT_AVAILABLE_BOTS);
   const logoutRef = useRef<() => void>(() => {});
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -158,6 +222,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           savedConvsStr,
           savedModelStr,
           savedProjectsStr,
+          savedBotConvsStr,
+          savedActiveBotConvId,
         ] = await Promise.all([
           AsyncStorage.getItem('@puku_auth_token'),
           AsyncStorage.getItem('@puku_user_profile'),
@@ -168,7 +234,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem('@puku_conversations'),
           AsyncStorage.getItem('@puku_selected_model'),
           AsyncStorage.getItem('@puku_projects'),
+          AsyncStorage.getItem('@pukubot_local_conversations'),
+          AsyncStorage.getItem('@pukubot_active_bot_conv'),
         ]);
+
+        if (savedBotConvsStr) {
+          try {
+            const parsed = JSON.parse(savedBotConvsStr);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setBotConversations(parsed);
+              if (savedActiveBotConvId && parsed.some(c => c.id === savedActiveBotConvId)) {
+                setActiveBotConversationId(savedActiveBotConvId);
+              } else {
+                setActiveBotConversationId(parsed[0].id);
+              }
+            }
+          } catch {}
+        }
 
         if (
           savedModelStr &&
@@ -1385,6 +1467,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
   logoutRef.current = logout;
 
+  useEffect(() => {
+    if (!isRestoringSession) {
+      AsyncStorage.setItem('@pukubot_local_conversations', JSON.stringify(botConversations)).catch(() => {});
+    }
+  }, [botConversations, isRestoringSession]);
+
+  useEffect(() => {
+    if (!isRestoringSession && activeBotConversationId) {
+      AsyncStorage.setItem('@pukubot_active_bot_conv', activeBotConversationId).catch(() => {});
+    }
+  }, [activeBotConversationId, isRestoringSession]);
+
+  const selectBotConversation = useCallback((id: string) => {
+    setActiveBotConversationId(id);
+    const found = botConversations.find(c => c.id === id);
+    if (found?.botId) {
+      setActiveBotId(found.botId);
+    }
+  }, [botConversations]);
+
+  const createBotConversation = useCallback((botId = activeBotId, title = 'New Bot Session') => {
+    const newConv: BotConversation = {
+      id: 'bot_conv_' + Date.now(),
+      botId,
+      title,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [],
+    };
+    setBotConversations(prev => [newConv, ...prev]);
+    setActiveBotConversationId(newConv.id);
+    return newConv;
+  }, [activeBotId]);
+
+  const deleteBotConversation = useCallback((id: string) => {
+    setBotConversations(prev => {
+      const filtered = prev.filter(c => c.id !== id);
+      if (activeBotConversationId === id) {
+        setActiveBotConversationId(filtered[0]?.id || null);
+      }
+      return filtered;
+    });
+  }, [activeBotConversationId]);
+
+  const renameBotConversation = useCallback((id: string, title: string) => {
+    setBotConversations(prev =>
+      prev.map(c => (c.id === id ? { ...c, title, updatedAt: new Date().toISOString() } : c))
+    );
+  }, []);
+
+  const selectBot = useCallback((botId: string) => {
+    setActiveBotId(botId);
+  }, []);
+
+  const addBotMessage = useCallback(
+    (convId: string, message: { role: 'user' | 'assistant'; text: string; toolCalls?: any[] }) => {
+      setBotConversations(prev => {
+        const target = prev.find(c => c.id === convId);
+        if (!target) return prev;
+        const newMsg = {
+          id: 'bm_' + Date.now() + Math.random().toString(36).substring(2, 6),
+          role: message.role,
+          text: message.text,
+          timestamp: 'Just now',
+          toolCalls: message.toolCalls,
+        };
+        let newTitle = target.title;
+        if (target.messages.length === 0 && message.role === 'user') {
+          newTitle = message.text.slice(0, 30) + (message.text.length > 30 ? '...' : '');
+        }
+        return prev.map(c =>
+          c.id === convId
+            ? {
+                ...c,
+                title: newTitle,
+                updatedAt: new Date().toISOString(),
+                messages: [...c.messages, newMsg],
+              }
+            : c
+        );
+      });
+    },
+    []
+  );
+
   return (
     <AppContext.Provider
       value={{
@@ -1434,6 +1601,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         connectRemoteSession,
         disconnectRemoteSession,
         respondToTool,
+        botConversations,
+        activeBotConversationId,
+        activeBotId,
+        availableBots,
+        selectBotConversation,
+        createBotConversation,
+        deleteBotConversation,
+        renameBotConversation,
+        selectBot,
+        addBotMessage,
         profile,
         settings,
         updateProfile,

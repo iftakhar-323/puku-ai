@@ -222,8 +222,6 @@ export function ChatScreen() {
         onTerminalTap={() => navigate('code')}
         onBotTap={() => navigate('pukuBot')}
         onThemeTap={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
-        showShare={!isIncognito && messages.length > 0}
-        onShare={handleShare}
       />
 
       {/* Main Body */}

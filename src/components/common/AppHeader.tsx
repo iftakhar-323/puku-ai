@@ -87,9 +87,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionBtn: {
-    width: 38,
+    width: 24,
     height: 38,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   title: {

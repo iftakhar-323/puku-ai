@@ -800,8 +800,8 @@ export function SunIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
 export function SidebarToggleIcon({ size = 20, color = '#FFFFFF' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x="3" y="4" width="18" height="16" rx="3" stroke={color} strokeWidth="1.8" />
-      <Path d="M9 4v16" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <Rect x="1" y="3" width="22" height="18" rx="3.5" stroke={color} strokeWidth="2" />
+      <Path d="M8.5 3v18" stroke={color} strokeWidth="2" strokeLinecap="round" />
     </Svg>
   );
 }

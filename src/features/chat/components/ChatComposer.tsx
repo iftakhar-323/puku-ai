@@ -156,8 +156,13 @@ export function ChatComposer({
                 setDropdownOpen(false);
                 onPlusTap();
               }}
-              style={styles.actionIconBtn}>
-              <PlusIcon size={18} color={theme.textPrimary} />
+              style={[
+                styles.plusBtn,
+                {
+                  borderColor: theme.border,
+                },
+              ]}>
+              <PlusIcon size={15} color={theme.textPrimary} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -283,7 +288,7 @@ const styles = StyleSheet.create({
     maxHeight: 140,
     fontSize: 15.5,
     lineHeight: 22,
-    paddingHorizontal: 2,
+    paddingHorizontal: 0,
     paddingTop: 0,
     paddingBottom: 8,
   },
@@ -298,6 +303,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  plusBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   rightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -310,8 +323,8 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   actionIconBtn: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -330,15 +343,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sendBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stopBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',

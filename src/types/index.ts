@@ -250,3 +250,25 @@ export interface PukuBotTurnEvent {
   code?: 'busy' | 'stopped' | 'too_many_steps' | 'timeout' | 'error';
   message?: string;
 }
+
+export interface BotConversation {
+  id: string;
+  botId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    text: string;
+    timestamp?: string;
+    toolCalls?: PukuBotToolCall[];
+  }>;
+}
+
+export interface BotItem {
+  id: string;
+  name: string;
+  description?: string;
+  avatar?: string;
+}

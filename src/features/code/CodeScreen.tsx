@@ -55,9 +55,10 @@ export function CodeScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
           onPress={() => setDrawerOpen(true)}
-          style={styles.actionBtn}>
-          <SidebarToggleIcon size={22} color={theme.textPrimary} />
+          style={styles.leadingBtn}>
+          <SidebarToggleIcon size={20} color={theme.textPrimary} />
         </TouchableOpacity>
 
         <View style={styles.trailingGroup}>
@@ -65,24 +66,25 @@ export function CodeScreen() {
             activeOpacity={0.7}
             onPress={() => navigate('chat')}
             style={styles.actionBtn}>
-            <TerminalPromptIcon size={20} color={theme.textPrimary} />
+            <TerminalPromptIcon size={19} color={theme.textPrimary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => navigate('pukuBot')}
             style={styles.actionBtn}>
-            <BotIcon size={20} color={theme.textPrimary} />
+            <BotIcon size={19} color={theme.textPrimary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
             onPress={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
-            style={styles.actionBtn}>
+            style={styles.trailingBtn}>
             {isDark ? (
-              <SunIcon size={20} color={theme.textPrimary} />
+              <SunIcon size={19} color={theme.textPrimary} />
             ) : (
-              <MoonIcon size={20} color={theme.textPrimary} />
+              <MoonIcon size={19} color={theme.textPrimary} />
             )}
           </TouchableOpacity>
         </View>
@@ -185,16 +187,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
-  actionBtn: {
-    width: 36,
+  leadingBtn: {
+    width: 22,
     height: 36,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  trailingBtn: {
+    width: 22,
+    height: 36,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   trailingGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   content: {
     paddingHorizontal: 16,
