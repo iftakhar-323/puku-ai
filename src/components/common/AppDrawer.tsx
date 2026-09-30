@@ -71,12 +71,10 @@ export function AppDrawer() {
   const [isBotDropdownOpen, setIsBotDropdownOpen] = useState(false);
   const [activeMenuBotConvId, setActiveMenuBotConvId] = useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [isFindModalOpen, setIsFindModalOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
   const [activeMenuConvId, setActiveMenuConvId] = useState<string | null>(null);
-
 
   React.useEffect(() => {
     if (isDrawerOpen && conversations.length === 0) {
@@ -86,11 +84,9 @@ export function AppDrawer() {
 
   if (!isDrawerOpen) return null;
 
-  // Filter conversations matching search
+  // Filter conversations for main drawer
   const filteredConversations = conversations.filter(c => {
-    if (!c.title || c.id.startsWith('incog_')) return false;
-    if (!searchQuery.trim()) return true;
-    return c.title.toLowerCase().includes(searchQuery.toLowerCase());
+    return Boolean(c.title && !c.id.startsWith('incog_'));
   });
 
   const searchedConversations = conversations.filter(c => {
@@ -231,7 +227,7 @@ export function AppDrawer() {
                   onPress={() => setIsBotDropdownOpen(prev => !prev)}
                   style={[styles.allProjectsBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
                   <BotIcon size={16} color={isDark ? '#35D6B4' : theme.textPrimary} />
-                  <Text numberOfLines={1} style={[styles.allProjectsText, { color: theme.textPrimary, flex: 1 }]}>
+                  <Text numberOfLines={1} style={[styles.allProjectsText, { color: theme.textPrimary }]}>
                     {currentBot.name}
                   </Text>
                   <ChevronDownIcon size={12} color={theme.textMuted} />
@@ -265,14 +261,19 @@ export function AppDrawer() {
                         {isSelected ? (
                           <CheckmarkIcon size={14} color={isDark ? '#35D6B4' : theme.textPrimary} />
                         ) : (
-                          <View style={{ width: 14 }} />
+                          <View style={styles.dropdownCheckPlaceholder} />
                         )}
-                        <View style={{ marginLeft: 8, flex: 1 }}>
-                          <Text style={[styles.dropdownItemText, { color: theme.textPrimary, fontWeight: isSelected ? '600' : '400' }]}>
+                        <View style={styles.dropdownItemContent}>
+                          <Text
+                            style={[
+                              styles.dropdownItemText,
+                              { color: theme.textPrimary },
+                              isSelected ? styles.weight600 : styles.weight400,
+                            ]}>
                             {b.name}
                           </Text>
                           {b.description ? (
-                            <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
+                            <Text style={[styles.dropdownItemDesc, { color: theme.textMuted }]}>
                               {b.description}
                             </Text>
                           ) : null}
@@ -329,8 +330,8 @@ export function AppDrawer() {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled">
                 {filteredBotConversations.length === 0 ? (
-                  <View style={{ paddingVertical: 32, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 13, color: theme.textMuted, textAlign: 'center', lineHeight: 20 }}>
+                  <View style={styles.botEmptyWrap}>
+                    <Text style={[styles.botEmptyText, { color: theme.textMuted }]}>
                       {botSearchQuery ? 'No matching bot chats' : 'No bot chats yet.\nTap + above to start a session.'}
                     </Text>
                   </View>
@@ -348,17 +349,15 @@ export function AppDrawer() {
                           }}
                           style={[
                             styles.convItem,
-                            isActive && { backgroundColor: theme.pillBackground, borderRadius: 8 },
+                            isActive && { backgroundColor: theme.pillBackground },
                           ]}>
                           <BotIcon size={15} color={isActive ? (isDark ? '#35D6B4' : theme.textPrimary) : theme.textSecondary} />
                           <Text
                             numberOfLines={1}
                             style={[
                               styles.convTitle,
-                              {
-                                color: theme.textPrimary,
-                                fontWeight: isActive ? '600' : '400',
-                              },
+                              { color: theme.textPrimary },
+                              isActive ? styles.weight600 : styles.weight400,
                             ]}>
                             {conv.title || 'Bot Session'}
                           </Text>
@@ -397,7 +396,7 @@ export function AppDrawer() {
                               onPress={() => handleDeleteBot(conv.id)}
                               style={styles.contextMenuItem}>
                               <TrashIcon size={14} color="#FF6B6B" />
-                              <Text style={[styles.contextMenuText, { color: '#FF6B6B' }]}>
+                              <Text style={[styles.contextMenuText, styles.deleteText]}>
                                 Delete
                               </Text>
                             </TouchableOpacity>
@@ -429,7 +428,7 @@ export function AppDrawer() {
                   ]}>
                   <View style={styles.switchHubLeft}>
                     <PukuLogoIcon size={18} />
-                    <View style={{ marginLeft: 10 }}>
+                    <View style={styles.switchHubTextWrap}>
                       <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
                         Switch to Puku AI
                       </Text>
@@ -583,17 +582,15 @@ export function AppDrawer() {
                     }}
                     style={[
                       styles.convItem,
-                      isActive && { backgroundColor: theme.pillBackground, borderRadius: 8 },
+                      isActive && { backgroundColor: theme.pillBackground },
                     ]}>
                     <ChatBubbleOutlineIcon size={15} color={isActive ? theme.textPrimary : theme.textSecondary} />
                     <Text
                       numberOfLines={1}
                       style={[
                         styles.convTitle,
-                        {
-                          color: theme.textPrimary,
-                          fontWeight: isActive ? '600' : '400',
-                        },
+                        { color: theme.textPrimary },
+                        isActive ? styles.weight600 : styles.weight400,
                       ]}>
                       {conv.title || 'Untitled conversation'}
                     </Text>
@@ -665,7 +662,7 @@ export function AppDrawer() {
                         onPress={() => handleDelete(conv.id)}
                         style={styles.contextMenuItem}>
                         <TrashIcon size={14} color="#FF6B6B" />
-                        <Text style={[styles.contextMenuText, { color: '#FF6B6B' }]}>
+                        <Text style={[styles.contextMenuText, styles.deleteText]}>
                           Delete
                         </Text>
                       </TouchableOpacity>
@@ -696,7 +693,7 @@ export function AppDrawer() {
               ]}>
               <View style={styles.switchHubLeft}>
                 <BotIcon size={18} color={isDark ? '#35D6B4' : theme.textPrimary} />
-                <View style={{ marginLeft: 10 }}>
+                <View style={styles.switchHubTextWrap}>
                   <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
                     Switch to Puku Bot
                   </Text>
@@ -781,12 +778,12 @@ export function AppDrawer() {
 
       {/* 1:1 Find a conversation overlay matching media_1790585790051.png */}
       {isFindModalOpen && (
-        <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
+        <View style={styles.findModalOverlay}>
           <View
             style={[
               styles.findModalBackdrop,
               Platform.OS === 'android' && keyboardHeight > 0
-                ? { paddingBottom: keyboardHeight + 20, justifyContent: 'flex-end' }
+                ? [styles.androidKeyboardOffset, { paddingBottom: keyboardHeight + 20 }]
                 : null,
             ]}>
             <TouchableWithoutFeedback onPress={() => setIsFindModalOpen(false)}>
@@ -1254,5 +1251,53 @@ const styles = StyleSheet.create({
   findEmptyText: {
     fontFamily: monoFont,
     fontSize: 13,
+  },
+  dropdownCheckPlaceholder: {
+    width: 14,
+  },
+  dropdownItemContent: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  dropdownItemDesc: {
+    fontFamily: monoFont,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  botEmptyWrap: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  botEmptyText: {
+    fontFamily: monoFont,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  convItemActive: {
+    borderRadius: 8,
+  },
+  weight600: {
+    fontWeight: '600',
+  },
+  weight400: {
+    fontWeight: '400',
+  },
+  deleteText: {
+    color: '#FF6B6B',
+  },
+  switchHubTextWrap: {
+    marginLeft: 10,
+  },
+  findModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
+  },
+  androidKeyboardOffset: {
+    justifyContent: 'flex-end',
   },
 });

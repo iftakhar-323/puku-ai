@@ -198,7 +198,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [botConversations, setBotConversations] = useState<BotConversation[]>(INITIAL_BOT_CONVERSATIONS);
   const [activeBotConversationId, setActiveBotConversationId] = useState<string | null>(INITIAL_BOT_CONVERSATIONS[0]?.id || null);
   const [activeBotId, setActiveBotId] = useState<string>('general-assistant');
-  const [availableBots, setAvailableBots] = useState<BotItem[]>(DEFAULT_AVAILABLE_BOTS);
+  const [availableBots, _setAvailableBots] = useState<BotItem[]>(DEFAULT_AVAILABLE_BOTS);
   const logoutRef = useRef<() => void>(() => {});
   const wsRef = useRef<WebSocket | null>(null);
 

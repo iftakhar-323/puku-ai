@@ -267,6 +267,59 @@ export class PukuBotApiClient {
     this.notifyAuthChange();
   }
 
+  /**
+   * Tests connection to baseUrl and checks if single-user mode or valid session is active.
+   */
+  public async checkConnectionAndAuth(): Promise<{
+    reachable: boolean;
+    authenticated: boolean;
+    isSingleUser?: boolean;
+    user?: PukuBotUser | null;
+    error?: string;
+  }> {
+    await this.init();
+    try {
+      // 1. Try /me with current auth headers
+      const res = await fetch(`${this.baseUrl}/me`, {
+        headers: this.getAuthHeaders(),
+      });
+
+      if (res.ok) {
+        const userData = (await res.json().catch(() => null)) as PukuBotUser | null;
+        if (userData) {
+          this.user = userData;
+          await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+          const isSingle = !this.token;
+          if (isSingle) {
+            // Local Pukubot server in PUKUBOT_SINGLE_USER=true mode
+            this.token = 'single-user-dev-session';
+            await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+          }
+          this.notifyAuthChange();
+          return { reachable: true, authenticated: true, isSingleUser: isSingle, user: userData };
+        }
+      }
+
+      if (res.status === 401) {
+        return { reachable: true, authenticated: false };
+      }
+
+      // 2. Check /openapi.json as fallback reachability probe
+      const openApiRes = await fetch(`${this.baseUrl}/openapi.json`).catch(() => null);
+      if (openApiRes && openApiRes.ok) {
+        return { reachable: true, authenticated: false };
+      }
+
+      return { reachable: false, authenticated: false, error: `HTTP ${res.status}` };
+    } catch (err: any) {
+      return {
+        reachable: false,
+        authenticated: false,
+        error: err.message || 'Cannot reach Puku Bot server',
+      };
+    }
+  }
+
   private getAuthHeaders(additional?: Record<string, string>): Record<string, string> {
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -399,6 +452,46 @@ export class PukuBotApiClient {
       method: 'PUT',
       headers: this.getAuthHeaders(),
     }).catch(() => {});
+  }
+
+  /**
+   * Uploads a file attachment to the specified conversation (/conversations/:id/attachments)
+   */
+  public async uploadAttachment(
+    conversationId: string,
+    fileData: { uri: string; name: string; type: string }
+  ): Promise<PukuBotAttachment> {
+    await this.init();
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileData.uri,
+      name: fileData.name,
+      type: fileData.type,
+    } as any);
+
+    const res = await fetch(
+      `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/attachments`,
+      {
+        method: 'POST',
+        headers: {
+          ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+        },
+        body: formData,
+      }
+    );
+
+    if (res.status === 401) {
+      await this.signOut();
+      throw new Error('Session expired.');
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to upload attachment.');
+    }
+
+    const data = await res.json();
+    return data.attachment;
   }
 
   // ══════════════════════════════════════════════════════════════════════════

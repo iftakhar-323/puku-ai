@@ -114,7 +114,7 @@ export function toBase64Url(bytes: Uint8Array): string {
     if (i + 1 < len) base64 += B64_CHARS.charAt(c3);
     if (i + 2 < len) base64 += B64_CHARS.charAt(c4);
   }
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]/g, '');
 }
 
 /**

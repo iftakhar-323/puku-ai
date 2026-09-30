@@ -157,6 +157,7 @@ export function PukuBotScreen() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [customApiUrl, setCustomApiUrl] = useState(pukuBotApi.getBaseUrl());
   const [isConnectingAuth, setIsConnectingAuth] = useState(false);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [showBotModal, setShowBotModal] = useState(false);
   const [expandedToolCallIds, setExpandedToolCallIds] = useState<Record<string, boolean>>({});
 
@@ -547,6 +548,96 @@ export function PukuBotScreen() {
     }
   };
 
+  const formatToolLabel = (tc: PukuBotToolCall): string => {
+    const args = tc.arguments || {};
+    switch (tc.name) {
+      case 'computer_navigate':
+        return `Opening ${args.url ? String(args.url).replace(/^https?:\/\//, '') : 'page'}`;
+      case 'computer_read':
+        return 'Reading page content';
+      case 'computer_snapshot':
+        return 'Looking at screen & elements';
+      case 'computer_click':
+        return 'Clicking element';
+      case 'computer_type':
+        return 'Typing input field';
+      case 'computer_key':
+        return `Pressing ${args.key || 'key'}`;
+      case 'computer_scroll':
+        return 'Scrolling page';
+      case 'computer_list_files':
+        return `Listing files${args.path ? ` in ${args.path}` : ''}`;
+      case 'computer_read_file':
+        return `Reading ${args.path || 'file'}`;
+      case 'computer_write_file':
+        return `Saving ${args.path || 'file'}`;
+      case 'computer_run_command': {
+        const cmd = String(args.command || '');
+        return `Running: ${cmd.length > 28 ? cmd.slice(0, 28) + '...' : cmd || 'command'}`;
+      }
+      case 'computer_request_help':
+        return 'Asking you to take control';
+      case 'computer_request_secret':
+        return `Asking you for ${args.label || 'secret'}`;
+      case 'desktop_describe':
+        return 'Inspecting desktop screen';
+      case 'desktop_click':
+        return `Clicking ${args.target || 'desktop'}`;
+      case 'desktop_type':
+        return 'Typing on desktop';
+      case 'desktop_key':
+        return `Pressing ${args.keys || 'keys'}`;
+      case 'desktop_open':
+        return `Opening ${args.app || 'app'}`;
+      default:
+        return tc.name.replace(/_/g, ' ');
+    }
+  };
+
+  // Test server connectivity and auto-authenticate if in single-user mode
+  const handleTestAndConnect = async () => {
+    setIsTestingConnection(true);
+    try {
+      await pukuBotApi.setBaseUrl(customApiUrl);
+      const res = await pukuBotApi.checkConnectionAndAuth();
+
+      if (!res.reachable) {
+        Alert.alert(
+          'Connection Failed',
+          `Cannot reach Puku Bot server at:\n${customApiUrl}\n\nMake sure your laptop server is running (e.g. docker run on port 3001) and your phone and laptop are on the same WiFi network.`
+        );
+        return;
+      }
+
+      if (res.authenticated) {
+        setIsAuthenticated(true);
+        setBotUser(res.user || null);
+        const bots = await pukuBotApi.getBots().catch(() => []);
+        if (bots.length > 0) {
+          setAvailableBots(bots);
+          setSelectedBotId(bots[0].id);
+          await loadActiveConversation(bots[0].id);
+        }
+        setShowSettingsModal(false);
+        Alert.alert(
+          'Connected! 🚀',
+          res.isSingleUser
+            ? `Connected to local Puku Bot server (${res.user?.email || 'admin'}) with live autonomous capabilities!`
+            : 'Connected to Puku Bot server successfully!'
+        );
+      } else {
+        Alert.alert(
+          'Server Online! 🟢',
+          'Puku Bot server is reachable.\n\nPlease tap "Sign In with Puku Bot" below to authorize access with your Puku account.'
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Connection Error', err.message || 'Error testing server');
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
   // Start PKCE Sign-In
   const handleConnectAuth = async () => {
     setIsConnectingAuth(true);
@@ -850,7 +941,7 @@ export function PukuBotScreen() {
                                       fontFamily: monoFont,
                                     },
                                   ]}>
-                                  {tc.name}
+                                  {formatToolLabel(tc)}
                                 </Text>
                                 {hasDetails && (
                                   <ChevronDownIcon size={10} color={isDark ? '#94C7A0' : '#2D7543'} />
@@ -1168,10 +1259,32 @@ export function PukuBotScreen() {
                   onPress={() => setCustomApiUrl(ENV.PUKU_BOT_LOCAL_BASE_URL)}
                   style={[styles.quickEnvPill, { borderColor: theme.border }]}>
                   <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                    Local (3001)
+                    Laptop (WiFi)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setCustomApiUrl(ENV.PUKU_BOT_EMULATOR_BASE_URL)}
+                  style={[styles.quickEnvPill, { borderColor: theme.border }]}>
+                  <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
+                    Emulator
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Test & Connect Button */}
+              <TouchableOpacity
+                disabled={isTestingConnection}
+                onPress={handleTestAndConnect}
+                style={[styles.testConnectBtn, { borderColor: isDark ? '#35D6B4' : '#1A1D18' }]}>
+                {isTestingConnection ? (
+                  <ActivityIndicator size="small" color={isDark ? '#35D6B4' : '#1A1D18'} />
+                ) : (
+                  <Text style={[styles.testConnectBtnText, { color: isDark ? '#35D6B4' : '#1A1D18', fontFamily: monoFont }]}>
+                    Test & Connect
+                  </Text>
+                )}
+              </TouchableOpacity>
 
               {/* Account Status */}
               <View style={[styles.accountBox, { borderColor: theme.border }]}>
@@ -1709,6 +1822,18 @@ const styles = StyleSheet.create({
   },
   quickEnvText: {
     fontSize: 11,
+  },
+  testConnectBtn: {
+    height: 38,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  testConnectBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   accountBox: {
     padding: 12,

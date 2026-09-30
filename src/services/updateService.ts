@@ -9,7 +9,7 @@ function getUpdatesModule() {
     if (mod && (mod.checkForUpdateAsync || mod.reloadAsync)) {
       return mod;
     }
-  } catch (e) {
+  } catch {
     // expo-updates native module not active or unavailable
   }
   return null;
