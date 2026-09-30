@@ -42,6 +42,7 @@ test('renders ChatScreen', async () => {
 });
 
 import { AppDrawer } from '../src/components/common/AppDrawer';
+import { PukuBotScreen } from '../src/features/puku_bot/PukuBotScreen';
 
 test('renders AppDrawer', async () => {
   await ReactTestRenderer.act(() => {
@@ -49,6 +50,18 @@ test('renders AppDrawer', async () => {
       <SafeAreaProvider>
         <AppProvider>
           <AppDrawer />
+        </AppProvider>
+      </SafeAreaProvider>
+    );
+  });
+});
+
+test('renders PukuBotScreen', async () => {
+  await ReactTestRenderer.act(() => {
+    ReactTestRenderer.create(
+      <SafeAreaProvider>
+        <AppProvider>
+          <PukuBotScreen />
         </AppProvider>
       </SafeAreaProvider>
     );
