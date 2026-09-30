@@ -5,6 +5,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -56,6 +57,7 @@ export function ChatScreen() {
     setDrawerOpen,
     navigate,
     incognitoMessages,
+    profile,
   } = useApp();
   const { show } = useToast();
 
@@ -173,6 +175,21 @@ export function ChatScreen() {
     }
   };
 
+  const handleShare = async () => {
+    if (!activeConversation) return;
+    const conversationSummary = messages
+      .map(m => `${m.role === 'user' ? 'User' : 'Puku'}: ${m.content}`)
+      .join('\n\n');
+    try {
+      await Share.share({
+        title: activeConversation.title || 'Puku Chat',
+        message: conversationSummary,
+      });
+    } catch {
+      show({ title: 'Failed to share', variant: 'destructive' });
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -193,12 +210,20 @@ export function ChatScreen() {
         theme={theme}
         isDark={isDark}
         isIncognitoMode={isIncognito}
-        title={isIncognito ? 'Incognito' : null}
+        title={
+          isIncognito
+            ? null
+            : activeConversation?.title && activeConversation.title !== 'New chat'
+            ? activeConversation.title
+            : null
+        }
         onLeadingTap={() => setDrawerOpen(true)}
         onTrailingTap={() => setIncognito(!isIncognito)}
         onTerminalTap={() => navigate('code')}
         onBotTap={() => navigate('pukuBot')}
         onThemeTap={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
+        showShare={!isIncognito && messages.length > 0}
+        onShare={handleShare}
       />
 
       {/* Main Body */}
@@ -219,6 +244,7 @@ export function ChatScreen() {
           <ChatEmptyState
             theme={theme}
             conversations={conversations}
+            userName={profile?.name}
             onSelectConversation={id => selectConversation(id)}
             onPromptTap={prompt => {
               sendMessage(prompt);

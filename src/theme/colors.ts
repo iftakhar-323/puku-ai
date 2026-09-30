@@ -7,38 +7,40 @@ export const AppColors = {
   black: '#000000',
   white: '#FFFFFF',
 
-  // Official @puku design tokens (ds.puku.sh)
-  pukuAccent: '#b0b3fc',
-  pukuAccentInk: '#242449',
-  pukuMain: '#151614',
-  pukuSidebar: '#10110f',
-  pukuPanel: '#1c1d1a',
-  pukuBorder: '#34362e',
-  pukuText: '#eeeee5',
-  pukuMuted: '#9da193',
-  pukuDanger: '#ff9198',
-  pukuSuccess: '#94c7a0',
+  // Official @puku design tokens (matching /puku-web-chat CSS tokens)
+  pukuAccent: '#d699ff',
+  pukuAccentInk: '#201c59',
+  pukuMain: '#100d1d',
+  pukuSidebar: '#100d1d',
+  pukuPanel: '#151125',
+  pukuBorder: 'rgba(255, 255, 255, 0.08)',
+  pukuText: '#ffffff',
+  pukuMuted: 'rgba(255, 255, 255, 0.65)',
+  pukuDanger: '#c73738',
+  pukuSuccess: '#17aa58',
   pukuWarning: '#e8b187',
+  pukuBrand: '#484fa3',
+  pukuBrandPurple: '#9941d7',
 
-  // Core App Tokens mapped to official Puku obsidian/charcoal black
-  primaryText: '#eeeee5',
-  secondaryText: '#9da193',
+  // Core App Tokens mapped to official Puku web theme
+  primaryText: '#ffffff',
+  secondaryText: 'rgba(255, 255, 255, 0.65)',
 
-  primary: '#242620',
-  secondary: '#10110f',
-  background: '#151614', // Official Puku main charcoal black
-  secondaryBackground: '#1c1d1a', // Official Puku panel
-  sidebarBackground: '#10110f', // Official Puku sidebar
-  iconBackground: '#242620',
-  outline: '#34362e', // Official Puku border
-  outlineVariant: 'rgba(52, 54, 46, 0.6)',
-  coolGrey: '#9da193',
+  primary: '#201c59',
+  secondary: '#100d1d',
+  background: '#100d1d', // matches --puku-chat-bg-web: #100d1d
+  secondaryBackground: '#151125', // matches --puku-chat-composer-bg: #151125
+  sidebarBackground: '#100d1d',
+  iconBackground: '#201c59',
+  outline: 'rgba(255, 255, 255, 0.08)',
+  outlineVariant: 'rgba(255, 255, 255, 0.14)',
+  coolGrey: 'rgba(255, 255, 255, 0.65)',
   pumpkin: '#e8b187',
-  accent: '#b0b3fc',
-  blue: '#2B7FFF',
-  blueLite: '#51A2FF',
+  accent: '#d699ff',
+  blue: '#484fa3',
+  blueLite: '#d699ff',
   paleSky: '#B8C4D0',
-  link: '#b0b3fc',
+  link: '#d699ff',
 } as const;
 
 export const colors = AppColors;

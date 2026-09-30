@@ -4,6 +4,7 @@ import {
   BackIcon,
   BotIcon,
   CloseIcon,
+  GhostIcon,
   MoonIcon,
   SidebarToggleIcon,
   SunIcon,
@@ -22,6 +23,8 @@ interface ChatHeaderProps {
   onTerminalTap?: () => void;
   onBotTap?: () => void;
   onThemeTap?: () => void;
+  onShare?: () => void;
+  showShare?: boolean;
 }
 
 export function ChatHeader({
@@ -35,71 +38,104 @@ export function ChatHeader({
   onTerminalTap,
   onBotTap,
   onThemeTap,
+  onShare,
+  showShare = false,
 }: ChatHeaderProps) {
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={onLeadingTap}
-        style={styles.actionBtn}>
-        {showsBackButton ? (
-          <BackIcon size={22} color={theme.textPrimary} />
-        ) : (
-          <SidebarToggleIcon size={22} color={theme.textPrimary} />
-        )}
-      </TouchableOpacity>
-
-      <View style={styles.titleContainer}>
-        {isIncognitoMode ? (
-          <Text style={[styles.title, { color: theme.textPrimary }]}>
-            {title || 'Incognito'}
+      {isIncognitoMode ? (
+        <View style={styles.incognitoLeftGroup}>
+          <GhostIcon size={20} color={theme.textPrimary} eyeColor={theme.background} />
+          <Text style={[styles.incognitoTitle, { color: theme.textPrimary }]}>
+            Incognito chat
           </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.trailingGroup}>
-        {isIncognitoMode ? (
+        </View>
+      ) : (
+        <View style={styles.leftGroup}>
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={onTrailingTap}
+            onPress={onLeadingTap}
             style={styles.actionBtn}>
-            <CloseIcon size={22} color={theme.textPrimary} />
+            {showsBackButton ? (
+              <BackIcon size={20} color={theme.textPrimary} />
+            ) : (
+              <SidebarToggleIcon size={20} color={theme.textPrimary} />
+            )}
           </TouchableOpacity>
-        ) : (
-          <>
-            {onTerminalTap && (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={onTerminalTap}
-                style={styles.actionBtn}>
-                <TerminalPromptIcon size={20} color={theme.textPrimary} />
-              </TouchableOpacity>
-            )}
 
-            {onBotTap && (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={onBotTap}
-                style={styles.actionBtn}>
-                <BotIcon size={20} color={theme.textPrimary} />
-              </TouchableOpacity>
-            )}
+          {title ? (
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.topBarTitle, { color: theme.textSecondary }]}>
+              {title}
+            </Text>
+          ) : null}
+        </View>
+      )}
 
-            {onThemeTap && (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={onThemeTap}
-                style={styles.actionBtn}>
-                {isDark ? (
-                  <SunIcon size={20} color={theme.textPrimary} />
-                ) : (
-                  <MoonIcon size={20} color={theme.textPrimary} />
-                )}
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-      </View>
+      {isIncognitoMode ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onTrailingTap}
+          style={styles.actionBtn}>
+          <CloseIcon size={20} color={theme.textPrimary} />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.trailingGroup}>
+          {showShare && onShare ? (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onShare}
+              style={[
+                styles.shareBtn,
+                {
+                  borderColor: theme.border,
+                  backgroundColor: theme.cardBackground,
+                },
+              ]}>
+              <Text style={[styles.shareBtnText, { color: theme.textPrimary }]}>Share</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {onTrailingTap && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onTrailingTap}
+              style={styles.actionBtn}>
+              <GhostIcon size={19} color={theme.textMuted} eyeColor={theme.background} />
+            </TouchableOpacity>
+          )}
+
+          {onTerminalTap && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onTerminalTap}
+              style={styles.actionBtn}>
+              <TerminalPromptIcon size={19} color={theme.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {onBotTap && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onBotTap}
+              style={styles.actionBtn}>
+              <BotIcon size={19} color={theme.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {onThemeTap && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onThemeTap}
+              style={styles.actionBtn}>
+              {isDark ? (
+                <SunIcon size={19} color={theme.textMuted} />
+              ) : (
+                <MoonIcon size={19} color={theme.textMuted} />
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -112,6 +148,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
+  leftGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginRight: 8,
+  },
+  incognitoLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  incognitoTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  topBarTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    maxWidth: 160,
+  },
   actionBtn: {
     width: 36,
     height: 36,
@@ -119,18 +177,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  shareBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginRight: 2,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
+  shareBtnText: {
+    fontSize: 12.5,
+    fontWeight: '500',
   },
   trailingGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
 });

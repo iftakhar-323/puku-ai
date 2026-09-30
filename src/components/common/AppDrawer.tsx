@@ -57,7 +57,6 @@ export function AppDrawer() {
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
   const [activeMenuConvId, setActiveMenuConvId] = useState<string | null>(null);
 
-  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   React.useEffect(() => {
     if (isDrawerOpen && conversations.length === 0) {
@@ -143,11 +142,11 @@ export function AppDrawer() {
               paddingBottom: Math.max(insets.bottom, 14),
             },
           ]}>
-          {/* Header Row: Logo + 'puku' + Close (X) */}
+          {/* Header Row: Logo + 'Puku Chat' + Close (X) */}
           <View style={styles.drawerHeader}>
             <View style={styles.brandRow}>
               <PukuLogoIcon size={24} />
-              <Text style={[styles.brandText, { color: theme.textPrimary }]}>puku</Text>
+              <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku Chat</Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -164,7 +163,7 @@ export function AppDrawer() {
               onPress={() => setIsProjectsDropdownOpen(prev => !prev)}
               style={[styles.allProjectsBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
               <FolderSmallIcon size={16} color={theme.textPrimary} />
-              <Text style={[styles.allProjectsText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+              <Text style={[styles.allProjectsText, { color: theme.textPrimary }]}>
                 All projects
               </Text>
               <ChevronDownIcon size={12} color={theme.textMuted} />
@@ -189,7 +188,7 @@ export function AppDrawer() {
                 onPress={() => setIsProjectsDropdownOpen(false)}
                 style={styles.dropdownItemRow}>
                 <CheckmarkIcon size={14} color={theme.textPrimary} />
-                <Text style={[styles.dropdownItemText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                <Text style={[styles.dropdownItemText, { color: theme.textPrimary }]}>
                   All projects
                 </Text>
               </TouchableOpacity>
@@ -203,7 +202,7 @@ export function AppDrawer() {
                 }}
                 style={styles.dropdownItemRow}>
                 <PlusIcon size={14} color={theme.textPrimary} />
-                <Text style={[styles.dropdownItemText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                <Text style={[styles.dropdownItemText, { color: theme.textPrimary }]}>
                   New project
                 </Text>
               </TouchableOpacity>
@@ -220,7 +219,7 @@ export function AppDrawer() {
               }}
               style={[styles.searchBox, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
               <SearchIcon size={16} color={theme.textMuted} />
-              <Text style={[styles.searchInputPlaceholder, { color: theme.placeholderText, fontFamily: monoFont }]}>
+              <Text style={[styles.searchInputPlaceholder, { color: theme.placeholderText }]}>
                 Search
               </Text>
             </TouchableOpacity>
@@ -239,7 +238,7 @@ export function AppDrawer() {
 
           {/* Recent Section Header */}
           <View style={styles.recentSectionHeader}>
-            <Text style={[styles.recentHeaderText, { color: theme.textMuted, fontFamily: monoFont }]}>
+            <Text style={[styles.recentHeaderText, { color: theme.textMuted }]}>
               Recent
             </Text>
             <TouchableOpacity activeOpacity={0.7}>
@@ -274,7 +273,7 @@ export function AppDrawer() {
                         styles.convTitle,
                         {
                           color: isActive ? theme.textPrimary : theme.textSecondary,
-                          fontFamily: monoFont,
+                          fontWeight: isActive ? '600' : '400',
                         },
                       ]}>
                       {conv.title || 'Untitled conversation'}
@@ -290,7 +289,7 @@ export function AppDrawer() {
                     </TouchableOpacity>
                   </TouchableOpacity>
 
-                  {/* Context Menu Popup (Screenshot 2) */}
+                  {/* Context Menu Popup */}
                   {activeMenuConvId === conv.id && (
                     <View
                       style={[
@@ -302,7 +301,7 @@ export function AppDrawer() {
                         onPress={() => handleRename(conv.id, conv.title)}
                         style={styles.contextMenuItem}>
                         <PencilIcon size={14} color={theme.textPrimary} />
-                        <Text style={[styles.contextMenuText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                        <Text style={[styles.contextMenuText, { color: theme.textPrimary }]}>
                           Rename
                         </Text>
                       </TouchableOpacity>
@@ -312,7 +311,7 @@ export function AppDrawer() {
                         onPress={() => setActiveMenuConvId(null)}
                         style={styles.contextMenuItem}>
                         <PinIcon size={14} color={theme.textPrimary} />
-                        <Text style={[styles.contextMenuText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                        <Text style={[styles.contextMenuText, { color: theme.textPrimary }]}>
                           Pin
                         </Text>
                       </TouchableOpacity>
@@ -325,7 +324,7 @@ export function AppDrawer() {
                         }}
                         style={styles.contextMenuItem}>
                         <FolderSmallIcon size={14} color={theme.textPrimary} />
-                        <Text style={[styles.contextMenuText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                        <Text style={[styles.contextMenuText, { color: theme.textPrimary }]}>
                           Move to project
                         </Text>
                       </TouchableOpacity>
@@ -335,7 +334,7 @@ export function AppDrawer() {
                         onPress={() => setActiveMenuConvId(null)}
                         style={styles.contextMenuItem}>
                         <ArchiveBoxIcon size={14} color={theme.textPrimary} />
-                        <Text style={[styles.contextMenuText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                        <Text style={[styles.contextMenuText, { color: theme.textPrimary }]}>
                           Archive
                         </Text>
                       </TouchableOpacity>
@@ -347,7 +346,7 @@ export function AppDrawer() {
                         onPress={() => handleDelete(conv.id)}
                         style={styles.contextMenuItem}>
                         <TrashIcon size={14} color="#FF6B6B" />
-                        <Text style={[styles.contextMenuText, { color: '#FF6B6B', fontFamily: monoFont }]}>
+                        <Text style={[styles.contextMenuText, { color: '#FF6B6B' }]}>
                           Delete
                         </Text>
                       </TouchableOpacity>
@@ -372,7 +371,7 @@ export function AppDrawer() {
                 }}
                 style={styles.customizeBtn}>
                 <SlidersIcon size={16} color={theme.textPrimary} />
-                <Text style={[styles.customizeText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                <Text style={[styles.customizeText, { color: theme.textPrimary }]}>
                   Customize
                 </Text>
               </TouchableOpacity>
@@ -400,7 +399,7 @@ export function AppDrawer() {
                   {displayName.substring(0, 2).toUpperCase()}
                 </Text>
               </View>
-              <Text style={[styles.userNameText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+              <Text style={[styles.userNameText, { color: theme.textPrimary }]}>
                 {displayName}
               </Text>
             </TouchableOpacity>
@@ -420,7 +419,7 @@ export function AppDrawer() {
                     borderColor: theme.border,
                   },
                 ]}>
-                <Text style={[styles.powerBtnText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                <Text style={[styles.powerBtnText, { color: theme.textPrimary }]}>
                   Power
                 </Text>
               </TouchableOpacity>
@@ -459,7 +458,7 @@ export function AppDrawer() {
                 <Text
                   style={[
                     styles.findModalTitle,
-                    { color: theme.textPrimary, fontFamily: monoFont },
+                    { color: theme.textPrimary },
                   ]}>
                   Find a conversation
                 </Text>
@@ -472,7 +471,7 @@ export function AppDrawer() {
                 </TouchableOpacity>
               </View>
 
-              {/* Indigo Outlined Search Input Box (highlighted in screenshot) */}
+              {/* Indigo Outlined Search Input Box */}
               <View
                 style={[
                   styles.findInputWrapper,
@@ -487,7 +486,7 @@ export function AppDrawer() {
                   autoFocus
                   style={[
                     styles.findInputField,
-                    { color: theme.textPrimary, fontFamily: monoFont },
+                    { color: theme.textPrimary },
                   ]}
                 />
               </View>
@@ -502,7 +501,7 @@ export function AppDrawer() {
                     <Text
                       style={[
                         styles.findEmptyText,
-                        { color: theme.textMuted, fontFamily: monoFont },
+                        { color: theme.textMuted },
                       ]}>
                       No thoughts found
                     </Text>
@@ -523,7 +522,7 @@ export function AppDrawer() {
                         numberOfLines={1}
                         style={[
                           styles.findItemText,
-                          { color: theme.textPrimary, fontFamily: monoFont },
+                          { color: theme.textPrimary },
                         ]}>
                         {conv.title}
                       </Text>
@@ -573,8 +572,8 @@ const styles = StyleSheet.create({
     paddingLeft: 2,
   },
   brandText: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     letterSpacing: -0.3,
   },
   closeBtn: {
@@ -759,7 +758,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#8B263E',
+    backgroundColor: '#3f3a86',
     alignItems: 'center',
     justifyContent: 'center',
   },

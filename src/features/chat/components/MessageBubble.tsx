@@ -181,10 +181,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   userBubble: {
-    maxWidth: '85%',
-    borderRadius: 16,
+    maxWidth: '82%',
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   userText: {
     fontSize: 15,
@@ -198,9 +199,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: 4,
     marginBottom: 4,
+    gap: 8,
   },
   assistantWrapper: {
-    marginVertical: 4,
+    marginVertical: 6,
     width: '100%',
   },
   assistantRow: {
@@ -211,20 +213,19 @@ const styles = StyleSheet.create({
   },
   assistantCard: {
     width: '100%',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 4,
   },
   assistantActionRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 6,
+    marginBottom: 6,
+    gap: 8,
   },
   actionBtn: {
-    padding: 5,
+    padding: 6,
     borderRadius: 6,
   },
 });

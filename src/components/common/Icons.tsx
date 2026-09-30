@@ -1095,12 +1095,109 @@ export function ConnectorsBranchIcon({ size = 20, color = '#ECEEEC' }: IconProps
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="6" cy="6" r="2.5" stroke={color} strokeWidth="1.8" />
-      <Circle cx="18" cy="18" r="2.5" stroke={color} strokeWidth="1.8" />
-      <Path d="M8.5 6h5a4 4 0 0 1 4 4v5.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
       <Circle cx="6" cy="18" r="2.5" stroke={color} strokeWidth="1.8" />
       <Path d="M8.5 18h2" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
     </Svg>
   );
 }
+
+/**
+ * Ghost Icon for Incognito Mode (matching puku-web-chat)
+ */
+export function GhostIcon({ size = 22, color = '#FFFFFF', eyeColor = '#100d1d' }: IconProps & { eyeColor?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3c-4.2 0-7 3-7 7.2V18l1.8-1.4L9 18l2.2-1.6L12 18l.8-1.6L15 18l2.2-1.4L19 18v-7.8C19 6 16.2 3 12 3z"
+        fill={color}
+        opacity={0.92}
+      />
+      <Circle cx="9.2" cy="10.5" r="1.15" fill={eyeColor} />
+      <Circle cx="14.8" cy="10.5" r="1.15" fill={eyeColor} />
+    </Svg>
+  );
+}
+
+/**
+ * Panel / Sidebar Toggle Icon (matching puku-web-chat PanelIcon)
+ */
+export function PanelIcon({ size = 20, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="4" width="18" height="16" rx="2" stroke={color} strokeWidth="1.6" />
+      <Path d="M9 4v16" stroke={color} strokeWidth="1.6" />
+    </Svg>
+  );
+}
+
+/**
+ * Write Suggestion Icon (matching puku-web-chat WriteIcon)
+ */
+export function WriteIcon({ size = 18, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 20h4l10-10-4-4L4 16v4z"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * Learn Suggestion Icon (matching puku-web-chat LearnIcon)
+ */
+export function LearnIcon({ size = 18, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3L2 8l10 5 10-5-10-5zM2 12l10 5 10-5M2 17l10 5 10-5"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * Life Stuff Suggestion Icon (matching puku-web-chat LifeIcon)
+ */
+export function LifeIcon({ size = 18, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M6 10h12v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-8z"
+        stroke={color}
+        strokeWidth="1.6"
+      />
+      <Path
+        d="M9 10V7a3 3 0 0 1 6 0v3"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * Sparkle Suggestion Icon (matching puku-web-chat SparkleIcon)
+ */
+export function SparkleIcon({ size = 18, color = '#ECEEEC' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5L12 2z"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 
 
