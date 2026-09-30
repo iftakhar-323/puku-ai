@@ -21,6 +21,18 @@ export const NativePicker = {
     }
     return null;
   },
+  uploadAttachment: async (
+    url: string,
+    filePath: string,
+    fileName: string,
+    mimeType: string,
+    token?: string
+  ): Promise<any> => {
+    if (PukuPicker && PukuPicker.uploadAttachment) {
+      return await PukuPicker.uploadAttachment(url, filePath, fileName, mimeType, token || null);
+    }
+    throw new Error('Native upload is not available');
+  },
 };
 
 export async function requestAudioPermission(): Promise<boolean> {

@@ -57,6 +57,7 @@ export function ChatScreen() {
     setIncognito,
     setDrawerOpen,
     navigate,
+    selectBotConversation,
     incognitoMessages,
     profile,
   } = useApp();
@@ -235,7 +236,10 @@ export function ChatScreen() {
         onLeadingTap={() => setDrawerOpen(true)}
         onTrailingTap={() => setIncognito(!isIncognito)}
         onTerminalTap={() => navigate('code')}
-        onBotTap={() => navigate('pukuBot')}
+        onBotTap={() => {
+          selectBotConversation(null as any);
+          navigate('pukuBot');
+        }}
         onThemeTap={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
       />
 

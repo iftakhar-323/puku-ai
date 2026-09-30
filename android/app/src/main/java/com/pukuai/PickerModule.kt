@@ -126,4 +126,100 @@ class PickerModule(private val reactContext: ReactApplicationContext) :
             promise.reject("PICKER_LAUNCH_ERROR", e.message, e)
         }
     }
+
+    @ReactMethod
+    fun uploadAttachment(
+        url: String,
+        filePath: String,
+        fileName: String,
+        mimeType: String,
+        token: String?,
+        promise: Promise
+    ) {
+        Thread {
+            var connection: java.net.HttpURLConnection? = null
+            try {
+                val cleanPath = if (filePath.startsWith("file://")) {
+                    Uri.parse(filePath).path ?: filePath.removePrefix("file://")
+                } else {
+                    filePath
+                }
+                val file = File(cleanPath)
+                if (!file.exists()) {
+                    promise.reject("FILE_NOT_FOUND", "File not found at $cleanPath")
+                    return@Thread
+                }
+
+                val boundary = "===" + System.currentTimeMillis() + "==="
+                val lineEnd = "\r\n"
+                val twoHyphens = "--"
+
+                val targetUrl = java.net.URL(url)
+                connection = (targetUrl.openConnection() as java.net.HttpURLConnection).apply {
+                    doInput = true
+                    doOutput = true
+                    useCaches = false
+                    requestMethod = "POST"
+                    setRequestProperty("Connection", "Keep-Alive")
+                    setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                    setRequestProperty("Accept", "application/json")
+                    if (!token.isNullOrEmpty()) {
+                        setRequestProperty("Authorization", "Bearer $token")
+                    }
+                }
+
+                val outputStream = java.io.DataOutputStream(connection.outputStream)
+
+                // Multipart Part for 'file'
+                outputStream.writeBytes(twoHyphens + boundary + lineEnd)
+                outputStream.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"$lineEnd")
+                val effectiveMime = if (mimeType.isNotEmpty()) mimeType else "application/octet-stream"
+                outputStream.writeBytes("Content-Type: $effectiveMime$lineEnd")
+                outputStream.writeBytes(lineEnd)
+
+                val fileInputStream = java.io.FileInputStream(file)
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (fileInputStream.read(buffer).also { bytesRead = it } != -1) {
+                    outputStream.write(buffer, 0, bytesRead)
+                }
+                fileInputStream.close()
+
+                outputStream.writeBytes(lineEnd)
+                outputStream.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd)
+                outputStream.flush()
+                outputStream.close()
+
+                val responseCode = connection.responseCode
+                val inputStream = if (responseCode in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream ?: connection.inputStream
+                }
+
+                val responseText = inputStream.bufferedReader().use { it.readText() }
+
+                if (responseCode !in 200..299) {
+                    promise.reject("UPLOAD_FAILED", "Server error ($responseCode): $responseText")
+                    return@Thread
+                }
+
+                val json = org.json.JSONObject(responseText)
+                val attJson = json.optJSONObject("attachment") ?: json
+
+                val result = Arguments.createMap().apply {
+                    putString("id", attJson.optString("id"))
+                    putString("name", attJson.optString("name", fileName))
+                    putString("r2Key", attJson.optString("r2Key"))
+                    putString("mime", attJson.optString("mime", effectiveMime))
+                    putInt("bytes", attJson.optInt("bytes", file.length().toInt()))
+                }
+                promise.resolve(result)
+            } catch (e: Exception) {
+                promise.reject("UPLOAD_ERROR", e.message, e)
+            } finally {
+                connection?.disconnect()
+            }
+        }.start()
+    }
 }

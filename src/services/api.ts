@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatModelType } from '../types';
 import { ENV } from '../config/env';
 import { tokenManager, TOKEN_KEYS } from './tokenManager';
+import { NativePicker } from './nativeModules';
 
 export const API_CONFIG = {
   chatApiUrl: ENV.API_BASE_URL,
@@ -374,23 +375,45 @@ export class PukuApiService {
     conversationId: string,
     file: { uri: string; name: string; type: string }
   ): Promise<any> {
-    const formData = new FormData();
-    formData.append('file', {
-      uri: file.uri,
-      name: file.name,
-      type: file.type || 'image/jpeg',
-    } as any);
-
     let token = await tokenManager.ensureValidToken();
     if (!token) {
       token = await this.initAuthToken();
     }
-    const headers: Record<string, string> = {};
+
+    const uploadUrl = `${this.baseUrl}/v1/chat/conversations/${conversationId}/attachments`;
+
+    // 1. Try NativePicker fast direct upload
+    try {
+      const nativeRes = await NativePicker.uploadAttachment(
+        uploadUrl,
+        file.uri,
+        file.name,
+        file.type || 'application/octet-stream',
+        token || undefined
+      );
+      if (nativeRes && (nativeRes.id || nativeRes.r2Key)) {
+        return nativeRes;
+      }
+    } catch (nativeErr) {
+      console.warn('[pukuApi] Native upload failed, falling back to fetch:', nativeErr);
+    }
+
+    // 2. Fallback to standard FormData + fetch
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+    } as any);
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseUrl}/v1/chat/conversations/${conversationId}/attachments`, {
+    const response = await fetch(uploadUrl, {
       method: 'POST',
       headers,
       body: formData,

@@ -1006,11 +1006,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     let targetConvId = activeConversationId;
+    let localTempId: string | null = null;
 
     if (!targetConvId) {
+      localTempId = 'conv_' + Date.now();
       const newConv: Conversation = {
-        id: 'conv_' + Date.now(),
-        title: effectiveText.length > 30 ? effectiveText.slice(0, 30) + '...' : effectiveText,
+        id: localTempId,
+        title: effectiveText.length > 30 ? effectiveText.slice(0, 30) + '...' : (effectiveText || attachment?.name || 'New chat'),
         activityDate: 'Just now',
         model: modelToUse,
         projectId: activeProjectId || undefined,
@@ -1018,7 +1020,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updatedAtTimestamp: Date.now(),
       };
       setConversations(prev => [newConv, ...prev]);
-      targetConvId = newConv.id;
+      targetConvId = localTempId;
       setActiveConversationId(targetConvId);
     } else {
       setConversations(prev =>
@@ -1045,7 +1047,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rafPending = false;
       setConversations(prev =>
         prev.map(c => {
-          if (c.id === targetConvId) {
+          if (c.id === targetConvId || (localTempId && c.id === localTempId)) {
             return {
               ...c,
               messages: c.messages.map(m =>
@@ -1068,22 +1070,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       let uploadedList: any[] = [];
-      if (attachment) {
-        let serverConvId: string | null = targetConvId;
-        if (!serverConvId || serverConvId.startsWith('conv_')) {
-          serverConvId = await pukuApi.createConversation(modelToUse, effectiveText.slice(0, 40) || attachment.name);
-          if (serverConvId) {
-            targetConvId = serverConvId;
-            setActiveConversationId(serverConvId);
-          }
-        }
+      let serverConvId: string | null = targetConvId;
+
+      if (!serverConvId || serverConvId.startsWith('conv_')) {
+        const titleToUse = effectiveText.trim().slice(0, 40) || attachment?.name || 'New chat';
+        serverConvId = await pukuApi.createConversation(modelToUse, titleToUse);
         if (serverConvId) {
-          try {
-            const uploaded = await pukuApi.uploadAttachment(serverConvId, attachment);
-            if (uploaded) uploadedList = [uploaded];
-          } catch (uploadErr) {
-            console.warn('Failed to upload attachment:', uploadErr);
+          const newId = serverConvId;
+          setConversations(prev =>
+            prev.map(c =>
+              c.id === targetConvId || (localTempId && c.id === localTempId)
+                ? { ...c, id: newId }
+                : c
+            )
+          );
+          targetConvId = newId;
+          setActiveConversationId(newId);
+        }
+      }
+
+      if (attachment && serverConvId && !serverConvId.startsWith('conv_')) {
+        try {
+          const uploaded = await pukuApi.uploadAttachment(serverConvId, attachment);
+          if (uploaded) {
+            uploadedList = [uploaded];
           }
+        } catch (uploadErr) {
+          console.warn('Failed to upload attachment:', uploadErr);
         }
       }
 
@@ -1098,14 +1111,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       accumulatedText = response.text;
       flushPersistent();
 
-      const serverConvId = response.conversationId;
-      if (targetConvId) {
+      const finalServerId = response.conversationId || serverConvId;
+      if (finalServerId) {
         setConversations(prev => {
           const updated = prev.map(c => {
-            if (c.id === targetConvId) {
+            if (c.id === targetConvId || (localTempId && c.id === localTempId)) {
               return {
                 ...c,
-                id: serverConvId || c.id,
+                id: finalServerId,
                 model: modelToUse,
                 activityDate: 'Just now',
                 updatedAtTimestamp: Date.now(),
@@ -1120,35 +1133,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return updated;
         });
 
-        if (serverConvId && serverConvId !== targetConvId) {
-          setActiveConversationId(serverConvId);
-        }
+        setActiveConversationId(finalServerId);
       }
     } catch (err: any) {
       const errorMsg =
         err?.message ||
         'Failed to get response from Puku AI. Please check your connection or sign in again.';
-      if (targetConvId) {
-        setConversations(prev =>
-          prev.map(c =>
-            c.id === targetConvId
-              ? {
-                  ...c,
-                  messages: c.messages.map(m =>
-                    m.id === aiMsgId
-                      ? {
-                          ...m,
-                          content: accumulatedText
-                            ? `${accumulatedText}\n\n[Error: ${errorMsg}]`
-                            : errorMsg,
-                        }
-                      : m
-                  ),
-                }
-              : c
-          )
-        );
-      }
+      setConversations(prev =>
+        prev.map(c =>
+          c.id === targetConvId || (localTempId && c.id === localTempId)
+            ? {
+                ...c,
+                messages: c.messages.map(m =>
+                  m.id === aiMsgId
+                    ? {
+                        ...m,
+                        content: accumulatedText
+                          ? `${accumulatedText}\n\n[Error: ${errorMsg}]`
+                          : errorMsg,
+                      }
+                    : m
+                ),
+              }
+            : c
+        )
+      );
     } finally {
       setIsGenerating(false);
     }

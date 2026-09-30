@@ -70,15 +70,6 @@ export function ChatHeader({
               puku ai
             </Text>
           </View>
-
-          {title ? (
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={[styles.topBarTitle, { color: theme.textMuted, fontFamily: monoFont }]}>
-              • {title}
-            </Text>
-          ) : null}
         </View>
       )}
 

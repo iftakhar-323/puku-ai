@@ -25,6 +25,7 @@ import {
   PukuBotUser,
 } from '../types';
 import { generatePkcePair, generateRandomString } from '../utils/auth';
+import { NativePicker } from './nativeModules';
 
 const STORAGE_KEYS = {
   BASE_URL: '@pukubot_base_url',
@@ -462,18 +463,39 @@ export class PukuBotApiClient {
     fileData: { uri: string; name: string; type: string }
   ): Promise<PukuBotAttachment> {
     await this.init();
+
+    const uploadUrl = `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/attachments`;
+
+    // 1. Try NativePicker fast direct upload
+    try {
+      const nativeRes = await NativePicker.uploadAttachment(
+        uploadUrl,
+        fileData.uri,
+        fileData.name,
+        fileData.type || 'application/octet-stream',
+        this.token || undefined
+      );
+      if (nativeRes && nativeRes.id) {
+        return nativeRes as PukuBotAttachment;
+      }
+    } catch (nativeErr) {
+      console.warn('[pukuBotApi] Native upload failed, falling back to fetch:', nativeErr);
+    }
+
+    // 2. Fallback to standard FormData + fetch
     const formData = new FormData();
     formData.append('file', {
       uri: fileData.uri,
       name: fileData.name,
-      type: fileData.type,
+      type: fileData.type || 'application/octet-stream',
     } as any);
 
     const res = await fetch(
-      `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/attachments`,
+      uploadUrl,
       {
         method: 'POST',
         headers: {
+          Accept: 'application/json',
           ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
         },
         body: formData,
