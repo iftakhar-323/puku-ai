@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   content: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 16,
   },
   mainTitle: {

@@ -1296,7 +1296,7 @@ const styles = StyleSheet.create({
   },
   emptyHeroContainer: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },

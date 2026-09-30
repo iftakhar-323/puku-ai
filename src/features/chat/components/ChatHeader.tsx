@@ -113,9 +113,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   actionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -131,6 +131,6 @@ const styles = StyleSheet.create({
   trailingGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
 });

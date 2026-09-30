@@ -563,13 +563,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
     paddingTop: 4,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    paddingLeft: 2,
   },
   brandText: {
     fontSize: 22,
@@ -577,8 +578,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
+    width: 38,
+    height: 38,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -590,12 +592,12 @@ const styles = StyleSheet.create({
   },
   allProjectsBtn: {
     flex: 1,
-    height: 40,
+    height: 38,
     borderWidth: 1,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     gap: 8,
   },
   allProjectsText: {
@@ -603,8 +605,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   squareIconBtn: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderWidth: 1,
     borderRadius: 8,
     alignItems: 'center',
@@ -639,7 +641,7 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     flex: 1,
-    height: 40,
+    height: 38,
     borderWidth: 1,
     borderRadius: 8,
     flexDirection: 'row',
@@ -656,8 +658,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingHorizontal: 4,
+    marginBottom: 8,
+    paddingHorizontal: 8,
   },
   recentHeaderText: {
     fontSize: 12,
@@ -727,7 +729,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
+    paddingHorizontal: 2,
   },
   customizeBtn: {
     flexDirection: 'row',
@@ -740,7 +743,7 @@ const styles = StyleSheet.create({
   rightActionIcons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
   },
   footerIconBtn: {
     padding: 2,
@@ -750,11 +753,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginBottom: 12,
+    paddingHorizontal: 2,
   },
   avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#8B263E',
     alignItems: 'center',
     justifyContent: 'center',
@@ -770,13 +774,14 @@ const styles = StyleSheet.create({
   powerMeterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    paddingHorizontal: 2,
   },
   powerBtn: {
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
   },
   powerBtnText: {
     fontSize: 12,
