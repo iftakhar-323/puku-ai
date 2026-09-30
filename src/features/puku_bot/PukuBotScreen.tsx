@@ -20,6 +20,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import {
   BotIcon,
   CheckmarkIcon,
+  ChevronDownIcon,
   CloseIcon,
   CopyIcon,
   EyeIcon,
@@ -27,6 +28,7 @@ import {
   LockIcon,
   MoonIcon,
   PencilIcon,
+  PlusIcon,
   RefreshIcon,
   SettingsIcon,
   SidebarToggleIcon,
@@ -35,6 +37,7 @@ import {
   UpArrowIcon,
 } from '../../components/common/Icons';
 import { ENV } from '../../config/env';
+import { MarkdownRenderer } from '../chat/components/MarkdownRenderer';
 import { NativeClipboard } from '../../services/nativeModules';
 import { pukuBotApi } from '../../services/pukuBotApi';
 import { useApp } from '../../store/AppContext';
@@ -128,11 +131,26 @@ export function PukuBotScreen() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [customApiUrl, setCustomApiUrl] = useState(pukuBotApi.getBaseUrl());
   const [isConnectingAuth, setIsConnectingAuth] = useState(false);
+  const [showBotModal, setShowBotModal] = useState(false);
+  const [expandedToolCallIds, setExpandedToolCallIds] = useState<Record<string, boolean>>({});
 
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
   const activeStreamAbortRef = useRef<(() => void) | null>(null);
   const { keyboardHeight } = useKeyboardHeight();
+
+  // Auto-refresh computer screenshot every 2.5 seconds while monitor modal is open
+  useEffect(() => {
+    let timer: any = null;
+    if (showComputerModal && isAuthenticated && selectedBotId) {
+      timer = setInterval(() => {
+        setScreenshotTimestamp(Date.now());
+      }, 2500);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showComputerModal, isAuthenticated, selectedBotId]);
 
   // Scroll to bottom on keyboard or new messages
   useEffect(() => {
@@ -224,6 +242,25 @@ export function PukuBotScreen() {
     } catch (err) {
       console.warn('[PukuBotScreen] Load conversation error:', err);
     }
+  };
+
+  const handleNewConversation = async () => {
+    if (!isAuthenticated || !selectedBotId) return;
+    try {
+      const newConv = await pukuBotApi.createConversation(selectedBotId);
+      setActiveConversation(newConv);
+      setMessages([]);
+      Alert.alert(
+        'New Session',
+        `Started fresh conversation with ${availableBots.find(b => b.id === selectedBotId)?.name || 'Bot'}.`
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to start new conversation');
+    }
+  };
+
+  const toggleToolCallExpanded = (id: string) => {
+    setExpandedToolCallIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleEditMessage = (text: string) => {
@@ -529,14 +566,30 @@ export function PukuBotScreen() {
           <Text style={[styles.screenTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
             puku bot
           </Text>
-          <View style={[styles.badge, { backgroundColor: isDark ? '#262925' : '#E4E5DB' }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            disabled={!isAuthenticated || availableBots.length <= 1}
+            onPress={() => setShowBotModal(true)}
+            style={[styles.badge, { backgroundColor: isDark ? '#262925' : '#E4E5DB', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
             <Text style={[styles.badgeText, { color: isDark ? '#35D6B4' : '#1A1D18', fontFamily: monoFont }]}>
-              {isAuthenticated ? (availableBots[0]?.name || 'LIVE') : 'AI'}
+              {isAuthenticated ? (availableBots.find(b => b.id === selectedBotId)?.name || 'LIVE') : 'AI'}
             </Text>
-          </View>
+            {isAuthenticated && availableBots.length > 1 && (
+              <ChevronDownIcon size={10} color={isDark ? '#35D6B4' : '#1A1D18'} />
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.trailingGroup}>
+          {isAuthenticated && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleNewConversation}
+              style={styles.actionBtn}>
+              <PlusIcon size={18} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
+
           {isAuthenticated && (
             <TouchableOpacity
               activeOpacity={0.7}
@@ -806,33 +859,73 @@ export function PukuBotScreen() {
                     {/* Tool execution indicators */}
                     {!isUser && item.toolCalls && item.toolCalls.length > 0 && (
                       <View style={styles.toolCallsContainer}>
-                        {item.toolCalls.map((tc: PukuBotToolCall) => (
-                          <View
-                            key={tc.id}
-                            style={[
-                              styles.toolCallPill,
-                              {
-                                backgroundColor: isDark ? '#1C271E' : '#E9F5EB',
-                                borderColor: isDark ? '#2D5E37' : '#BEE2C7',
-                              },
-                            ]}>
-                            {tc.status === 'pending' ? (
-                              <ActivityIndicator size="small" color={isDark ? '#94C7A0' : '#2D7543'} />
-                            ) : (
-                              <CheckmarkIcon size={14} color={isDark ? '#94C7A0' : '#2D7543'} />
-                            )}
-                            <Text
-                              style={[
-                                styles.toolCallText,
-                                {
-                                  color: isDark ? '#94C7A0' : '#2D7543',
-                                  fontFamily: monoFont,
-                                },
-                              ]}>
-                              {tc.name}
-                            </Text>
-                          </View>
-                        ))}
+                        {item.toolCalls.map((tc: PukuBotToolCall) => {
+                          const isExpanded = !!expandedToolCallIds[tc.id];
+                          const hasDetails = (tc.arguments && Object.keys(tc.arguments).length > 0) || tc.result !== undefined;
+                          return (
+                            <View key={tc.id} style={{ marginBottom: 4 }}>
+                              <TouchableOpacity
+                                activeOpacity={hasDetails ? 0.7 : 1}
+                                onPress={hasDetails ? () => toggleToolCallExpanded(tc.id) : undefined}
+                                style={[
+                                  styles.toolCallPill,
+                                  {
+                                    backgroundColor: isDark ? '#1C271E' : '#E9F5EB',
+                                    borderColor: isDark ? '#2D5E37' : '#BEE2C7',
+                                  },
+                                ]}>
+                                {tc.status === 'pending' ? (
+                                  <ActivityIndicator size="small" color={isDark ? '#94C7A0' : '#2D7543'} />
+                                ) : (
+                                  <CheckmarkIcon size={14} color={isDark ? '#94C7A0' : '#2D7543'} />
+                                )}
+                                <Text
+                                  style={[
+                                    styles.toolCallText,
+                                    {
+                                      color: isDark ? '#94C7A0' : '#2D7543',
+                                      fontFamily: monoFont,
+                                    },
+                                  ]}>
+                                  {tc.name}
+                                </Text>
+                                {hasDetails && (
+                                  <ChevronDownIcon size={10} color={isDark ? '#94C7A0' : '#2D7543'} />
+                                )}
+                              </TouchableOpacity>
+
+                              {isExpanded && (
+                                <View
+                                  style={[
+                                    styles.toolDetailsCard,
+                                    {
+                                      backgroundColor: isDark ? '#151D16' : '#F0F8F2',
+                                      borderColor: isDark ? '#2D5E37' : '#BEE2C7',
+                                    },
+                                  ]}>
+                                  {tc.arguments && Object.keys(tc.arguments).length > 0 && (
+                                    <Text
+                                      style={[
+                                        styles.toolDetailsText,
+                                        { color: theme.textSecondary, fontFamily: monoFont },
+                                      ]}>
+                                      {JSON.stringify(tc.arguments, null, 2)}
+                                    </Text>
+                                  )}
+                                  {tc.result !== undefined && (
+                                    <Text
+                                      style={[
+                                        styles.toolDetailsResultText,
+                                        { color: isDark ? '#35D6B4' : '#1A6B3D', fontFamily: monoFont },
+                                      ]}>
+                                      ➜ {typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result)}
+                                    </Text>
+                                  )}
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
 
@@ -845,13 +938,25 @@ export function PukuBotScreen() {
                           ? [styles.userBubble, { backgroundColor: isDark ? '#22251F' : '#E8E7DF' }]
                           : [styles.botBubble, { backgroundColor: theme.cardBackground, borderColor: theme.border }],
                       ]}>
-                      <Text
-                        style={[
-                          styles.messageText,
-                          { color: theme.textPrimary, fontFamily: monoFont },
-                        ]}>
-                        {item.text || (isStreaming ? 'Thinking...' : '')}
-                      </Text>
+                      {isUser ? (
+                        <Text
+                          style={[
+                            styles.messageText,
+                            { color: theme.textPrimary, fontFamily: monoFont },
+                          ]}>
+                          {item.text}
+                        </Text>
+                      ) : item.text ? (
+                        <MarkdownRenderer content={item.text} theme={theme} />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.messageText,
+                            { color: theme.textMuted, fontFamily: monoFont, fontStyle: 'italic' },
+                          ]}>
+                          Thinking...
+                        </Text>
+                      )}
                     </TouchableOpacity>
 
                     {isUser && (
@@ -1154,6 +1259,63 @@ export function PukuBotScreen() {
                   </View>
                 )}
               </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bot Switcher Modal */}
+      <Modal
+        visible={showBotModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBotModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                Select Bot
+              </Text>
+              <TouchableOpacity onPress={() => setShowBotModal(false)}>
+                <CloseIcon size={20} color={theme.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingVertical: 12, gap: 8 }}>
+              {availableBots.map(bot => {
+                const isSelected = bot.id === selectedBotId;
+                return (
+                  <TouchableOpacity
+                    key={bot.id}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedBotId(bot.id);
+                      loadActiveConversation(bot.id);
+                      setShowBotModal(false);
+                    }}
+                    style={[
+                      styles.botSelectRow,
+                      {
+                        backgroundColor: isSelected
+                          ? (isDark ? '#1C271E' : '#E0F3E5')
+                          : 'transparent',
+                        borderColor: isSelected ? '#94C7A0' : theme.border,
+                      },
+                    ]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.botSelectName, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                        {bot.name || bot.title}
+                      </Text>
+                      {bot.description ? (
+                        <Text style={[styles.botSelectDesc, { color: theme.textMuted, fontFamily: monoFont }]}>
+                          {bot.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {isSelected && <CheckmarkIcon size={16} color={isDark ? '#94C7A0' : '#2D7543'} />}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </View>
@@ -1628,5 +1790,37 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  toolDetailsCard: {
+    marginTop: 4,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  toolDetailsText: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  toolDetailsResultText: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 6,
+    fontWeight: '600',
+  },
+  botSelectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 10,
+  },
+  botSelectName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  botSelectDesc: {
+    fontSize: 11,
+    marginTop: 2,
   },
 });
