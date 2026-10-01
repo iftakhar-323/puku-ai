@@ -30,3 +30,22 @@ jest.mock('react-native-inappbrowser-reborn', () => ({
 }));
 
 
+
+jest.mock('expo-secure-store', () => {
+  let store = {};
+  return {
+    isAvailableAsync: jest.fn(() => Promise.resolve(true)),
+    getItemAsync: jest.fn(key => Promise.resolve(key in store ? store[key] : null)),
+    setItemAsync: jest.fn((key, value) => {
+      store[key] = value;
+      return Promise.resolve();
+    }),
+    deleteItemAsync: jest.fn(key => {
+      delete store[key];
+      return Promise.resolve();
+    }),
+    __reset: () => {
+      store = {};
+    },
+  };
+});

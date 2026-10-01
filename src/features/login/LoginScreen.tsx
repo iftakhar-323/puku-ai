@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { secureStorage } from '../../services/secureStorage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import {
@@ -257,9 +258,9 @@ export function LoginScreen() {
       }
 
       const storedVerifier =
-        overrideVerifier || authVerifier || (await AsyncStorage.getItem('@puku_oauth_verifier')) || '';
+        overrideVerifier || authVerifier || (await secureStorage.getItem('@puku_oauth_verifier')) || '';
       const storedState =
-        overrideState || authState || (await AsyncStorage.getItem('@puku_oauth_state')) || '';
+        overrideState || authState || (await secureStorage.getItem('@puku_oauth_state')) || '';
       const redirectUri = overrideRedirectUri || getOAuthRedirectUri();
 
       if (storedState && returnedState && storedState !== returnedState) {
@@ -368,6 +369,9 @@ export function LoginScreen() {
 
           await AsyncStorage.setItem('@puku_is_logged_in', 'true');
           await AsyncStorage.removeItem('@puku_is_logged_out');
+          // The PKCE verifier and state are single-use.
+          await secureStorage.removeItem('@puku_oauth_verifier');
+          await secureStorage.removeItem('@puku_oauth_state');
           setIsGoogleModalOpen(false);
           setIsOAuthWaiting(false);
           setIsOpeningWorkspace(true);
@@ -425,8 +429,8 @@ export function LoginScreen() {
       setAuthVerifier(verifier);
       setAuthState(stateVal);
 
-      await AsyncStorage.setItem('@puku_oauth_verifier', verifier);
-      await AsyncStorage.setItem('@puku_oauth_state', stateVal);
+      await secureStorage.setItem('@puku_oauth_verifier', verifier);
+      await secureStorage.setItem('@puku_oauth_state', stateVal);
 
       const authUrl =
         `${ENV.AUTH_BASE_URL}/api/oauth/authorize?response_type=code` +
