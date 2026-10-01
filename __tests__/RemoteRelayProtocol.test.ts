@@ -84,6 +84,86 @@ describe('connection lifecycle', () => {
     expect(effects).toEqual([]);
   });
 
+  test('worker_disconnected finalizes an in-flight streamed reply so a later turn cannot land on it', () => {
+    const streaming = run([
+      {
+        type: 'stream_event',
+        event: { type: 'content_block_start', content_block: { type: 'text' } },
+      },
+      delta('partial'),
+    ]);
+    expect(streaming.state.entries).toEqual([
+      expect.objectContaining({ text: 'partial', streaming: true }),
+    ]);
+
+    const dropped = run([{ type: 'worker_disconnected' }], streaming.state);
+    const assistantAfterDrop = dropped.state.entries.filter(
+      e => e.kind === 'assistant',
+    );
+    expect(assistantAfterDrop).toEqual([
+      expect.objectContaining({ text: 'partial', streaming: false }),
+    ]);
+
+    // Reconnect, then a fresh turn streams and finishes: its final text must
+    // land on its own new entry, not get matched onto the stale one above.
+    const reconnected = run([{ type: 'worker_connected' }], dropped.state);
+    const nextTurn = run(
+      [
+        {
+          type: 'stream_event',
+          event: {
+            type: 'content_block_start',
+            content_block: { type: 'text' },
+          },
+        },
+        delta('new reply'),
+        {
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'new reply' }] },
+        },
+      ],
+      reconnected.state,
+    );
+    const assistantAfterNextTurn = nextTurn.state.entries.filter(
+      e => e.kind === 'assistant',
+    );
+    expect(assistantAfterNextTurn).toEqual([
+      expect.objectContaining({ text: 'partial', streaming: false }),
+      expect.objectContaining({ text: 'new reply', streaming: false }),
+    ]);
+  });
+
+  test('reconnecting after a mid-turn drop tells the user the reply may be missing', () => {
+    const working = {
+      ...createInitialState(),
+      phase: 'attached' as const,
+      isWorking: true,
+    };
+    const dropped = run([{ type: 'worker_disconnected' }], working);
+    expect(dropped.state.turnInterrupted).toBe(true);
+
+    const reconnected = run([{ type: 'worker_connected' }], dropped.state);
+    const last = reconnected.state.entries[reconnected.state.entries.length - 1];
+    expect(last).toMatchObject({
+      kind: 'system',
+      text: expect.stringContaining('may not have come through'),
+    });
+    expect(reconnected.state.turnInterrupted).toBe(false);
+  });
+
+  test('reconnecting after an idle drop (no turn in flight) keeps the plain message', () => {
+    const attached = { ...createInitialState(), phase: 'attached' as const };
+    const dropped = run([{ type: 'worker_disconnected' }], attached);
+    expect(dropped.state.turnInterrupted).toBe(false);
+
+    const reconnected = run([{ type: 'worker_connected' }], dropped.state);
+    const last = reconnected.state.entries[reconnected.state.entries.length - 1];
+    expect(last).toMatchObject({
+      kind: 'system',
+      text: 'Reconnected to your laptop',
+    });
+  });
+
   test.each(['client_replaced', 'session_end'])(
     '%s closes the session',
     type => {

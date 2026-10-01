@@ -106,6 +106,8 @@ export interface RemoteSessionState {
   cwd?: string;
   /** Last control error to surface to the user (e.g. unknown model). */
   notice?: string;
+  /** A worker_disconnected hit mid-turn; cleared once we reconnect. */
+  turnInterrupted?: boolean;
   /** Monotonic counter for entry ids. */
   seq: number;
 }
@@ -444,23 +446,43 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
 
     case 'worker_connected': {
       const wasDetached = state.phase === 'open' && state.entries.length > 0;
-      const next = { ...state, phase: 'attached' as const };
-      return {
-        state: wasDetached
-          ? addSystem(next, 'Reconnected to your laptop')
-          : next,
-        effects: [],
+      const next: RemoteSessionState = {
+        ...state,
+        phase: 'attached' as const,
+        turnInterrupted: false,
       };
+      if (!wasDetached) return { state: next, effects: [] };
+      // A turn was in flight when the CLI dropped: the reply may never have
+      // reached us, so say so instead of silently looking idle.
+      const message = state.turnInterrupted
+        ? "Reconnected to your laptop. Puku's reply may not have come through — send your last message again if you don't see it."
+        : 'Reconnected to your laptop';
+      return { state: addSystem(next, message), effects: [] };
     }
 
-    case 'worker_disconnected':
+    case 'worker_disconnected': {
+      // Finalize any in-flight streamed reply: it won't be completed over
+      // this connection, and leaving it `streaming` would make a later
+      // turn's final text wrongly match onto this stale, already-shown entry
+      // instead of its own (the matcher pairs final blocks to the oldest
+      // still-streaming entry, in order).
+      const entries = state.entries.map(e =>
+        e.kind === 'assistant' && e.streaming ? { ...e, streaming: false } : e,
+      );
       return {
         state: addSystem(
-          { ...state, phase: 'open', isWorking: false },
+          {
+            ...state,
+            entries,
+            phase: 'open',
+            isWorking: false,
+            turnInterrupted: state.turnInterrupted || state.isWorking,
+          },
           'Laptop CLI disconnected. Waiting for it to come back…',
         ),
         effects: [],
       };
+    }
 
     case 'client_replaced':
       return {
