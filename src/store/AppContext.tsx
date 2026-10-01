@@ -1408,31 +1408,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       wsRef.current = null;
     }
 
+    let accountToken = '';
+    try {
+      accountToken =
+        (await tokenManager.ensureValidToken().catch(() => null)) ||
+        (await tokenManager.getAccessToken().catch(() => null)) ||
+        pukuApi.getAuthToken() ||
+        (await AsyncStorage.getItem('@puku_auth_token')) ||
+        '';
+    } catch {}
+
     let activeToken = (token || '').trim();
     if (!activeToken) {
       const match = activeRelaySessions.find(s => s.sessionId === sessionId);
       if (match?.mobileToken) {
         activeToken = match.mobileToken;
-      } else {
+      } else if (accountToken) {
         try {
-          const accessToken =
-            (await tokenManager.ensureValidToken().catch(() => null)) ||
-            (await tokenManager.getAccessToken().catch(() => null)) ||
-            pukuApi.getAuthToken() ||
-            (await AsyncStorage.getItem('@puku_auth_token'));
-
-          if (accessToken) {
-            const authRes = await fetch(`${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/auth`, {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'User-Agent': 'puku-ai-app/1.0',
-              },
-            });
-            if (authRes.ok) {
-              const authData = await authRes.json();
-              activeToken = authData.mobileToken || '';
-            }
+          const authRes = await fetch(`${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/auth`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accountToken}`,
+              'User-Agent': 'puku-ai-app/1.0',
+            },
+          });
+          if (authRes.ok) {
+            const authData = await authRes.json();
+            activeToken = authData.mobileToken || '';
           }
         } catch (err) {
           console.warn('[RemoteRelay] Error resolving token:', err);
@@ -1450,34 +1452,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const wsUrl = `${ENV.REMOTE_SESSION_RELAY_HOST.replace(/^http/, 'ws')}/client/${sessionId}?token=${activeToken}`;
-      // Provide mobile token and account token headers for relay authentication
+      // Crucial: X-Puku-Mobile-Token must be activeToken, X-Puku-Account-Token must be accountToken!
       const ws = new WebSocket(wsUrl, undefined, {
         headers: {
           'X-Puku-Mobile-Token': activeToken,
-          'X-Puku-Account-Token': activeToken,
+          'X-Puku-Account-Token': accountToken,
           'User-Agent': 'Mozilla/5.0 (Linux; Android 14) PukuMobile/1.0',
         },
       });
       wsRef.current = ws;
 
-      let fallbackTimer: any = setTimeout(() => {
-        setRemoteSession(prev => ({
-          ...prev,
-          status: 'connected',
-          progressStatus: 'ready',
-          logs: [
-            ...prev.logs,
-            `[System] Connected to laptop session (${sessionId.slice(0, 8)}...).`,
-            `[Terminal] Ready. Type your commands or prompts below to control your laptop.`,
-          ],
-        }));
-      }, 1500);
-
       ws.onopen = () => {
-        if (fallbackTimer) {
-          clearTimeout(fallbackTimer);
-          fallbackTimer = null;
-        }
         setRemoteSession(prev => ({
           ...prev,
           status: 'connected',
@@ -1485,6 +1470,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ...prev.logs,
             `[Connection] Live WebSocket connected to laptop CLI!`,
             `[Terminal] Type a prompt or bash command to run on your laptop.`,
+          ],
+        }));
+      };
+
+      ws.onerror = (err: any) => {
+        console.warn('[RemoteRelay] WebSocket error:', err);
+        setRemoteSession(prev => ({
+          ...prev,
+          status: 'disconnected',
+          logs: [
+            ...prev.logs,
+            `[Connection Error] Could not connect to laptop relay. Make sure your account token is valid.`,
+          ],
+        }));
+      };
+
+      ws.onclose = (e: any) => {
+        console.log('[RemoteRelay] WebSocket closed:', e.code, e.reason);
+        wsRef.current = null;
+        setRemoteSession(prev => ({
+          ...prev,
+          status: 'disconnected',
+          logs: [
+            ...prev.logs,
+            `[Connection Closed] Relay connection closed (${e.code || ''} ${e.reason || ''}). Tap Connect to retry.`,
           ],
         }));
       };
@@ -1588,14 +1598,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         } catch (err) {
           console.warn('[RemoteRelay] onmessage parse error:', err);
         }
-      };
-
-      ws.onerror = () => {
-        // Fallback handles gracefully
-      };
-
-      ws.onclose = () => {
-        wsRef.current = null;
       };
     } catch {
       // Fallback
