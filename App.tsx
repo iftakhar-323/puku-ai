@@ -24,12 +24,14 @@ import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { UsageScreen } from './src/features/settings/UsageScreen';
 import { TranscribeScreen } from './src/features/transcribe/TranscribeScreen';
 import { AppProvider, useApp } from './src/store/AppContext';
+import { RemoteSessionProvider, useRemoteSession } from './src/store/RemoteSessionContext';
 import { ToastProvider } from './src/components/ui/Toast';
 import { UpdateService } from './src/services/updateService';
 import { pukuBotApi } from './src/services/pukuBotApi';
 
 function MainNavigator(): React.JSX.Element {
-  const { activeRoute, isDark, isRestoringSession, navigate, connectRemoteSession } = useApp();
+  const { activeRoute, isDark, isRestoringSession, navigate } = useApp();
+  const { connect: connectRemoteSession } = useRemoteSession();
 
   useEffect(() => {
     try {
@@ -231,9 +233,11 @@ function App(): React.JSX.Element {
     <ErrorBoundary>
       <SafeAreaProvider>
         <AppProvider>
-          <ToastProvider>
-            <MainNavigator />
-          </ToastProvider>
+          <RemoteSessionProvider>
+            <ToastProvider>
+              <MainNavigator />
+            </ToastProvider>
+          </RemoteSessionProvider>
         </AppProvider>
       </SafeAreaProvider>
     </ErrorBoundary>

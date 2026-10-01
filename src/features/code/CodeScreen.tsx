@@ -18,6 +18,7 @@ import {
   SunIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
+import { useRelaySessionPolling, useRemoteSession } from '../../store/RemoteSessionContext';
 
 export function CodeScreen() {
   const insets = useSafeAreaInsets();
@@ -28,24 +29,19 @@ export function CodeScreen() {
     setDrawerOpen,
     navigate,
     profile,
+  } = useApp();
+  const {
     activeRelaySessions,
     isLoadingRelaySessions,
     fetchActiveRelaySessions,
-    connectRemoteSession,
-  } = useApp();
+    connect: connectRemoteSession,
+  } = useRemoteSession();
+  useRelaySessionPolling(true);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [manualSessionInput, setManualSessionInput] = useState('');
 
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
-
-  React.useEffect(() => {
-    fetchActiveRelaySessions().catch(() => {});
-    const interval = setInterval(() => {
-      fetchActiveRelaySessions().catch(() => {});
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [fetchActiveRelaySessions]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

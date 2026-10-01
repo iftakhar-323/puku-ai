@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../store/AppContext';
+import { useRemoteSession } from '../../store/RemoteSessionContext';
 import { ChatModelType } from '../../types';
 import { ChatAttachmentSheet } from './components/ChatAttachmentSheet';
 import { ChatComposer } from './components/ChatComposer';
@@ -60,10 +61,9 @@ export function ChatScreen() {
     selectBotConversation,
     incognitoMessages,
     profile,
-    remoteSession,
-    activeRelaySessions,
-    connectRemoteSession,
   } = useApp();
+  const { isActive: isRemoteActive, liveRelaySessions, connect: connectRemoteSession } =
+    useRemoteSession();
   const { show } = useToast();
 
   const [inputVal, setInputVal] = useState('');
@@ -238,14 +238,14 @@ export function ChatScreen() {
         }
         onLeadingTap={() => setDrawerOpen(true)}
         onTrailingTap={() => setIncognito(!isIncognito)}
-        isTerminalLive={remoteSession.status === 'connected' || activeRelaySessions.length > 0}
+        isTerminalLive={isRemoteActive || liveRelaySessions.length > 0}
         onTerminalTap={() => {
-          if (remoteSession.status === 'connected') {
+          if (isRemoteActive) {
             navigate('remoteSession');
-          } else if (activeRelaySessions.length > 0) {
+          } else if (liveRelaySessions.length > 0) {
             connectRemoteSession(
-              activeRelaySessions[0].sessionId,
-              activeRelaySessions[0].mobileToken
+              liveRelaySessions[0].sessionId,
+              liveRelaySessions[0].mobileToken
             );
             navigate('remoteSession');
           } else {

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../store/AppContext';
+import { useRemoteSession } from '../../store/RemoteSessionContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 import {
   ArchiveBoxIcon,
@@ -65,10 +66,9 @@ export function AppDrawer() {
     deleteBotConversation,
     renameBotConversation,
     selectBot,
-    activeRelaySessions,
-    remoteSession,
-    connectRemoteSession,
   } = useApp();
+  const { isActive: isRemoteActive, liveRelaySessions, connect: connectRemoteSession } =
+    useRemoteSession();
 
   const isBotMode = activeRoute === 'pukuBot';
 
@@ -716,12 +716,12 @@ export function AppDrawer() {
               activeOpacity={0.7}
               onPress={() => {
                 setDrawerOpen(false);
-                if (remoteSession.status === 'connected') {
+                if (isRemoteActive) {
                   navigate('remoteSession');
-                } else if (activeRelaySessions.length > 0) {
+                } else if (liveRelaySessions.length > 0) {
                   connectRemoteSession(
-                    activeRelaySessions[0].sessionId,
-                    activeRelaySessions[0].mobileToken
+                    liveRelaySessions[0].sessionId,
+                    liveRelaySessions[0].mobileToken
                   );
                   navigate('remoteSession');
                 } else {
@@ -733,7 +733,7 @@ export function AppDrawer() {
                 {
                   backgroundColor: theme.cardBackground,
                   borderColor:
-                    remoteSession.status === 'connected' || activeRelaySessions.length > 0
+                    isRemoteActive || liveRelaySessions.length > 0
                       ? '#52C41A'
                       : theme.border,
                   marginTop: 8,
@@ -743,7 +743,7 @@ export function AppDrawer() {
                 <RemoteIcon
                   size={20}
                   color={
-                    remoteSession.status === 'connected' || activeRelaySessions.length > 0
+                    isRemoteActive || liveRelaySessions.length > 0
                       ? '#52C41A'
                       : theme.primary
                   }
@@ -753,15 +753,15 @@ export function AppDrawer() {
                     <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
                       Remote Laptop Sessions
                     </Text>
-                    {(remoteSession.status === 'connected' || activeRelaySessions.length > 0) && (
+                    {(isRemoteActive || liveRelaySessions.length > 0) && (
                       <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#52C41A' }} />
                     )}
                   </View>
                   <Text style={[styles.switchHubSub, { color: theme.textMuted }]}>
-                    {remoteSession.status === 'connected'
+                    {isRemoteActive
                       ? '● Live connected · Tap to open'
-                      : activeRelaySessions.length > 0
-                      ? `${activeRelaySessions.length} live session(s) detected`
+                      : liveRelaySessions.length > 0
+                      ? `${liveRelaySessions.length} live session(s) detected`
                       : 'Mirror & control laptop terminal'}
                   </Text>
                 </View>

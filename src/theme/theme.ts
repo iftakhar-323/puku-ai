@@ -23,6 +23,10 @@ export interface ThemeColors {
   success: string;
   warning: string;
   codeBackground: string;
+  /** Inline `code` and links in agent output (remote session). */
+  inlineCode: string;
+  inlineCodeBackground: string;
+  link: string;
   thinkingBackground: string;
   userBubble: string;
   onUserBubble: string;
@@ -57,6 +61,9 @@ export const darkTheme: ThemeColors = {
   success: AppColors.pukuSuccess, // #94c7a0
   warning: AppColors.pukuWarning, // #e8b187
   codeBackground: AppColors.secondary, // #10110f
+  inlineCode: '#F28B82',
+  inlineCodeBackground: 'rgba(255, 255, 255, 0.06)',
+  link: '#5AA9FF',
   thinkingBackground: 'rgba(255, 255, 255, 0.04)',
   userBubble: 'rgba(255, 255, 255, 0.08)',
   onUserBubble: AppColors.primaryText, // #eeeee5
@@ -91,6 +98,9 @@ export const lightTheme: ThemeColors = {
   success: '#206b35',
   warning: '#8b4a18',
   codeBackground: '#edece4',
+  inlineCode: '#C0392B',
+  inlineCodeBackground: '#F1EFE8',
+  link: '#2563EB',
   thinkingBackground: '#e7e9df',
   userBubble: '#e8e7df',
   onUserBubble: '#111310',

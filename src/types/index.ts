@@ -88,37 +88,6 @@ export interface CodeSession {
   status: 'idle' | 'running' | 'completed' | 'expired';
 }
 
-export interface RemoteMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system' | 'tool';
-  content: string;
-  timestamp: number;
-}
-
-export interface RemoteSession {
-  sessionId: string;
-  token: string;
-  title?: string;
-  host?: string;
-  status: 'connecting' | 'connected' | 'idle' | 'executing' | 'disconnected';
-  currentTool?: {
-    id?: string;
-    name: string;
-    description: string;
-    params?: Record<string, any>;
-    status: 'pending' | 'approved' | 'rejected' | 'completed';
-  };
-  progressStatus: 'thinking' | 'idle' | 'ready' | 'completed' | 'failed';
-  diffLines?: Array<{ type: 'add' | 'remove' | 'context'; text: string }>;
-  logs: string[];
-  /**
-   * Indices in `logs` holding text streamed live from `stream_event` deltas for
-   * the assistant message in progress. The final `assistant` frame replaces them.
-   */
-  streamingLogIndices?: number[];
-  messages?: RemoteMessage[];
-}
-
 export interface ActiveRelaySession {
   sessionId: string;
   createdAt: number;

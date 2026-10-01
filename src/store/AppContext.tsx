@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  ActiveRelaySession,
   AppRoute,
   AppSettings,
   Artifact,
@@ -14,7 +13,6 @@ import {
   CodeSession,
   Conversation,
   Project,
-  RemoteSession,
   UserProfile,
 } from '../types';
 import { darkTheme, lightTheme, ThemeColors } from '../theme/theme';
@@ -22,7 +20,6 @@ import { pukuApi, mapModelToApi, mapApiToModel } from '../services/api';
 import { tokenManager } from '../services/tokenManager';
 import { extractJwtData } from '../utils/auth';
 import { formatActivityDate, getConversationTimestamp } from '../utils/date';
-import { ENV } from '../config/env';
 
 interface AppContextValue {
   theme: ThemeColors;
@@ -75,17 +72,6 @@ interface AppContextValue {
   selectCodeSession: (id: string | null) => void;
   createCodeSession: (title: string, environment: string, autoAccept: boolean) => CodeSession;
   runCodeSession: (sessionId: string, code: string) => void;
-  // Remote sessions
-  remoteSession: RemoteSession;
-  activeRelaySessions: ActiveRelaySession[];
-  isLoadingRelaySessions: boolean;
-  fetchActiveRelaySessions: () => Promise<ActiveRelaySession[]>;
-  connectRemoteSession: (sessionId: string, token?: string) => void;
-  disconnectRemoteSession: () => void;
-  sendRemoteMessage: (content: string) => boolean;
-  sendRemoteInterrupt: () => boolean;
-  clearRemoteLogs: () => void;
-  respondToTool: (approved: boolean, requestId?: string) => void;
   // Puku Bot state
   botConversations: BotConversation[];
   activeBotConversationId: string | null;
@@ -212,7 +198,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeBotId, setActiveBotId] = useState<string>('general-assistant');
   const [availableBots, _setAvailableBots] = useState<BotItem[]>(DEFAULT_AVAILABLE_BOTS);
   const logoutRef = useRef<() => void>(() => {});
-  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     const unsub = tokenManager.onSessionExpired(() => {
@@ -616,20 +601,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeCodeSessionId, setActiveCodeSessionId] = useState<string | null>(
     initialCodeSessions[0]?.id || null
   );
-
-  const [activeRelaySessions, setActiveRelaySessions] = useState<ActiveRelaySession[]>([]);
-  const [isLoadingRelaySessions, setIsLoadingRelaySessions] = useState<boolean>(false);
-
-  const [remoteSession, setRemoteSession] = useState<RemoteSession>({
-    sessionId: '',
-    token: '',
-    title: 'Remote Agent Desktop Relay',
-    status: 'idle',
-    progressStatus: 'ready',
-    logs: [
-      '[System] Relay ready to connect to your laptop CLI.',
-    ],
-  });
 
   const isDark = settings.themeMode === 'dark';
   const theme = isDark ? darkTheme : lightTheme;
@@ -1362,446 +1333,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, 1000);
   };
 
-  const fetchActiveRelaySessions = useCallback(async (): Promise<ActiveRelaySession[]> => {
-    setIsLoadingRelaySessions(true);
-    try {
-      const accessToken =
-        (await tokenManager.ensureValidToken().catch(() => null)) ||
-        (await tokenManager.getAccessToken().catch(() => null)) ||
-        pukuApi.getAuthToken() ||
-        (await AsyncStorage.getItem('@puku_auth_token'));
-
-      if (!accessToken) {
-        console.warn('[RemoteRelay] No access token available, user may need to log in');
-        setIsLoadingRelaySessions(false);
-        return [];
-      }
-      const response = await fetch(`${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions?mine=1`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'User-Agent': 'puku-ai-app/1.0',
-        },
-      });
-      if (!response.ok) {
-        console.warn('[RemoteRelay] Relay server responded with HTTP', response.status);
-        setIsLoadingRelaySessions(false);
-        return [];
-      }
-      const data = await response.json();
-      const sessions: ActiveRelaySession[] = Array.isArray(data.sessions) ? data.sessions : [];
-      setActiveRelaySessions(sessions);
-      setIsLoadingRelaySessions(false);
-      return sessions;
-    } catch (e) {
-      console.warn('[RemoteRelay] Failed to fetch active sessions:', e);
-      setIsLoadingRelaySessions(false);
-      return [];
-    }
-  }, []);
-
-  const connectRemoteSession = async (sessionId: string, token?: string) => {
-    if (wsRef.current) {
-      try {
-        wsRef.current.close();
-      } catch {}
-      wsRef.current = null;
-    }
-
-    let accountToken = '';
-    try {
-      accountToken =
-        (await tokenManager.ensureValidToken().catch(() => null)) ||
-        (await tokenManager.getAccessToken().catch(() => null)) ||
-        pukuApi.getAuthToken() ||
-        (await AsyncStorage.getItem('@puku_auth_token')) ||
-        '';
-    } catch {}
-
-    let activeToken = (token || '').trim();
-    if (!activeToken) {
-      const match = activeRelaySessions.find(s => s.sessionId === sessionId);
-      if (match?.mobileToken) {
-        activeToken = match.mobileToken;
-      } else if (accountToken) {
-        try {
-          const authRes = await fetch(`${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/auth`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accountToken}`,
-              'User-Agent': 'puku-ai-app/1.0',
-            },
-          });
-          if (authRes.ok) {
-            const authData = await authRes.json();
-            activeToken = authData.mobileToken || '';
-          }
-        } catch (err) {
-          console.warn('[RemoteRelay] Error resolving token:', err);
-        }
-      }
-    }
-
-    setRemoteSession(prev => ({
-      ...prev,
-      sessionId,
-      token: activeToken,
-      status: 'connecting',
-      logs: [...prev.logs, `[Connection] Connecting to relay session ${sessionId}...`],
-    }));
-
-    try {
-      const wsUrl = `${ENV.REMOTE_SESSION_RELAY_HOST.replace(/^http/, 'ws')}/client/${sessionId}?token=${activeToken}`;
-      // Crucial: X-Puku-Mobile-Token must be activeToken, X-Puku-Account-Token must be accountToken!
-      const ws = new WebSocket(wsUrl, undefined, {
-        headers: {
-          'X-Puku-Mobile-Token': activeToken,
-          'X-Puku-Account-Token': accountToken,
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) PukuMobile/1.0',
-        },
-      });
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setRemoteSession(prev => ({
-          ...prev,
-          status: 'connected',
-          logs: [
-            ...prev.logs,
-            `[Connection] Live WebSocket connected to laptop CLI!`,
-            `[Terminal] Type a prompt or bash command to run on your laptop.`,
-          ],
-        }));
-      };
-
-      ws.onerror = (err: any) => {
-        console.warn('[RemoteRelay] WebSocket error:', err);
-        setRemoteSession(prev => ({
-          ...prev,
-          status: 'disconnected',
-          logs: [
-            ...prev.logs,
-            `[Connection Error] Could not connect to laptop relay. Make sure your account token is valid.`,
-          ],
-        }));
-      };
-
-      ws.onclose = (e: any) => {
-        console.log('[RemoteRelay] WebSocket closed:', e.code, e.reason);
-        wsRef.current = null;
-        setRemoteSession(prev => ({
-          ...prev,
-          status: 'disconnected',
-          logs: [
-            ...prev.logs,
-            `[Connection Closed] Relay connection closed (${e.code || ''} ${e.reason || ''}). Tap Connect to retry.`,
-          ],
-        }));
-      };
-
-      ws.onmessage = (event: any) => {
-        try {
-          const raw = typeof event.data === 'string' ? event.data.trim() : '';
-          if (!raw) return;
-
-          const dataObjects: any[] = [];
-          try {
-            dataObjects.push(JSON.parse(raw));
-          } catch {
-            const lines = raw.split('\n').filter((l: string) => l.trim().length > 0);
-            for (const line of lines) {
-              try {
-                dataObjects.push(JSON.parse(line));
-              } catch {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith('{') && !trimmed.startsWith('[') && !trimmed.startsWith('"')) {
-                  setRemoteSession(prev => ({
-                    ...prev,
-                    logs: [...prev.logs, line],
-                  }));
-                }
-              }
-            }
-          }
-
-          for (const data of dataObjects) {
-            if (__DEV__) {
-              console.log('[RemoteRelay] frame', data.type, data.event?.type || data.subtype || '');
-            }
-            if (data.type === 'control_request') {
-              if (data.request?.subtype === 'can_use_tool') {
-                const toolName = data.request.tool_name || 'Tool Execution';
-                const desc = data.request.description || JSON.stringify(data.request.input || {});
-                setRemoteSession(prev => ({
-                  ...prev,
-                  currentTool: {
-                    id: data.request_id || 'req_' + Date.now(),
-                    name: toolName,
-                    description: desc,
-                    status: 'pending',
-                  },
-                  logs: [...prev.logs, `⚠️ [Permission Required] ${toolName}: ${desc}`],
-                }));
-              }
-            } else if (data.type === 'user') {
-              const msg = data.message?.content;
-              let text = '';
-              const toolResults: string[] = [];
-
-              if (typeof msg === 'string') {
-                text = msg;
-              } else if (Array.isArray(msg)) {
-                for (const m of msg) {
-                  if (m.type === 'text') {
-                    text += (text ? '\n' : '') + (m.text || '');
-                  } else if (m.type === 'tool_result') {
-                    const rawContent =
-                      typeof m.content === 'string'
-                        ? m.content
-                        : Array.isArray(m.content)
-                        ? m.content.map((c: any) => c.text || '').join('\n')
-                        : JSON.stringify(m.content || '');
-                    if (rawContent) {
-                      toolResults.push(rawContent);
-                    }
-                  }
-                }
-              }
-
-              const cleanText = text.trim();
-              if (cleanText || toolResults.length > 0) {
-                setRemoteSession(prev => {
-                  const newLogs = [...prev.logs];
-                  if (cleanText) {
-                    const lastUserCmd = [...newLogs]
-                      .reverse()
-                      .find(l => typeof l === 'string' && l.startsWith('> '));
-                    if (lastUserCmd !== `> ${cleanText}`) {
-                      newLogs.push(`> ${cleanText}`);
-                    }
-                  }
-                  for (const tr of toolResults) {
-                    newLogs.push(`[ToolResult] ${tr}`);
-                  }
-                  return {
-                    ...prev,
-                    progressStatus: cleanText ? 'thinking' : prev.progressStatus,
-                    logs: newLogs,
-                  };
-                });
-              }
-            } else if (data.type === 'assistant') {
-              const msg = data.message?.content;
-              const items: string[] = [];
-              if (typeof msg === 'string') {
-                if (msg) items.push(msg);
-              } else if (Array.isArray(msg)) {
-                for (const m of msg) {
-                  if (m.type === 'text' && m.text) {
-                    items.push(m.text);
-                  } else if (m.type === 'tool_use') {
-                    items.push(`[Tool] ${m.name || 'exec'}(${JSON.stringify(m.input || {})})`);
-                  }
-                }
-              }
-              if (items.length > 0) {
-                setRemoteSession(prev => {
-                  // The final frame is authoritative: drop the live-streamed copies.
-                  const streamed = new Set(prev.streamingLogIndices ?? []);
-                  const kept = streamed.size
-                    ? prev.logs.filter((_, idx) => !streamed.has(idx))
-                    : prev.logs;
-                  return {
-                    ...prev,
-                    progressStatus: 'idle',
-                    logs: [...kept, ...items],
-                    streamingLogIndices: [],
-                  };
-                });
-              }
-            } else if (data.type === 'stream_event' || data.type === 'content_block_delta') {
-              // Partial output while the CLI is still writing. Claude-style
-              // stream-json nests the Anthropic event under `event`.
-              const ev = data.type === 'stream_event' ? data.event || {} : data;
-              const startsTextBlock =
-                ev.type === 'content_block_start' && ev.content_block?.type === 'text';
-              // Only text deltas carry `delta.text`; thinking and tool-input
-              // deltas use other keys, so they are skipped here.
-              const deltaText =
-                ev.type === 'content_block_delta' ? ev.delta?.text || '' : data.text || '';
-              if (startsTextBlock || deltaText) {
-                setRemoteSession(prev => {
-                  const indices = prev.streamingLogIndices ?? [];
-                  const current = indices[indices.length - 1];
-                  // Each text block streams into its own log entry.
-                  if (startsTextBlock || current === undefined) {
-                    return {
-                      ...prev,
-                      progressStatus: 'thinking',
-                      logs: [...prev.logs, deltaText],
-                      streamingLogIndices: [...indices, prev.logs.length],
-                    };
-                  }
-                  const updated = [...prev.logs];
-                  updated[current] = (updated[current] || '') + deltaText;
-                  return { ...prev, progressStatus: 'thinking', logs: updated };
-                });
-              }
-            } else if (data.type === 'tool_progress') {
-              setRemoteSession(prev => ({
-                ...prev,
-                progressStatus: 'thinking',
-                logs: [...prev.logs, `[Running] ${data.tool_name || ''}...`],
-              }));
-            } else if (data.type === 'result') {
-              setRemoteSession(prev => ({
-                ...prev,
-                currentTool: undefined,
-                progressStatus: 'idle',
-                logs: [...prev.logs, `✓ Done (${data.subtype || 'success'})`],
-                streamingLogIndices: [],
-              }));
-            } else if (data.type === 'system') {
-              if (data.subtype === 'status') {
-                setRemoteSession(prev => ({
-                  ...prev,
-                  logs: [...prev.logs, `[Status] ${data.status || ''}`],
-                }));
-              } else if (data.subtype === 'compact_boundary') {
-                setRemoteSession(prev => ({
-                  ...prev,
-                  logs: [...prev.logs, `[System] Conversation compacted`],
-                }));
-              }
-            } else if (data.log) {
-              const logText = typeof data.log === 'string' ? data.log : JSON.stringify(data.log);
-              setRemoteSession(prev => ({
-                ...prev,
-                logs: [...prev.logs, logText],
-              }));
-            }
-          }
-        } catch (err) {
-          console.warn('[RemoteRelay] onmessage parse error:', err);
-        }
-      };
-    } catch {
-      // Fallback
-    }
-  };
-
-  const disconnectRemoteSession = () => {
-    if (wsRef.current) {
-      try {
-        wsRef.current.close();
-      } catch {}
-      wsRef.current = null;
-    }
-    setRemoteSession(prev => ({
-      ...prev,
-      status: 'disconnected',
-      logs: [...prev.logs, '[Connection] Disconnected from laptop.'],
-    }));
-  };
-
-  const sendRemoteMessage = useCallback(
-    (content: string): boolean => {
-      const trimmed = content.trim();
-      if (!trimmed) return false;
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        const payload = JSON.stringify({
-          type: 'user',
-          message: {
-            role: 'user',
-            content: trimmed,
-          },
-          parent_tool_use_id: null,
-          session_id: remoteSession.sessionId,
-        });
-        wsRef.current.send(payload);
-        setRemoteSession(prev => ({
-          ...prev,
-          progressStatus: 'thinking',
-          logs: [...prev.logs, `> ${trimmed}`],
-        }));
-        return true;
-      } else {
-        setRemoteSession(prev => ({
-          ...prev,
-          progressStatus: 'idle',
-          logs: [
-            ...prev.logs,
-            `> ${trimmed}`,
-            `[Relay Warning] WebSocket not connected to laptop. Message queued.`,
-          ],
-        }));
-        return false;
-      }
-    },
-    [remoteSession.sessionId]
-  );
-
-  const sendRemoteInterrupt = useCallback((): boolean => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const payload = JSON.stringify({
-        type: 'control_request',
-        request_id: 'req_' + Date.now(),
-        request: { subtype: 'interrupt' },
-      });
-      wsRef.current.send(payload);
-      setRemoteSession(prev => ({
-        ...prev,
-        progressStatus: 'idle',
-        logs: [...prev.logs, `^C (Interrupt signal sent to laptop)`],
-      }));
-      return true;
-    }
-    return false;
-  }, []);
-
-  const clearRemoteLogs = useCallback(() => {
-    setRemoteSession(prev => ({
-      ...prev,
-      progressStatus: 'idle',
-      logs: [],
-      streamingLogIndices: [],
-    }));
-  }, []);
-
-  const respondToTool = (approved: boolean, requestId?: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const targetId = requestId || remoteSession.currentTool?.id || 'req_tool';
-      try {
-        wsRef.current.send(
-          JSON.stringify({
-            type: 'control_response',
-            response: {
-              subtype: 'success',
-              request_id: targetId,
-              response: {
-                behavior: approved ? 'allow' : 'deny',
-                ...(approved
-                  ? { decisionClassification: 'user_temporary' }
-                  : { message: 'Denied by user from mobile' }),
-              },
-            },
-          })
-        );
-      } catch {}
-    }
-    setRemoteSession(prev => ({
-      ...prev,
-      currentTool: prev.currentTool
-        ? { ...prev.currentTool, status: approved ? 'approved' : 'rejected' }
-        : undefined,
-      logs: [
-        ...prev.logs,
-        approved ? '[Permission] Tool execution APPROVED.' : '[Permission] Tool execution REJECTED.',
-      ],
-      progressStatus: approved ? 'completed' : 'idle',
-    }));
-  };
-
   const updateProfile = (updates: Partial<UserProfile>) => {
     setProfile(prev => {
       const updated = { ...prev, ...updates };
@@ -1969,16 +1500,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         selectCodeSession,
         createCodeSession,
         runCodeSession,
-        remoteSession,
-        activeRelaySessions,
-        isLoadingRelaySessions,
-        fetchActiveRelaySessions,
-        connectRemoteSession,
-        disconnectRemoteSession,
-        sendRemoteMessage,
-        sendRemoteInterrupt,
-        clearRemoteLogs,
-        respondToTool,
         botConversations,
         activeBotConversationId,
         activeBotId,
