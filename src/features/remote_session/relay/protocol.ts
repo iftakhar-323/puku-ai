@@ -277,6 +277,10 @@ function applyAssistant(
 
   for (const block of blocks) {
     if (block?.type === 'text') {
+      const blockText =
+        typeof block.text === 'string'
+          ? block.text
+          : sanitizePromptString(block.text);
       const idx = streamed[streamCursor++];
       if (idx !== undefined) {
         // An empty final block (e.g. a truncated/aborted turn) should still
@@ -285,11 +289,11 @@ function applyAssistant(
         const prev = entries[idx] as Extract<RemoteEntry, { kind: 'assistant' }>;
         entries[idx] = {
           ...prev,
-          text: block.text || prev.text,
+          text: blockText || prev.text,
           streaming: false,
         };
-      } else if (block.text) {
-        appended.push({ kind: 'assistant', text: block.text });
+      } else if (blockText) {
+        appended.push({ kind: 'assistant', text: blockText });
       }
     } else if (block?.type === 'tool_use') {
       appended.push({
@@ -297,7 +301,8 @@ function applyAssistant(
         id: block.id,
         tool: {
           name: block.name || 'Tool',
-          input: block.input || {},
+          input:
+            block.input && typeof block.input === 'object' ? block.input : {},
           status: 'running',
         },
       });
@@ -377,9 +382,10 @@ function applyStreamEvent(
 
   const startsText =
     ev.type === 'content_block_start' && ev.content_block?.type === 'text';
-  // Only text deltas carry `delta.text`; thinking and tool-input deltas use other keys.
-  const delta =
+  const rawDelta =
     ev.type === 'content_block_delta' ? ev.delta?.text || '' : data.text || '';
+  const delta =
+    typeof rawDelta === 'string' ? rawDelta : sanitizePromptString(rawDelta);
   if (!startsText && !delta) return state;
 
   const streamed = streamingIndices(state.entries);

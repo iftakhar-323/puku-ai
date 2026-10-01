@@ -179,7 +179,7 @@ class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <SafeAreaProvider>
+        <SafeAreaProvider style={{ flex: 1 }}>
           <StatusBar barStyle="light-content" />
           <View
             style={{

@@ -13,13 +13,20 @@ export type FeedItem =
 
 export function buildFeed(entries: RemoteEntry[]): FeedItem[] {
   const feed: FeedItem[] = [];
-  for (const entry of entries) {
+  if (!Array.isArray(entries)) return feed;
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (!entry) continue;
     if (entry.kind === 'tool') {
       const last = feed[feed.length - 1];
       if (last?.kind === 'tools') {
         feed[feed.length - 1] = { ...last, tools: [...last.tools, entry] };
       } else {
-        feed.push({ kind: 'tools', id: `group_${entry.id}`, tools: [entry] });
+        feed.push({
+          kind: 'tools',
+          id: `group_${entry.id || i}`,
+          tools: [entry],
+        });
       }
     } else {
       feed.push(entry);

@@ -109,17 +109,19 @@ export function RemoteFeed({
 
   const renderItem = useCallback(
     ({ item }: { item: FeedItem }) => (
-      <FeedRow
-        item={item}
-        isExpanded={expanded.has(item.id)}
-        canResend={canResend}
-        theme={theme}
-        cliColors={cliColors}
-        onCopy={onCopy}
-        onResend={onResend}
-        onOpenTool={onOpenTool}
-        onToggleGroup={toggleGroup}
-      />
+      <FeedRowErrorBoundary>
+        <FeedRow
+          item={item}
+          isExpanded={expanded.has(item.id)}
+          canResend={canResend}
+          theme={theme}
+          cliColors={cliColors}
+          onCopy={onCopy}
+          onResend={onResend}
+          onOpenTool={onOpenTool}
+          onToggleGroup={toggleGroup}
+        />
+      </FeedRowErrorBoundary>
     ),
     [
       expanded,
@@ -207,6 +209,28 @@ interface RowProps {
   onToggleGroup: (id: string) => void;
 }
 
+class FeedRowErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(err: any) {
+    console.warn('Feed row render error caught:', err);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
 const FeedRow = memo(function FeedRowView({
   item,
   isExpanded,
@@ -218,21 +242,25 @@ const FeedRow = memo(function FeedRowView({
   onOpenTool,
   onToggleGroup,
 }: RowProps) {
+  if (!item || !item.kind) return null;
+
   switch (item.kind) {
-    case 'user':
+    case 'user': {
+      const userText =
+        typeof item.text === 'string' ? item.text : String(item.text || '');
       return (
         <View style={styles.userRow}>
           <TouchableOpacity
             activeOpacity={0.85}
             delayLongPress={200}
-            onLongPress={() => onCopy(item.text)}
+            onLongPress={() => onCopy(userText)}
             style={[styles.userBubble, { backgroundColor: theme.userBubble }]}
           >
             <Text
               selectable
               style={[styles.userText, { color: theme.onUserBubble }]}
             >
-              {item.text}
+              {userText}
             </Text>
           </TouchableOpacity>
           <View style={styles.userActions}>
@@ -241,7 +269,7 @@ const FeedRow = memo(function FeedRowView({
               accessibilityRole="button"
               accessibilityLabel="Copy message"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => onCopy(item.text)}
+              onPress={() => onCopy(userText)}
             >
               <CopyIcon size={14} color={theme.textMuted} />
             </TouchableOpacity>
@@ -251,7 +279,7 @@ const FeedRow = memo(function FeedRowView({
                 accessibilityRole="button"
                 accessibilityLabel="Send this message again"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                onPress={() => onResend(item.text)}
+                onPress={() => onResend(userText)}
               >
                 <RefreshIcon size={14} color={theme.textMuted} />
               </TouchableOpacity>
@@ -259,9 +287,16 @@ const FeedRow = memo(function FeedRowView({
           </View>
         </View>
       );
+    }
 
     case 'tools': {
-      const tools = item.tools.map(t => t.tool);
+      const rawTools = Array.isArray(item.tools) ? item.tools : [];
+      const validToolEntries = rawTools.filter(
+        t => t && t.tool && typeof t.tool === 'object',
+      );
+      if (validToolEntries.length === 0) return null;
+
+      const tools = validToolEntries.map(t => t.tool);
       const running = tools.some(t => t.status === 'running');
       const failed = tools.some(t => t.status === 'error');
       return (
@@ -291,9 +326,9 @@ const FeedRow = memo(function FeedRowView({
           </TouchableOpacity>
           {isExpanded && (
             <View style={[styles.toolList, { borderLeftColor: theme.outline }]}>
-              {item.tools.map(({ id, tool }) => (
+              {validToolEntries.map(({ id, tool }, idx) => (
                 <TouchableOpacity
-                  key={id}
+                  key={id || `tool_${idx}`}
                   activeOpacity={0.6}
                   accessibilityRole="button"
                   accessibilityHint="Shows the command and its output"
@@ -323,7 +358,9 @@ const FeedRow = memo(function FeedRowView({
       );
     }
 
-    case 'system':
+    case 'system': {
+      const systemText =
+        typeof item.text === 'string' ? item.text : String(item.text || '');
       return (
         <View style={styles.systemRow}>
           <View
@@ -341,22 +378,26 @@ const FeedRow = memo(function FeedRowView({
                 },
               ]}
             >
-              {item.text}
+              {systemText}
             </Text>
           </View>
         </View>
       );
+    }
 
-    case 'assistant':
+    case 'assistant': {
+      const assistantText =
+        typeof item.text === 'string' ? item.text : String(item.text || '');
       return (
         <View style={styles.assistantRow}>
           <MarkdownRenderer
-            content={item.text}
+            content={assistantText}
             theme={theme}
             cliColors={cliColors}
           />
         </View>
       );
+    }
   }
 });
 

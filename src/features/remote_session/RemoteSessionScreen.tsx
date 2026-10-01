@@ -129,7 +129,7 @@ class RemoteSessionErrorBoundary extends React.Component<
   }
 }
 
-export function RemoteSessionScreen() {
+function RemoteSessionScreenContent() {
   const insets = useSafeAreaInsets();
   const { keyboardHeight } = useKeyboardHeight();
   const { theme, goBack, navigate } = useApp();
@@ -187,28 +187,20 @@ export function RemoteSessionScreen() {
     : theme.warning;
 
   return (
-    <RemoteSessionErrorBoundary
-      theme={theme}
-      onReset={() => {
-        if (session.sessionId) {
-          connect(session.sessionId, session.token);
-        }
-      }}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.background,
+          paddingTop: Math.max(insets.top, 10),
+          paddingBottom:
+            Platform.OS === 'android' && keyboardHeight > 0
+              ? keyboardHeight + 10
+              : Math.max(insets.bottom, 10),
+        },
+      ]}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.background,
-            paddingTop: Math.max(insets.top, 10),
-            paddingBottom:
-              Platform.OS === 'android' && keyboardHeight > 0
-                ? keyboardHeight + 10
-                : Math.max(insets.bottom, 10),
-          },
-        ]}
-      >
       <View style={styles.header}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -434,6 +426,25 @@ export function RemoteSessionScreen() {
         </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
+  );
+}
+
+export function RemoteSessionScreen() {
+  const { theme, goBack } = useApp();
+  const { session, connect } = useRemoteSession();
+
+  return (
+    <RemoteSessionErrorBoundary
+      theme={theme}
+      onReset={() => {
+        if (session.sessionId) {
+          connect(session.sessionId, session.token);
+        } else {
+          goBack();
+        }
+      }}
+    >
+      <RemoteSessionScreenContent />
     </RemoteSessionErrorBoundary>
   );
 }

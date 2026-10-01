@@ -37,6 +37,8 @@ export function renderFormattedText(
   theme: ThemeColors,
   cliColors?: CliColors
 ) {
+  const safeText = typeof text === 'string' ? text : String(text || '');
+  if (!safeText) return [];
   const parts: React.ReactNode[] = [];
   const regex = cliColors
     ? /(\[[^\]]+\]\([^)\s]+\)|\*\*.*?\*\*|\*.*?\*|`.*?`)/g
@@ -44,70 +46,79 @@ export function renderFormattedText(
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
+  try {
+    while ((match = regex.exec(safeText)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(
+          <Text key={lastIndex} style={baseStyle}>
+            {safeText.slice(lastIndex, match.index)}
+          </Text>
+        );
+      }
+
+      const chunk = match[0];
+      const linkMatch = cliColors ? chunk.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/) : null;
+      if (linkMatch) {
+        const url = linkMatch[2];
+        const isWebUrl = /^https?:\/\//.test(url);
+        const linkColor = cliColors?.link || theme.primary;
+        parts.push(
+          <Text
+            key={match.index}
+            onPress={isWebUrl ? () => Linking.openURL(url).catch(ignore('MarkdownRenderer')) : undefined}
+            style={[baseStyle, { color: linkColor, textDecorationLine: 'underline' }]}>
+            {linkMatch[1]}
+          </Text>
+        );
+      } else if (chunk.startsWith('**') && chunk.endsWith('**')) {
+        parts.push(
+          <Text
+            key={match.index}
+            style={[baseStyle, { fontWeight: '700', color: theme.textPrimary }]}>
+            {chunk.slice(2, -2)}
+          </Text>
+        );
+      } else if (chunk.startsWith('*') && chunk.endsWith('*')) {
+        parts.push(
+          <Text key={match.index} style={[baseStyle, { fontStyle: 'italic' }]}>
+            {chunk.slice(1, -1)}
+          </Text>
+        );
+      } else if (chunk.startsWith('`') && chunk.endsWith('`')) {
+        parts.push(
+          <Text
+            key={match.index}
+            style={[
+              baseStyle,
+              {
+                fontFamily: monoFamily,
+                backgroundColor: cliColors?.inlineCodeBackground ?? theme.codeBackground,
+                paddingHorizontal: 4,
+                borderRadius: 4,
+              },
+              cliColors && { color: cliColors.inlineCode, fontSize: 13.5 },
+            ]}>
+            {chunk.slice(1, -1)}
+          </Text>
+        );
+      }
+
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < safeText.length) {
       parts.push(
         <Text key={lastIndex} style={baseStyle}>
-          {text.slice(lastIndex, match.index)}
+          {safeText.slice(lastIndex)}
         </Text>
       );
     }
-
-    const chunk = match[0];
-    const linkMatch = cliColors ? chunk.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/) : null;
-    if (linkMatch) {
-      const url = linkMatch[2];
-      const isWebUrl = /^https?:\/\//.test(url);
-      parts.push(
-        <Text
-          key={match.index}
-          onPress={isWebUrl ? () => Linking.openURL(url).catch(ignore('MarkdownRenderer')) : undefined}
-          style={[baseStyle, { color: cliColors!.link, textDecorationLine: 'underline' }]}>
-          {linkMatch[1]}
-        </Text>
-      );
-    } else if (chunk.startsWith('**') && chunk.endsWith('**')) {
-      parts.push(
-        <Text
-          key={match.index}
-          style={[baseStyle, { fontWeight: '700', color: theme.textPrimary }]}>
-          {chunk.slice(2, -2)}
-        </Text>
-      );
-    } else if (chunk.startsWith('*') && chunk.endsWith('*')) {
-      parts.push(
-        <Text key={match.index} style={[baseStyle, { fontStyle: 'italic' }]}>
-          {chunk.slice(1, -1)}
-        </Text>
-      );
-    } else if (chunk.startsWith('`') && chunk.endsWith('`')) {
-      parts.push(
-        <Text
-          key={match.index}
-          style={[
-            baseStyle,
-            {
-              fontFamily: monoFamily,
-              backgroundColor: cliColors?.inlineCodeBackground ?? theme.codeBackground,
-              paddingHorizontal: 4,
-              borderRadius: 4,
-            },
-            cliColors && { color: cliColors.inlineCode, fontSize: 13.5 },
-          ]}>
-          {chunk.slice(1, -1)}
-        </Text>
-      );
-    }
-
-    lastIndex = regex.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(
-      <Text key={lastIndex} style={baseStyle}>
-        {text.slice(lastIndex)}
+  } catch {
+    return [
+      <Text key="fallback" style={baseStyle}>
+        {safeText}
       </Text>
-    );
+    ];
   }
 
   return parts;
@@ -219,11 +230,19 @@ function CodeBlockItem({
 export function MarkdownRenderer({ content, theme, cliColors }: MarkdownRendererProps) {
   const fmt = (text: string, style: any) => renderFormattedText(text, style, theme, cliColors);
 
-  if (!content) return null;
+  const textContent =
+    typeof content === 'string'
+      ? content
+      : content && typeof content === 'object'
+      ? (content as any).text || (content as any).message || JSON.stringify(content)
+      : String(content || '');
 
-  const lines = content.split('\n');
-  const elements: React.ReactNode[] = [];
-  let i = 0;
+  if (!textContent.trim()) return null;
+
+  try {
+    const lines = textContent.split('\n');
+    const elements: React.ReactNode[] = [];
+    let i = 0;
 
   while (i < lines.length) {
     const rawLine = lines[i];
@@ -437,7 +456,16 @@ export function MarkdownRenderer({ content, theme, cliColors }: MarkdownRenderer
     i++;
   }
 
-  return <View style={styles.container}>{elements}</View>;
+    return <View style={styles.container}>{elements}</View>;
+  } catch (err) {
+    return (
+      <View style={styles.container}>
+        <Text style={[styles.paragraph, { color: theme.textPrimary }]}>
+          {textContent}
+        </Text>
+      </View>
+    );
+  }
 }
 
 const styles = StyleSheet.create({
