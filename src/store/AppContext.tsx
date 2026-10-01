@@ -1538,11 +1538,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                   : Array.isArray(msg)
                   ? msg.map((m: any) => m.text || '').join('\n')
                   : '';
-              if (text) {
-                setRemoteSession(prev => ({
-                  ...prev,
-                  logs: [...prev.logs, `> ${text}`],
-                }));
+              const cleanText = text.trim();
+              if (cleanText) {
+                setRemoteSession(prev => {
+                  const lastUserCmd = [...prev.logs]
+                    .reverse()
+                    .find(l => typeof l === 'string' && l.startsWith('> '));
+                  if (lastUserCmd === `> ${cleanText}`) {
+                    return {
+                      ...prev,
+                      progressStatus: 'thinking',
+                    };
+                  }
+                  return {
+                    ...prev,
+                    progressStatus: 'thinking',
+                    logs: [...prev.logs, `> ${cleanText}`],
+                  };
+                });
               }
             } else if (data.type === 'assistant') {
               const msg = data.message?.content;
@@ -1562,18 +1575,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               if (text) {
                 setRemoteSession(prev => ({
                   ...prev,
+                  progressStatus: 'idle',
                   logs: [...prev.logs, text],
                 }));
+              }
+            } else if (data.type === 'stream_event' || data.type === 'content_block_delta') {
+              const deltaText = data.delta?.text || data.text || '';
+              if (deltaText) {
+                setRemoteSession(prev => {
+                  const lastIndex = prev.logs.length - 1;
+                  const lastLog = prev.logs[lastIndex];
+                  if (
+                    lastIndex >= 0 &&
+                    typeof lastLog === 'string' &&
+                    !lastLog.startsWith('> ') &&
+                    !lastLog.startsWith('[Tool]') &&
+                    !lastLog.startsWith('[Running]') &&
+                    !lastLog.startsWith('✓ Done') &&
+                    !lastLog.startsWith('[Status]') &&
+                    !lastLog.startsWith('[System]') &&
+                    !lastLog.startsWith('⚠️')
+                  ) {
+                    const updated = [...prev.logs];
+                    updated[lastIndex] = lastLog + deltaText;
+                    return { ...prev, progressStatus: 'thinking', logs: updated };
+                  } else {
+                    return {
+                      ...prev,
+                      progressStatus: 'thinking',
+                      logs: [...prev.logs, deltaText],
+                    };
+                  }
+                });
               }
             } else if (data.type === 'tool_progress') {
               setRemoteSession(prev => ({
                 ...prev,
+                progressStatus: 'thinking',
                 logs: [...prev.logs, `[Running] ${data.tool_name || ''}...`],
               }));
             } else if (data.type === 'result') {
               setRemoteSession(prev => ({
                 ...prev,
                 currentTool: undefined,
+                progressStatus: 'idle',
                 logs: [...prev.logs, `✓ Done (${data.subtype || 'success'})`],
               }));
             } else if (data.type === 'system') {
@@ -1636,12 +1681,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         wsRef.current.send(payload);
         setRemoteSession(prev => ({
           ...prev,
+          progressStatus: 'thinking',
           logs: [...prev.logs, `> ${trimmed}`],
         }));
         return true;
       } else {
         setRemoteSession(prev => ({
           ...prev,
+          progressStatus: 'idle',
           logs: [
             ...prev.logs,
             `> ${trimmed}`,
@@ -1664,6 +1711,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       wsRef.current.send(payload);
       setRemoteSession(prev => ({
         ...prev,
+        progressStatus: 'idle',
         logs: [...prev.logs, `^C (Interrupt signal sent to laptop)`],
       }));
       return true;
@@ -1674,6 +1722,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const clearRemoteLogs = useCallback(() => {
     setRemoteSession(prev => ({
       ...prev,
+      progressStatus: 'idle',
       logs: [],
     }));
   }, []);
