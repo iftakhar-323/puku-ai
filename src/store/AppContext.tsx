@@ -1589,9 +1589,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 }));
               }
             } else if (data.log) {
+              const logText = typeof data.log === 'string' ? data.log : JSON.stringify(data.log);
               setRemoteSession(prev => ({
                 ...prev,
-                logs: [...prev.logs, data.log],
+                logs: [...prev.logs, logText],
               }));
             }
           }

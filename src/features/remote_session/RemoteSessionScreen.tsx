@@ -16,6 +16,8 @@ import {
   BackIcon,
   CheckmarkIcon,
   CloseIcon,
+  EyeIcon,
+  EyeOffIcon,
   LogoutIcon,
   RemoteIcon,
   SendIcon,
@@ -45,6 +47,7 @@ export function RemoteSessionScreen() {
 
   const [inputSessionId, setInputSessionId] = useState(remoteSession.sessionId || '');
   const [inputToken, setInputToken] = useState(remoteSession.token || '');
+  const [showToken, setShowToken] = useState(false);
   const [commandText, setCommandText] = useState('');
   const [isSending, setIsSending] = useState(false);
 
@@ -134,7 +137,14 @@ export function RemoteSessionScreen() {
   };
 
   // Helper to format each log item into clean, modern UI components
-  const renderLogItem = (log: string, index: number) => {
+  const renderLogItem = (rawLog: any, index: number) => {
+    const log =
+      typeof rawLog === 'string'
+        ? rawLog
+        : typeof rawLog === 'object'
+        ? JSON.stringify(rawLog)
+        : String(rawLog ?? '');
+
     // 1. User command (e.g. "> ls -la")
     if (log.startsWith('> ')) {
       const cmd = log.slice(2);
@@ -350,9 +360,20 @@ export function RemoteSessionScreen() {
                 </View>
                 <Text
                   numberOfLines={1}
-                  style={[styles.detectedId, { color: '#8C8C8C', fontFamily: monoFont }]}>
-                  {activeRelaySessions[0].title || 'puku-cli'} · {activeRelaySessions[0].sessionId.slice(0, 16)}...
+                  style={[styles.detectedName, { color: '#D9D9D9', fontFamily: monoFont }]}>
+                  {activeRelaySessions[0].title || 'puku-cli'}
                 </Text>
+                <View style={styles.detectedSessionBox}>
+                  <Text style={[styles.detectedLabel, { color: '#8C8C8C', fontFamily: monoFont }]}>
+                    Relay Session ID:
+                  </Text>
+                  <Text
+                    selectable
+                    numberOfLines={1}
+                    style={[styles.detectedSessionValue, { color: '#73D13D', fontFamily: monoFont }]}>
+                    {activeRelaySessions[0].sessionId}
+                  </Text>
+                </View>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => {
@@ -391,24 +412,35 @@ export function RemoteSessionScreen() {
             <Text style={[styles.inputLabel, { color: '#8C8C8C', fontFamily: monoFont }]}>
               Mobile Session Token (Optional)
             </Text>
-            <TextInput
-              style={[
-                styles.terminalInput,
-                {
-                  backgroundColor: '#161B22',
-                  color: '#FFFFFF',
-                  borderColor: '#30363D',
-                  fontFamily: monoFont,
-                },
-              ]}
-              placeholder="Auto-resolved if logged into same account"
-              placeholderTextColor="#595959"
-              secureTextEntry
-              value={inputToken}
-              onChangeText={setInputToken}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View style={[styles.tokenInputWrap, { backgroundColor: '#161B22', borderColor: '#30363D' }]}>
+              <TextInput
+                style={[
+                  styles.tokenInputInner,
+                  {
+                    color: '#FFFFFF',
+                    fontFamily: monoFont,
+                  },
+                ]}
+                placeholder="Auto-resolved if logged into same account"
+                placeholderTextColor="#595959"
+                secureTextEntry={!showToken}
+                value={inputToken}
+                onChangeText={setInputToken}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowToken(!showToken)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.eyeBtn}>
+                {showToken ? (
+                  <EyeOffIcon size={18} color="#8C8C8C" />
+                ) : (
+                  <EyeIcon size={18} color="#8C8C8C" />
+                )}
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               activeOpacity={0.8}
@@ -457,6 +489,36 @@ export function RemoteSessionScreen() {
               </View>
             </View>
           )}
+
+          {/* Active Session Info Bar */}
+          <View style={styles.sessionMetaBanner}>
+            <View style={styles.sessionMetaLeft}>
+              <Text style={[styles.sessionMetaLabel, { color: '#8C8C8C', fontFamily: monoFont }]}>
+                ID:
+              </Text>
+              <Text
+                numberOfLines={1}
+                selectable
+                style={[styles.sessionMetaId, { color: '#52C41A', fontFamily: monoFont }]}>
+                {remoteSession.sessionId || 'active'}
+              </Text>
+            </View>
+            {remoteSession.token ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowToken(!showToken)}
+                style={styles.metaEyeBtn}>
+                {showToken ? (
+                  <EyeOffIcon size={14} color="#8C8C8C" />
+                ) : (
+                  <EyeIcon size={14} color="#8C8C8C" />
+                )}
+                <Text style={[styles.metaEyeText, { color: '#8C8C8C', fontFamily: monoFont }]}>
+                  {showToken ? remoteSession.token.slice(0, 8) + '...' : 'Token'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           {/* Terminal Console Logs */}
           <ScrollView
@@ -984,5 +1046,82 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  detectedName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  detectedSessionBox: {
+    backgroundColor: '#0D1117',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 2,
+  },
+  detectedLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  detectedSessionValue: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tokenInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingRight: 10,
+  },
+  tokenInputInner: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+  },
+  eyeBtn: {
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sessionMetaBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: '#161B22',
+    borderBottomWidth: 1,
+    borderBottomColor: '#21262D',
+  },
+  sessionMetaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  sessionMetaLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sessionMetaId: {
+    fontSize: 11,
+    fontWeight: '700',
+    flex: 1,
+  },
+  metaEyeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#21262D',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  metaEyeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
 });
