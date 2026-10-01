@@ -440,18 +440,39 @@ export function RemoteSessionProvider({
       if (!mobileToken && accountToken) {
         try {
           const res = await fetch(
-            `${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/auth`,
+            `${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/info`,
             {
-              method: 'POST',
+              method: 'GET',
               headers: {
                 Authorization: `Bearer ${accountToken}`,
                 'User-Agent': 'puku-ai-app/1.0',
               },
             },
           );
-          if (res.ok) mobileToken = (await res.json()).mobileToken || '';
+          if (res.ok) {
+            const data = await res.json();
+            mobileToken = data.mobileToken || data.mobile_token || '';
+          }
         } catch (err) {
-          devWarn('remote.resolveMobileToken', err);
+          devWarn('remote.resolveMobileTokenInfo', err);
+        }
+
+        if (!mobileToken) {
+          try {
+            const res = await fetch(
+              `${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/auth`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${accountToken}`,
+                  'User-Agent': 'puku-ai-app/1.0',
+                },
+              },
+            );
+            if (res.ok) mobileToken = (await res.json()).mobileToken || '';
+          } catch (err) {
+            devWarn('remote.resolveMobileTokenAuth', err);
+          }
         }
       }
 
