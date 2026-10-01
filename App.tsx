@@ -27,6 +27,7 @@ import { RemoteSessionProvider, useRemoteSession } from './src/store/RemoteSessi
 import { ToastProvider } from './src/components/ui/Toast';
 import { UpdateService } from './src/services/updateService';
 import { pukuBotApi } from './src/services/pukuBotApi';
+import { ignore } from './src/utils/devLog';
 
 function MainNavigator(): React.JSX.Element {
   const { activeRoute, isDark, isRestoringSession, navigate } = useApp();
@@ -41,7 +42,7 @@ function MainNavigator(): React.JSX.Element {
 
   useEffect(() => {
     try {
-      UpdateService.checkForUpdates(false).catch(() => {});
+      UpdateService.checkForUpdates(false).catch(ignore('App'));
     } catch {
       // Ignored
     }

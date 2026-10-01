@@ -35,6 +35,7 @@ import { ENV } from '../../config/env';
 import { extractJwtData, fetchAuthenticUserInfo } from '../../utils/auth';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
+import { ignore } from '../../utils/devLog';
 
 // Standard pure JS SHA-256 for PKCE S256 challenge calculation
 function sha256(ascii: string): Uint8Array {
@@ -194,7 +195,7 @@ export function LoginScreen() {
         if (isLoggedOut === 'true') return;
         const validToken = await tokenManager.ensureValidToken();
         if (validToken) {
-          refreshConversations().catch(() => {});
+          refreshConversations().catch(ignore('LoginScreen'));
           navigate('chat');
         }
       } catch {}
@@ -376,7 +377,7 @@ export function LoginScreen() {
           setIsOpeningWorkspace(true);
 
           showSnackBar(authenticEmail ? `Signed in as ${authenticEmail}` : 'Google Sign-In successful!');
-          refreshConversations().catch(() => {});
+          refreshConversations().catch(ignore('LoginScreen'));
           setTimeout(() => {
             setIsOpeningWorkspace(false);
             navigate('chat');
@@ -558,7 +559,7 @@ export function LoginScreen() {
       setIsEmailModalOpen(false);
       setIsOpeningWorkspace(true);
       showSnackBar(`Signed in as ${finalEmail}`);
-      refreshConversations().catch(() => {});
+      refreshConversations().catch(ignore('LoginScreen'));
       setTimeout(() => {
         setIsOpeningWorkspace(false);
         navigate('chat');
@@ -755,7 +756,7 @@ export function LoginScreen() {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
-                  Linking.openURL(`${ENV.AUTH_BASE_URL}/email-login`).catch(() => {});
+                  Linking.openURL(`${ENV.AUTH_BASE_URL}/email-login`).catch(ignore('LoginScreen'));
                 }}
                 style={styles.webEmailLinkBtn}>
                 <Text style={styles.webEmailLinkText}>

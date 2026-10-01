@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { EyeIcon, EyeOffIcon, RemoteIcon } from '../../../components/common/Icons';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {
+  EyeIcon,
+  EyeOffIcon,
+  RemoteIcon,
+} from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import { ActiveRelaySession } from '../../../types';
 
@@ -41,50 +52,92 @@ export function PairingView({
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={[styles.content, { paddingBottom: Math.max(bottomInset, 24) }]}>
-      <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.outline }]}>
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: Math.max(bottomInset, 24) },
+      ]}
+    >
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: theme.cardBackground, borderColor: theme.outline },
+        ]}
+      >
         <View style={styles.header}>
           <RemoteIcon size={24} color={theme.accent} />
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Connect to Laptop CLI</Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>
+            Connect to Laptop CLI
+          </Text>
         </View>
         <Text style={[styles.hint, { color: theme.textSecondary }]}>
-          Run /remote-control in Puku CLI on your laptop. Sessions on your account show up here
-          automatically.
+          Run /remote-control in Puku CLI on your laptop. Sessions on your
+          account show up here automatically.
         </Text>
 
         {detected && (
           <View
             style={[
               styles.detected,
-              { backgroundColor: theme.secondaryBackground, borderColor: theme.success },
-            ]}>
+              {
+                backgroundColor: theme.secondaryBackground,
+                borderColor: theme.success,
+              },
+            ]}
+          >
             <View style={styles.detectedHeader}>
-              <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
-              <Text style={[styles.detectedTitle, { color: theme.textPrimary }]}>
+              <View
+                style={[styles.liveDot, { backgroundColor: theme.success }]}
+              />
+              <Text
+                style={[styles.detectedTitle, { color: theme.textPrimary }]}
+              >
                 Laptop session online
               </Text>
             </View>
-            <Text numberOfLines={1} style={[styles.detectedName, { color: theme.textSecondary }]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.detectedName, { color: theme.textSecondary }]}
+            >
               {detected.title || 'puku-cli'}
             </Text>
-            <Text selectable numberOfLines={1} style={[styles.detectedId, { color: theme.textMuted }]}>
+            <Text
+              selectable
+              numberOfLines={1}
+              style={[styles.detectedId, { color: theme.textMuted }]}
+            >
               {detected.sessionId}
             </Text>
             <TouchableOpacity
               activeOpacity={0.8}
               accessibilityRole="button"
-              onPress={() => onConnect(detected.sessionId, detected.mobileToken)}
-              style={[styles.primaryBtn, { backgroundColor: theme.textPrimary }]}>
-              <Text style={[styles.primaryBtnText, { color: theme.background }]}>Connect</Text>
+              onPress={() =>
+                onConnect(detected.sessionId, detected.mobileToken)
+              }
+              style={[
+                styles.primaryBtn,
+                { backgroundColor: theme.textPrimary },
+              ]}
+            >
+              <Text
+                style={[styles.primaryBtnText, { color: theme.background }]}
+              >
+                Connect
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <Text style={[styles.label, { color: theme.textSecondary }]}>Relay session ID</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>
+          Relay session ID
+        </Text>
         <TextInput
           style={[
             styles.input,
-            { backgroundColor: theme.secondaryBackground, borderColor: theme.outline, color: theme.textPrimary },
+            {
+              backgroundColor: theme.secondaryBackground,
+              borderColor: theme.outline,
+              color: theme.textPrimary,
+            },
           ]}
           placeholder="e.g. af689a1b-2858-..."
           placeholderTextColor={theme.placeholderText}
@@ -95,12 +148,18 @@ export function PairingView({
           accessibilityLabel="Relay session ID"
         />
 
-        <Text style={[styles.label, { color: theme.textSecondary }]}>Mobile token (optional)</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>
+          Mobile token (optional)
+        </Text>
         <View
           style={[
             styles.tokenWrap,
-            { backgroundColor: theme.secondaryBackground, borderColor: theme.outline },
-          ]}>
+            {
+              backgroundColor: theme.secondaryBackground,
+              borderColor: theme.outline,
+            },
+          ]}
+        >
           <TextInput
             style={[styles.tokenInput, { color: theme.textPrimary }]}
             placeholder="Resolved automatically on the same account"
@@ -118,7 +177,8 @@ export function PairingView({
             accessibilityLabel={showToken ? 'Hide token' : 'Show token'}
             onPress={() => setShowToken(v => !v)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.eyeBtn}>
+            style={styles.eyeBtn}
+          >
             {showToken ? (
               <EyeOffIcon size={18} color={theme.textSecondary} />
             ) : (
@@ -137,8 +197,11 @@ export function PairingView({
             styles.primaryBtn,
             { backgroundColor: theme.textPrimary },
             !canConnect && styles.disabled,
-          ]}>
-          <Text style={[styles.primaryBtnText, { color: theme.background }]}>Connect manually</Text>
+          ]}
+        >
+          <Text style={[styles.primaryBtnText, { color: theme.background }]}>
+            Connect manually
+          </Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

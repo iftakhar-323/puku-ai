@@ -16,6 +16,7 @@ import {
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { NativeClipboard, NativeSpeech } from '../../services/nativeModules';
+import { ignore } from '../../utils/devLog';
 
 export function TranscribeScreen() {
   const insets = useSafeAreaInsets();
@@ -100,7 +101,7 @@ export function TranscribeScreen() {
     .filter(Boolean).length;
 
   const handleCopy = () => {
-    NativeClipboard.setString(transcript).catch(() => {});
+    NativeClipboard.setString(transcript).catch(ignore('TranscribeScreen'));
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 1500);
   };

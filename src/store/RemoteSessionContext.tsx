@@ -67,9 +67,12 @@ interface RemoteSessionContextValue {
   dismissNotice: () => void;
 }
 
-const RemoteSessionContext = createContext<RemoteSessionContextValue | null>(null);
+const RemoteSessionContext = createContext<RemoteSessionContextValue | null>(
+  null,
+);
 
-const reconnectTokenKey = (sessionId: string) => `@puku_remote_reconnect_${sessionId}`;
+const reconnectTokenKey = (sessionId: string) =>
+  `@puku_remote_reconnect_${sessionId}`;
 
 async function resolveAccountToken(): Promise<string> {
   return (
@@ -80,11 +83,18 @@ async function resolveAccountToken(): Promise<string> {
   );
 }
 
-export function RemoteSessionProvider({ children }: { children: React.ReactNode }) {
+export function RemoteSessionProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { profile } = useApp();
 
-  const [session, setSession] = useState<RemoteSessionState>(createInitialState);
-  const [activeRelaySessions, setActiveRelaySessions] = useState<ActiveRelaySession[]>([]);
+  const [session, setSession] =
+    useState<RemoteSessionState>(createInitialState);
+  const [activeRelaySessions, setActiveRelaySessions] = useState<
+    ActiveRelaySession[]
+  >([]);
   const [isLoadingRelaySessions, setIsLoadingRelaySessions] = useState(false);
 
   // The reducer runs against this ref so side effects never run inside a
@@ -92,24 +102,29 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
   const stateRef = useRef<RemoteSessionState>(session);
   const flushPending = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const connRef = useRef<{ sessionId: string; mobileToken: string; accountToken: string } | null>(
-    null
-  );
+  const connRef = useRef<{
+    sessionId: string;
+    mobileToken: string;
+    accountToken: string;
+  } | null>(null);
   const attemptRef = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // After a reconnect the CLI replays what we missed; skip frames already applied.
   const seenFrameIds = useRef<Set<string>>(new Set());
 
-  const update = useCallback((fn: (s: RemoteSessionState) => RemoteSessionState) => {
-    stateRef.current = fn(stateRef.current);
-    if (!flushPending.current) {
-      flushPending.current = true;
-      requestAnimationFrame(() => {
-        flushPending.current = false;
-        setSession(stateRef.current);
-      });
-    }
-  }, []);
+  const update = useCallback(
+    (fn: (s: RemoteSessionState) => RemoteSessionState) => {
+      stateRef.current = fn(stateRef.current);
+      if (!flushPending.current) {
+        flushPending.current = true;
+        requestAnimationFrame(() => {
+          flushPending.current = false;
+          setSession(stateRef.current);
+        });
+      }
+    },
+    [],
+  );
 
   const send = useCallback((payload: Record<string, any>): boolean => {
     const ws = wsRef.current;
@@ -177,7 +192,7 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
         }
       }
     },
-    [send, closeSocket]
+    [send, closeSocket],
   );
 
   // `openSocket` and `scheduleReconnect` call each other; the ref breaks the cycle.
@@ -190,12 +205,17 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
         const gone = code !== undefined && code >= 4000 && code < 5000;
         update(s =>
           addSystem(
-            { ...s, phase: 'closed', isWorking: false, pendingPrompt: undefined },
+            {
+              ...s,
+              phase: 'closed',
+              isWorking: false,
+              pendingPrompt: undefined,
+            },
             gone
               ? 'This session has expired. Run /remote-control on your laptop to pair again.'
               : 'Could not reach your laptop. Tap Reconnect to try again.',
-            'error'
-          )
+            'error',
+          ),
         );
         return;
       }
@@ -207,7 +227,7 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
         openSocketRef.current();
       }, delay);
     },
-    [update]
+    [update],
   );
 
   const openSocket = useCallback(async () => {
@@ -222,8 +242,12 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
 
     const base = ENV.REMOTE_SESSION_RELAY_HOST.replace(/^http/, 'ws');
     const url =
-      `${base}/client/${encodeURIComponent(conn.sessionId)}?token=${encodeURIComponent(conn.mobileToken)}` +
-      (reconnectToken ? `&reconnectToken=${encodeURIComponent(reconnectToken)}` : '');
+      `${base}/client/${encodeURIComponent(
+        conn.sessionId,
+      )}?token=${encodeURIComponent(conn.mobileToken)}` +
+      (reconnectToken
+        ? `&reconnectToken=${encodeURIComponent(reconnectToken)}`
+        : '');
 
     let ws: WebSocket;
     try {
@@ -255,7 +279,8 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
       const { frames, text } = parseMessage(raw);
       const effects: RelayEffect[] = [];
       let next = stateRef.current;
-      for (const line of text) next = addEntry(next, { kind: 'assistant', text: line });
+      for (const line of text)
+        next = addEntry(next, { kind: 'assistant', text: line });
       for (const frame of frames) {
         const frameId: unknown = frame?.uuid;
         if (typeof frameId === 'string') {
@@ -263,7 +288,11 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
           seenFrameIds.current.add(frameId);
         }
         if (__DEV__) {
-          console.log('[RemoteRelay] frame', frame?.type, frame?.event?.type || frame?.subtype || '');
+          console.log(
+            '[RemoteRelay] frame',
+            frame?.type,
+            frame?.event?.type || frame?.subtype || '',
+          );
         }
         const result = applyFrame(next, frame);
         next = result.state;
@@ -296,12 +325,20 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
     try {
       const accessToken = await resolveAccountToken();
       if (!accessToken) return { sessions: [], status: 401 };
-      const response = await fetch(`${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions?mine=1`, {
-        headers: { Authorization: `Bearer ${accessToken}`, 'User-Agent': 'puku-ai-app/1.0' },
-      });
+      const response = await fetch(
+        `${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions?mine=1`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'User-Agent': 'puku-ai-app/1.0',
+          },
+        },
+      );
       if (!response.ok) return { sessions: [], status: response.status };
       const data = await response.json();
-      const sessions: ActiveRelaySession[] = Array.isArray(data.sessions) ? data.sessions : [];
+      const sessions: ActiveRelaySession[] = Array.isArray(data.sessions)
+        ? data.sessions
+        : [];
       setActiveRelaySessions(sessions);
       return { sessions, status: response.status };
     } catch (err) {
@@ -314,7 +351,7 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
 
   const fetchActiveRelaySessions = useCallback(
     async () => (await fetchSessionsWithStatus()).sessions,
-    [fetchSessionsWithStatus]
+    [fetchSessionsWithStatus],
   );
 
   const connect = useCallback(
@@ -337,10 +374,16 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
       let mobileToken = (token || '').trim() || listed?.mobileToken || '';
       if (!mobileToken && accountToken) {
         try {
-          const res = await fetch(`${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/auth`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${accountToken}`, 'User-Agent': 'puku-ai-app/1.0' },
-          });
+          const res = await fetch(
+            `${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/auth`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accountToken}`,
+                'User-Agent': 'puku-ai-app/1.0',
+              },
+            },
+          );
           if (res.ok) mobileToken = (await res.json()).mobileToken || '';
         } catch (err) {
           devWarn('remote.resolveMobileToken', err);
@@ -351,7 +394,7 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
       update(s => ({ ...s, token: mobileToken }));
       await openSocket();
     },
-    [activeRelaySessions, closeSocket, openSocket, update]
+    [activeRelaySessions, closeSocket, openSocket, update],
   );
 
   const disconnect = useCallback(() => {
@@ -361,9 +404,14 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
       s.phase === 'idle'
         ? s
         : addSystem(
-            { ...s, phase: 'closed', isWorking: false, pendingPrompt: undefined },
-            'Disconnected from laptop.'
-          )
+            {
+              ...s,
+              phase: 'closed',
+              isWorking: false,
+              pendingPrompt: undefined,
+            },
+            'Disconnected from laptop.',
+          ),
     );
   }, [closeSocket, update]);
 
@@ -375,7 +423,7 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
       update(s => addLocalUser(s, trimmed));
       return true;
     },
-    [send, update]
+    [send, update],
   );
 
   const interrupt = useCallback(() => {
@@ -395,7 +443,7 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
       send(permissionReply(prompt.requestId, allow, message));
       update(s => ({ ...s, pendingPrompt: undefined }));
     },
-    [send, update]
+    [send, update],
   );
 
   const answerQuestions = useCallback(
@@ -405,26 +453,30 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
       send(questionReply(prompt, answers));
       update(s => ({ ...s, pendingPrompt: undefined }));
     },
-    [send, update]
+    [send, update],
   );
 
   const sendControl = useCallback(
     (control: PendingControl) => {
       const requestId = makeRequestId();
       if (!send(controlFrame(requestId, control))) return;
-      update(s => ({ ...s, pendingControls: { ...s.pendingControls, [requestId]: control } }));
+      update(s => ({
+        ...s,
+        pendingControls: { ...s.pendingControls, [requestId]: control },
+      }));
     },
-    [send, update]
+    [send, update],
   );
 
   const setPermissionMode = useCallback(
-    (mode: PermissionMode) => sendControl({ subtype: 'set_permission_mode', value: mode }),
-    [sendControl]
+    (mode: PermissionMode) =>
+      sendControl({ subtype: 'set_permission_mode', value: mode }),
+    [sendControl],
   );
 
   const setModel = useCallback(
     (model: string) => sendControl({ subtype: 'set_model', value: model }),
-    [sendControl]
+    [sendControl],
   );
 
   const dismissNotice = useCallback(() => {
@@ -449,10 +501,12 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => closeSocket, [closeSocket]);
 
-  const isActive = ['connecting', 'open', 'attached', 'reconnecting'].includes(session.phase);
+  const isActive = ['connecting', 'open', 'attached', 'reconnecting'].includes(
+    session.phase,
+  );
   const liveRelaySessions = useMemo(
     () => activeRelaySessions.filter(s => s.workerConnected && !s.expired),
-    [activeRelaySessions]
+    [activeRelaySessions],
   );
 
   const value = useMemo<RemoteSessionContextValue>(
@@ -491,7 +545,7 @@ export function RemoteSessionProvider({ children }: { children: React.ReactNode 
       setPermissionMode,
       setModel,
       dismissNotice,
-    ]
+    ],
   );
 
   return (
@@ -509,7 +563,10 @@ const SessionPollingContext = createContext<
 
 export function useRemoteSession(): RemoteSessionContextValue {
   const ctx = useContext(RemoteSessionContext);
-  if (!ctx) throw new Error('useRemoteSession must be used within a RemoteSessionProvider');
+  if (!ctx)
+    throw new Error(
+      'useRemoteSession must be used within a RemoteSessionProvider',
+    );
   return ctx;
 }
 

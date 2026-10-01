@@ -20,6 +20,7 @@ import { pukuApi, mapModelToApi, mapApiToModel } from '../services/api';
 import { tokenManager } from '../services/tokenManager';
 import { extractJwtData } from '../utils/auth';
 import { formatActivityDate, getConversationTimestamp } from '../utils/date';
+import { ignore } from '../utils/devLog';
 
 interface AppContextValue {
   theme: ThemeColors;
@@ -373,7 +374,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 );
               }
             })
-            .catch(() => {});
+            .catch(ignore('AppContext'));
         }
 
         // Proactively sync cloud conversations from server
@@ -430,11 +431,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
                 // Sort chronologically (newest first)
                 merged.sort((a, b) => (b.updatedAtTimestamp || 0) - (a.updatedAtTimestamp || 0));
-                AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(() => {});
+                AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(ignore('AppContext'));
                 return merged;
               });
             }
-          }).catch(() => {});
+          }).catch(ignore('AppContext'));
         }
 
         if (savedProjectsStr) {
@@ -476,7 +477,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 return merged;
               });
             }
-          }).catch(() => {});
+          }).catch(ignore('AppContext'));
         }
 
         const targetRoute =
@@ -506,25 +507,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (conversations.length > 0) {
-      AsyncStorage.setItem('@puku_conversations', JSON.stringify(conversations)).catch(() => {});
+      AsyncStorage.setItem('@puku_conversations', JSON.stringify(conversations)).catch(ignore('AppContext'));
     }
   }, [conversations]);
 
   useEffect(() => {
-    AsyncStorage.setItem('@puku_app_settings', JSON.stringify(settings)).catch(() => {});
+    AsyncStorage.setItem('@puku_app_settings', JSON.stringify(settings)).catch(ignore('AppContext'));
   }, [settings]);
 
   useEffect(() => {
     if (activeRoute && activeRoute !== 'login') {
-      AsyncStorage.setItem('@puku_active_route', activeRoute).catch(() => {});
+      AsyncStorage.setItem('@puku_active_route', activeRoute).catch(ignore('AppContext'));
     }
   }, [activeRoute]);
 
   useEffect(() => {
     if (activeConversationId && !activeConversationId.startsWith('incog_')) {
-      AsyncStorage.setItem('@puku_active_conversation_id', activeConversationId).catch(() => {});
+      AsyncStorage.setItem('@puku_active_conversation_id', activeConversationId).catch(ignore('AppContext'));
     } else if (!activeConversationId) {
-      AsyncStorage.removeItem('@puku_active_conversation_id').catch(() => {});
+      AsyncStorage.removeItem('@puku_active_conversation_id').catch(ignore('AppContext'));
     }
   }, [activeConversationId]);
 
@@ -532,7 +533,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedModel = (model: ChatModelType) => {
     setSelectedModelState(model);
-    AsyncStorage.setItem('@puku_selected_model', model).catch(() => {});
+    AsyncStorage.setItem('@puku_selected_model', model).catch(ignore('AppContext'));
     if (activeConversationId) {
       setConversations(prev =>
         prev.map(c => (c.id === activeConversationId ? { ...c, model } : c))
@@ -542,7 +543,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .updateConversation(activeConversationId, {
             model: mapModelToApi(model),
           })
-          .catch(() => {});
+          .catch(ignore('AppContext'));
       }
     }
   };
@@ -553,7 +554,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const idToDelete = incognitoConversationIdRef.current || incognitoConversationId;
     if (idToDelete && !idToDelete.startsWith('incog_')) {
       try {
-        pukuApi.deleteConversation(idToDelete).catch(() => {});
+        pukuApi.deleteConversation(idToDelete).catch(ignore('AppContext'));
       } catch {}
     }
     incognitoConversationIdRef.current = null;
@@ -568,7 +569,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           c.title?.toLowerCase() !== 'incognito'
       );
       if (filtered.length !== prev.length) {
-        AsyncStorage.setItem('@puku_conversations', JSON.stringify(filtered)).catch(() => {});
+        AsyncStorage.setItem('@puku_conversations', JSON.stringify(filtered)).catch(ignore('AppContext'));
       }
       return filtered;
     });
@@ -590,7 +591,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (projects.length > 0) {
-      AsyncStorage.setItem('@puku_projects', JSON.stringify(projects)).catch(() => {});
+      AsyncStorage.setItem('@puku_projects', JSON.stringify(projects)).catch(ignore('AppContext'));
     }
   }, [projects]);
 
@@ -615,7 +616,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRouteHistory(prev => [...prev, route]);
     setActiveRoute(route);
     if (route !== 'login') {
-      AsyncStorage.setItem('@puku_active_route', route).catch(() => {});
+      AsyncStorage.setItem('@puku_active_route', route).catch(ignore('AppContext'));
     }
   };
 
@@ -686,7 +687,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             raw.id === incognitoConversationIdRef.current
         );
         incognitoOnServer.forEach((raw: any) => {
-          pukuApi.deleteConversation(raw.id).catch(() => {});
+          pukuApi.deleteConversation(raw.id).catch(ignore('AppContext'));
         });
 
         const validCloudConvs = cloudConvs.filter(
@@ -751,7 +752,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
           // Sort chronologically (newest conversation first)
           merged.sort((a, b) => (b.updatedAtTimestamp || 0) - (a.updatedAtTimestamp || 0));
-          AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(() => {});
+          AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(ignore('AppContext'));
           return merged;
         });
       }
@@ -828,7 +829,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               };
               updated = [newConv, ...prev];
             }
-            AsyncStorage.setItem('@puku_conversations', JSON.stringify(updated)).catch(() => {});
+            AsyncStorage.setItem('@puku_conversations', JSON.stringify(updated)).catch(ignore('AppContext'));
             return updated;
           });
         }
@@ -857,7 +858,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     ids.forEach(id => {
       if (!id.startsWith('conv_')) {
-        pukuApi.deleteConversation(id).catch(() => {});
+        pukuApi.deleteConversation(id).catch(ignore('AppContext'));
       }
     });
   };
@@ -1213,7 +1214,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setProjects(prev => prev.map(p => (p.id === tempId ? { ...p, id: realId } : p)));
         }
       })
-      .catch(() => {});
+      .catch(ignore('AppContext'));
 
     return newProj;
   };
@@ -1221,7 +1222,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateProject = (id: string, updates: Partial<Project>) => {
     setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
     if (!id.startsWith('proj_')) {
-      pukuApi.updateProject(id, updates as any).catch(() => {});
+      pukuApi.updateProject(id, updates as any).catch(ignore('AppContext'));
     }
   };
 
@@ -1229,7 +1230,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProjects(prev => prev.filter(p => p.id !== id));
     if (activeProjectId === id) setActiveProjectId(null);
     if (!id.startsWith('proj_')) {
-      pukuApi.deleteProject(id).catch(() => {});
+      pukuApi.deleteProject(id).catch(ignore('AppContext'));
     }
   };
 
@@ -1336,7 +1337,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = (updates: Partial<UserProfile>) => {
     setProfile(prev => {
       const updated = { ...prev, ...updates };
-      AsyncStorage.setItem('@puku_user_profile', JSON.stringify(updated)).catch(() => {});
+      AsyncStorage.setItem('@puku_user_profile', JSON.stringify(updated)).catch(ignore('AppContext'));
       return updated;
     });
   };
@@ -1347,19 +1348,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     pukuApi.setAuthToken(null);
-    tokenManager.clearTokens().catch(() => {});
+    tokenManager.clearTokens().catch(ignore('AppContext'));
     clearIncognitoChat();
-    AsyncStorage.setItem('@puku_is_logged_out', 'true').catch(() => {});
-    AsyncStorage.removeItem('@puku_auth_token').catch(() => {});
-    AsyncStorage.removeItem('@puku_refresh_token').catch(() => {});
-    AsyncStorage.removeItem('@puku_token_expires_at').catch(() => {});
-    AsyncStorage.removeItem('@puku_user_profile').catch(() => {});
-    AsyncStorage.removeItem('@puku_conversations').catch(() => {});
-    AsyncStorage.removeItem('@puku_projects').catch(() => {});
-    AsyncStorage.removeItem('@puku_active_route').catch(() => {});
-    AsyncStorage.removeItem('@puku_active_conversation_id').catch(() => {});
-    AsyncStorage.removeItem('@puku_is_logged_in').catch(() => {});
-    AsyncStorage.removeItem('@puku_selected_model').catch(() => {});
+    AsyncStorage.setItem('@puku_is_logged_out', 'true').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_auth_token').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_refresh_token').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_token_expires_at').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_user_profile').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_conversations').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_projects').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_active_route').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_active_conversation_id').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_is_logged_in').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_selected_model').catch(ignore('AppContext'));
     setSelectedModelState('puku-ai-2.7');
     setProfile(initialProfile);
     setConversations([]);
@@ -1372,13 +1373,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isRestoringSession) {
-      AsyncStorage.setItem('@pukubot_local_conversations', JSON.stringify(botConversations)).catch(() => {});
+      AsyncStorage.setItem('@pukubot_local_conversations', JSON.stringify(botConversations)).catch(ignore('AppContext'));
     }
   }, [botConversations, isRestoringSession]);
 
   useEffect(() => {
     if (!isRestoringSession && activeBotConversationId) {
-      AsyncStorage.setItem('@pukubot_active_bot_conv', activeBotConversationId).catch(() => {});
+      AsyncStorage.setItem('@pukubot_active_bot_conv', activeBotConversationId).catch(ignore('AppContext'));
     }
   }, [activeBotConversationId, isRestoringSession]);
 

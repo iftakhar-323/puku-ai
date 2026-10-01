@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { ChevronDownIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import { OptionSheet } from './OptionSheet';
-import { PERMISSION_MODES, PermissionMode, REMOTE_MODELS } from '../relay/protocol';
+import {
+  PERMISSION_MODES,
+  PermissionMode,
+  REMOTE_MODELS,
+} from '../relay/protocol';
 
 interface Props {
   theme: ThemeColors;
@@ -36,8 +47,12 @@ export function RemoteComposer({
 
   const hasText = text.trim().length > 0;
   const showStop = isWorking && !hasText;
-  const modeLabel = PERMISSION_MODES.find(m => m.mode === permissionMode)?.label || 'Ask';
-  const models = model && !REMOTE_MODELS.includes(model) ? [model, ...REMOTE_MODELS] : REMOTE_MODELS;
+  const modeLabel =
+    PERMISSION_MODES.find(m => m.mode === permissionMode)?.label || 'Ask';
+  const models =
+    model && !REMOTE_MODELS.includes(model)
+      ? [model, ...REMOTE_MODELS]
+      : REMOTE_MODELS;
 
   const submit = () => {
     if (!hasText || !enabled) return;
@@ -49,8 +64,12 @@ export function RemoteComposer({
       <View
         style={[
           styles.card,
-          { backgroundColor: theme.chatBarBackground, borderColor: theme.chatBarBorder },
-        ]}>
+          {
+            backgroundColor: theme.chatBarBackground,
+            borderColor: theme.chatBarBorder,
+          },
+        ]}
+      >
         <TextInput
           style={[styles.input, { color: theme.textPrimary }]}
           placeholder={enabled ? 'Type / for commands' : disabledHint}
@@ -70,8 +89,14 @@ export function RemoteComposer({
             accessibilityLabel="Stop (interrupt the laptop)"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={onInterrupt}
-            style={styles.sendBtn}>
-            <View style={[styles.stopSquare, { backgroundColor: theme.textPrimary }]} />
+            style={styles.sendBtn}
+          >
+            <View
+              style={[
+                styles.stopSquare,
+                { backgroundColor: theme.textPrimary },
+              ]}
+            />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -82,9 +107,17 @@ export function RemoteComposer({
             disabled={!hasText || !enabled}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={submit}
-            style={styles.sendBtn}>
+            style={styles.sendBtn}
+          >
             <Text
-              style={[styles.sendGlyph, { color: hasText && enabled ? theme.textPrimary : theme.textMuted }]}>
+              style={[
+                styles.sendGlyph,
+                {
+                  color:
+                    hasText && enabled ? theme.textPrimary : theme.textMuted,
+                },
+              ]}
+            >
               ↵
             </Text>
           </TouchableOpacity>
@@ -98,8 +131,11 @@ export function RemoteComposer({
           accessibilityRole="button"
           accessibilityLabel={`Permission mode: ${modeLabel}`}
           onPress={() => setSheet('mode')}
-          style={[styles.control, !enabled && styles.dimmed]}>
-          <Text style={[styles.controlText, { color: theme.textSecondary }]}>{modeLabel}</Text>
+          style={[styles.control, !enabled && styles.dimmed]}
+        >
+          <Text style={[styles.controlText, { color: theme.textSecondary }]}>
+            {modeLabel}
+          </Text>
           <ChevronDownIcon size={11} color={theme.textMuted} />
         </TouchableOpacity>
         <View style={styles.spacer} />
@@ -109,13 +145,19 @@ export function RemoteComposer({
           accessibilityRole="button"
           accessibilityLabel={`Model: ${model || 'default'}`}
           onPress={() => setSheet('model')}
-          style={[styles.control, !enabled && styles.dimmed]}>
-          <Text numberOfLines={1} style={[styles.controlText, { color: theme.textSecondary }]}>
+          style={[styles.control, !enabled && styles.dimmed]}
+        >
+          <Text
+            numberOfLines={1}
+            style={[styles.controlText, { color: theme.textSecondary }]}
+          >
             {model || 'Default model'}
           </Text>
           <ChevronDownIcon size={11} color={theme.textMuted} />
         </TouchableOpacity>
-        {isWorking && <ActivityIndicator size="small" color={theme.textMuted} />}
+        {isWorking && (
+          <ActivityIndicator size="small" color={theme.textMuted} />
+        )}
       </View>
 
       <OptionSheet
@@ -123,10 +165,15 @@ export function RemoteComposer({
         title="Permission mode"
         theme={theme}
         selectedKey={permissionMode}
-        options={PERMISSION_MODES.map(m => ({ key: m.mode, label: m.label, description: m.description }))}
+        options={PERMISSION_MODES.map(m => ({
+          key: m.mode,
+          label: m.label,
+          description: m.description,
+        }))}
         onSelect={key => {
           setSheet(null);
-          if (key !== permissionMode) onSetPermissionMode(key as PermissionMode);
+          if (key !== permissionMode)
+            onSetPermissionMode(key as PermissionMode);
         }}
         onClose={() => setSheet(null)}
       />

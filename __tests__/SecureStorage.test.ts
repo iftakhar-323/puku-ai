@@ -33,9 +33,16 @@ describe('secureStorage', () => {
 
   test('TokenManager keeps access and refresh tokens out of AsyncStorage', async () => {
     const manager = new TokenManager();
-    await manager.saveTokens({ accessToken: 'acc', refreshToken: 'ref', expiresIn: 3600 });
+    await manager.saveTokens({
+      accessToken: 'acc',
+      refreshToken: 'ref',
+      expiresIn: 3600,
+    });
     expect(await AsyncStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN)).toBeNull();
     expect(await AsyncStorage.getItem(TOKEN_KEYS.REFRESH_TOKEN)).toBeNull();
-    expect(await new TokenManager().loadTokens()).toMatchObject({ accessToken: 'acc', refreshToken: 'ref' });
+    expect(await new TokenManager().loadTokens()).toMatchObject({
+      accessToken: 'acc',
+      refreshToken: 'ref',
+    });
   });
 });

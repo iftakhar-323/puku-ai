@@ -20,6 +20,7 @@ import {
 import { useApp } from '../../store/AppContext';
 import { Conversation } from '../../types';
 import { formatActivityDate } from '../../utils/date';
+import { ignore } from '../../utils/devLog';
 
 function formatModelName(model?: string): string {
   switch (model) {
@@ -53,7 +54,7 @@ export function ChatsScreen() {
 
   // Sync cloud conversations on screen mount so cross-device/past chats appear immediately
   useEffect(() => {
-    refreshConversations().catch(() => {});
+    refreshConversations().catch(ignore('ChatsScreen'));
   }, [refreshConversations]);
 
   const handleRefresh = async () => {

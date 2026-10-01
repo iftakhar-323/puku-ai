@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { CheckmarkIcon, CloseIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import type { PendingPrompt } from '../relay/protocol';
@@ -15,13 +22,26 @@ interface Props {
 }
 
 /** The CLI is waiting on the user: Allow/Deny, or a picker for AskUserQuestion. */
-export function PromptCard({ prompt, theme, onAnswer, onAnswerQuestions }: Props) {
+export function PromptCard({
+  prompt,
+  theme,
+  onAnswer,
+  onAnswerQuestions,
+}: Props) {
   return (
     <View
-      style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.warning }]}
-      accessibilityLiveRegion="polite">
+      style={[
+        styles.card,
+        { backgroundColor: theme.cardBackground, borderColor: theme.warning },
+      ]}
+      accessibilityLiveRegion="polite"
+    >
       {prompt.questions ? (
-        <QuestionPicker prompt={prompt} theme={theme} onAnswer={onAnswerQuestions} />
+        <QuestionPicker
+          prompt={prompt}
+          theme={theme}
+          onAnswer={onAnswerQuestions}
+        />
       ) : (
         <PermissionBody prompt={prompt} theme={theme} onAnswer={onAnswer} />
       )}
@@ -38,18 +58,35 @@ function PermissionBody({
   theme: ThemeColors;
   onAnswer: (allow: boolean) => void;
 }) {
-  const summary = describeTool({ name: prompt.toolName, input: prompt.input, status: 'running' });
+  const summary = describeTool({
+    name: prompt.toolName,
+    input: prompt.input,
+    status: 'running',
+  });
   return (
     <>
-      <Text style={[styles.eyebrow, { color: theme.warning }]}>PERMISSION REQUIRED</Text>
-      <Text style={[styles.title, { color: theme.textPrimary }]}>Allow {prompt.toolName}?</Text>
-      <View style={[styles.commandBox, { backgroundColor: theme.codeBackground }]}>
-        <Text selectable numberOfLines={6} style={[styles.command, { color: theme.textPrimary }]}>
+      <Text style={[styles.eyebrow, { color: theme.warning }]}>
+        PERMISSION REQUIRED
+      </Text>
+      <Text style={[styles.title, { color: theme.textPrimary }]}>
+        Allow {prompt.toolName}?
+      </Text>
+      <View
+        style={[styles.commandBox, { backgroundColor: theme.codeBackground }]}
+      >
+        <Text
+          selectable
+          numberOfLines={6}
+          style={[styles.command, { color: theme.textPrimary }]}
+        >
           {summary}
         </Text>
       </View>
       {prompt.description ? (
-        <Text numberOfLines={3} style={[styles.description, { color: theme.textSecondary }]}>
+        <Text
+          numberOfLines={3}
+          style={[styles.description, { color: theme.textSecondary }]}
+        >
           {prompt.description}
         </Text>
       ) : null}
@@ -59,7 +96,8 @@ function PermissionBody({
           accessibilityRole="button"
           accessibilityLabel={`Deny ${prompt.toolName}`}
           onPress={() => onAnswer(false)}
-          style={[styles.secondaryBtn, { borderColor: theme.outline }]}>
+          style={[styles.secondaryBtn, { borderColor: theme.outline }]}
+        >
           <CloseIcon size={13} color={theme.error} />
           <Text style={[styles.btnText, { color: theme.error }]}>Deny</Text>
         </TouchableOpacity>
@@ -68,9 +106,12 @@ function PermissionBody({
           accessibilityRole="button"
           accessibilityLabel={`Allow ${prompt.toolName}`}
           onPress={() => onAnswer(true)}
-          style={[styles.primaryBtn, { backgroundColor: theme.textPrimary }]}>
+          style={[styles.primaryBtn, { backgroundColor: theme.textPrimary }]}
+        >
           <CheckmarkIcon size={13} color={theme.background} />
-          <Text style={[styles.btnText, { color: theme.background }]}>Allow</Text>
+          <Text style={[styles.btnText, { color: theme.background }]}>
+            Allow
+          </Text>
         </TouchableOpacity>
       </View>
     </>
@@ -108,50 +149,77 @@ function QuestionPicker({
 
   return (
     <>
-      <Text style={[styles.eyebrow, { color: theme.warning }]}>YOUR LAPTOP IS ASKING</Text>
+      <Text style={[styles.eyebrow, { color: theme.warning }]}>
+        YOUR LAPTOP IS ASKING
+      </Text>
       <ScrollView style={styles.questionScroll} nestedScrollEnabled>
         {questions.map(q => (
           <View key={q.question} style={styles.question}>
             {q.header ? (
-              <Text style={[styles.header, { color: theme.textMuted }]}>{q.header}</Text>
+              <Text style={[styles.header, { color: theme.textMuted }]}>
+                {q.header}
+              </Text>
             ) : null}
-            <Text style={[styles.title, { color: theme.textPrimary }]}>{q.question}</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>
+              {q.question}
+            </Text>
             {q.options.map(option => {
-              const selected = (answers[q.question] || []).includes(option.label);
+              const selected = (answers[q.question] || []).includes(
+                option.label,
+              );
               return (
                 <TouchableOpacity
                   key={option.label}
                   activeOpacity={0.7}
                   accessibilityRole={q.multiSelect ? 'checkbox' : 'radio'}
                   accessibilityState={{ checked: selected }}
-                  onPress={() => toggle(q.question, option.label, !!q.multiSelect)}
+                  onPress={() =>
+                    toggle(q.question, option.label, !!q.multiSelect)
+                  }
                   style={[
                     styles.option,
                     {
                       borderColor: selected ? theme.textPrimary : theme.outline,
-                      backgroundColor: selected ? theme.pillBackground : undefined,
+                      backgroundColor: selected
+                        ? theme.pillBackground
+                        : undefined,
                     },
-                  ]}>
+                  ]}
+                >
                   <View
                     style={[
                       q.multiSelect ? styles.checkbox : styles.radio,
-                      { borderColor: selected ? theme.textPrimary : theme.textMuted },
-                    ]}>
+                      {
+                        borderColor: selected
+                          ? theme.textPrimary
+                          : theme.textMuted,
+                      },
+                    ]}
+                  >
                     {selected && (
                       <View
                         style={[
-                          q.multiSelect ? styles.checkboxFill : styles.radioFill,
+                          q.multiSelect
+                            ? styles.checkboxFill
+                            : styles.radioFill,
                           { backgroundColor: theme.textPrimary },
                         ]}
                       />
                     )}
                   </View>
                   <View style={styles.optionText}>
-                    <Text style={[styles.optionLabel, { color: theme.textPrimary }]}>
+                    <Text
+                      style={[styles.optionLabel, { color: theme.textPrimary }]}
+                    >
                       {option.label}
                     </Text>
                     {option.description ? (
-                      <Text style={[styles.optionDescription, { color: theme.textMuted }]}>
+                      <Text
+                        style={[
+                          styles.optionDescription,
+                          { color: theme.textMuted },
+                        ]}
+                      >
                         {option.description}
                       </Text>
                     ) : null}
@@ -167,8 +235,11 @@ function QuestionPicker({
           activeOpacity={0.8}
           accessibilityRole="button"
           onPress={() => onAnswer(null)}
-          style={[styles.secondaryBtn, { borderColor: theme.outline }]}>
-          <Text style={[styles.btnText, { color: theme.textSecondary }]}>Skip</Text>
+          style={[styles.secondaryBtn, { borderColor: theme.outline }]}
+        >
+          <Text style={[styles.btnText, { color: theme.textSecondary }]}>
+            Skip
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           activeOpacity={0.8}
@@ -180,8 +251,11 @@ function QuestionPicker({
             styles.primaryBtn,
             { backgroundColor: theme.textPrimary },
             !complete && styles.disabled,
-          ]}>
-          <Text style={[styles.btnText, { color: theme.background }]}>Submit</Text>
+          ]}
+        >
+          <Text style={[styles.btnText, { color: theme.background }]}>
+            Submit
+          </Text>
         </TouchableOpacity>
       </View>
     </>

@@ -26,6 +26,7 @@ import {
 } from '../types';
 import { generatePkcePair, generateRandomString } from '../utils/auth';
 import { NativePicker } from './nativeModules';
+import { ignore } from '../utils/devLog';
 
 const STORAGE_KEYS = {
   BASE_URL: '@pukubot_base_url',
@@ -452,7 +453,7 @@ export class PukuBotApiClient {
     await fetch(`${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/read`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
-    }).catch(() => {});
+    }).catch(ignore('pukuBotApi'));
   }
 
   /**
@@ -563,7 +564,7 @@ export class PukuBotApiClient {
       try {
         xhr.abort();
       } catch {}
-      this.stopTurn(conversationId).catch(() => {});
+      this.stopTurn(conversationId).catch(ignore('pukuBotApi'));
     };
 
     const targetUrl = `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/messages`;
@@ -735,7 +736,7 @@ export class PukuBotApiClient {
     await fetch(`${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/stop`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-    }).catch(() => {});
+    }).catch(ignore('pukuBotApi'));
   }
 
   /**

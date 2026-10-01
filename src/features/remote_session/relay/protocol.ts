@@ -19,11 +19,31 @@ export type ConnectionPhase =
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'auto';
 
-export const PERMISSION_MODES: { mode: PermissionMode; label: string; description: string }[] = [
-  { mode: 'default', label: 'Ask', description: 'Prompts before risky operations' },
-  { mode: 'acceptEdits', label: 'Accept edits', description: 'Auto-accepts file edits; still asks for commands' },
-  { mode: 'plan', label: 'Plan', description: 'Planning only, no tool execution' },
-  { mode: 'auto', label: 'Auto', description: 'Autopilot (may be unavailable)' },
+export const PERMISSION_MODES: {
+  mode: PermissionMode;
+  label: string;
+  description: string;
+}[] = [
+  {
+    mode: 'default',
+    label: 'Ask',
+    description: 'Prompts before risky operations',
+  },
+  {
+    mode: 'acceptEdits',
+    label: 'Accept edits',
+    description: 'Auto-accepts file edits; still asks for commands',
+  },
+  {
+    mode: 'plan',
+    label: 'Plan',
+    description: 'Planning only, no tool execution',
+  },
+  {
+    mode: 'auto',
+    label: 'Auto',
+    description: 'Autopilot (may be unavailable)',
+  },
 ];
 
 /** Offered in the model picker; the CLI's own allowlist has the final say. */
@@ -116,54 +136,72 @@ export function createInitialState(): RemoteSessionState {
 
 export function makeRequestId(): string {
   const hex = (n: number) =>
-    Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    Array.from({ length: n }, () =>
+      Math.floor(Math.random() * 16).toString(16),
+    ).join('');
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${hex(4)}-${hex(12)}`;
 }
 
-function nextId(state: RemoteSessionState, prefix: string): [string, RemoteSessionState] {
+function nextId(
+  state: RemoteSessionState,
+  prefix: string,
+): [string, RemoteSessionState] {
   const seq = state.seq + 1;
   return [`${prefix}_${seq}`, { ...state, seq }];
 }
 
 export function addEntry(
   state: RemoteSessionState,
-  entry: NewEntry
+  entry: NewEntry,
 ): RemoteSessionState {
   const [id, next]: [string, RemoteSessionState] = entry.id
     ? [entry.id, state]
     : nextId(state, entry.kind);
-  return { ...next, entries: [...next.entries, { ...entry, id } as RemoteEntry] };
+  return {
+    ...next,
+    entries: [...next.entries, { ...entry, id } as RemoteEntry],
+  };
 }
 
 export function addSystem(
   state: RemoteSessionState,
   text: string,
-  tone: 'info' | 'error' = 'info'
+  tone: 'info' | 'error' = 'info',
 ): RemoteSessionState {
   return addEntry(state, { kind: 'system', text, tone });
 }
 
 /** Record a prompt the user sent from this device. */
-export function addLocalUser(state: RemoteSessionState, text: string): RemoteSessionState {
+export function addLocalUser(
+  state: RemoteSessionState,
+  text: string,
+): RemoteSessionState {
   return { ...addEntry(state, { kind: 'user', text }), isWorking: true };
 }
 
 function contentToText(content: any): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
-    return content.map(c => (typeof c === 'string' ? c : c?.text || '')).join('\n');
+    return content
+      .map(c => (typeof c === 'string' ? c : c?.text || ''))
+      .join('\n');
   }
   return content == null ? '' : JSON.stringify(content);
 }
 
 function normalizePermissionMode(mode: unknown): PermissionMode | undefined {
-  return PERMISSION_MODES.some(m => m.mode === mode) ? (mode as PermissionMode) : undefined;
+  return PERMISSION_MODES.some(m => m.mode === mode)
+    ? (mode as PermissionMode)
+    : undefined;
 }
 
 function controlError(requestId: string, error: string): RelayEffect {
   return {
     type: 'send',
-    payload: { type: 'control_response', response: { subtype: 'error', request_id: requestId, error } },
+    payload: {
+      type: 'control_response',
+      response: { subtype: 'error', request_id: requestId, error },
+    },
   };
 }
 
@@ -176,12 +214,21 @@ function streamingIndices(entries: RemoteEntry[]): number[] {
   return out;
 }
 
-function applyAssistant(state: RemoteSessionState, data: any): RemoteSessionState {
+function applyAssistant(
+  state: RemoteSessionState,
+  data: any,
+): RemoteSessionState {
   const content = data.message?.content;
   const blocks: any[] =
-    typeof content === 'string' ? [{ type: 'text', text: content }] : Array.isArray(content) ? content : [];
+    typeof content === 'string'
+      ? [{ type: 'text', text: content }]
+      : Array.isArray(content)
+      ? content
+      : [];
 
-  let next: RemoteSessionState = data.message?.model ? { ...state, model: data.message.model } : state;
+  let next: RemoteSessionState = data.message?.model
+    ? { ...state, model: data.message.model }
+    : state;
 
   // Final text replaces what was streamed for it, in place.
   const streamed = streamingIndices(next.entries);
@@ -193,7 +240,11 @@ function applyAssistant(state: RemoteSessionState, data: any): RemoteSessionStat
     if (block?.type === 'text' && block.text) {
       const idx = streamed[streamCursor++];
       if (idx !== undefined) {
-        entries[idx] = { ...(entries[idx] as Extract<RemoteEntry, { kind: 'assistant' }>), text: block.text, streaming: false };
+        entries[idx] = {
+          ...(entries[idx] as Extract<RemoteEntry, { kind: 'assistant' }>),
+          text: block.text,
+          streaming: false,
+        };
       } else {
         appended.push({ kind: 'assistant', text: block.text });
       }
@@ -201,7 +252,11 @@ function applyAssistant(state: RemoteSessionState, data: any): RemoteSessionStat
       appended.push({
         kind: 'tool',
         id: block.id,
-        tool: { name: block.name || 'Tool', input: block.input || {}, status: 'running' },
+        tool: {
+          name: block.name || 'Tool',
+          input: block.input || {},
+          status: 'running',
+        },
       });
     }
   }
@@ -233,7 +288,9 @@ function applyUser(state: RemoteSessionState, data: any): RemoteSessionState {
         next = {
           ...next,
           entries: next.entries.map(e =>
-            e.kind === 'tool' && e.id === toolId ? { ...e, tool: { ...e.tool, status, output } } : e
+            e.kind === 'tool' && e.id === toolId
+              ? { ...e, tool: { ...e.tool, status, output } }
+              : e,
           ),
         };
       }
@@ -248,18 +305,26 @@ function applyUser(state: RemoteSessionState, data: any): RemoteSessionState {
   return { ...addEntry(next, { kind: 'user', text: clean }), isWorking: true };
 }
 
-function applyStreamEvent(state: RemoteSessionState, data: any): RemoteSessionState {
+function applyStreamEvent(
+  state: RemoteSessionState,
+  data: any,
+): RemoteSessionState {
   // Claude-style stream-json nests the Anthropic event under `event`.
   const ev = data.type === 'stream_event' ? data.event || {} : data;
-  const startsText = ev.type === 'content_block_start' && ev.content_block?.type === 'text';
+  const startsText =
+    ev.type === 'content_block_start' && ev.content_block?.type === 'text';
   // Only text deltas carry `delta.text`; thinking and tool-input deltas use other keys.
-  const delta = ev.type === 'content_block_delta' ? ev.delta?.text || '' : data.text || '';
+  const delta =
+    ev.type === 'content_block_delta' ? ev.delta?.text || '' : data.text || '';
   if (!startsText && !delta) return state;
 
   const streamed = streamingIndices(state.entries);
   const last = streamed[streamed.length - 1];
   if (startsText || last === undefined) {
-    return { ...addEntry(state, { kind: 'assistant', text: delta, streaming: true }), isWorking: true };
+    return {
+      ...addEntry(state, { kind: 'assistant', text: delta, streaming: true }),
+      isWorking: true,
+    };
   }
   const entries = [...state.entries];
   const entry = entries[last] as Extract<RemoteEntry, { kind: 'assistant' }>;
@@ -267,7 +332,10 @@ function applyStreamEvent(state: RemoteSessionState, data: any): RemoteSessionSt
   return { ...state, entries, isWorking: true };
 }
 
-function applyControlRequest(state: RemoteSessionState, data: any): FrameResult {
+function applyControlRequest(
+  state: RemoteSessionState,
+  data: any,
+): FrameResult {
   const requestId: string = data.request_id || data.request?.request_id || '';
   const request = data.request || {};
 
@@ -275,12 +343,18 @@ function applyControlRequest(state: RemoteSessionState, data: any): FrameResult 
     // Silence makes the CLI hang: always answer unknown subtypes.
     return {
       state,
-      effects: [controlError(requestId, `Unsupported request subtype: ${request.subtype}`)],
+      effects: [
+        controlError(
+          requestId,
+          `Unsupported request subtype: ${request.subtype}`,
+        ),
+      ],
     };
   }
 
   const input = request.input || {};
-  const isQuestion = request.tool_name === 'AskUserQuestion' && Array.isArray(input.questions);
+  const isQuestion =
+    request.tool_name === 'AskUserQuestion' && Array.isArray(input.questions);
   const pendingPrompt: PendingPrompt = {
     requestId,
     toolName: request.tool_name || 'Tool',
@@ -291,7 +365,10 @@ function applyControlRequest(state: RemoteSessionState, data: any): FrameResult 
   return { state: { ...state, pendingPrompt }, effects: [{ type: 'vibrate' }] };
 }
 
-function applyControlResponse(state: RemoteSessionState, data: any): RemoteSessionState {
+function applyControlResponse(
+  state: RemoteSessionState,
+  data: any,
+): RemoteSessionState {
   const response = data.response || {};
   const requestId: string = response.request_id;
   const pending = state.pendingControls[requestId];
@@ -302,10 +379,14 @@ function applyControlResponse(state: RemoteSessionState, data: any): RemoteSessi
   let next: RemoteSessionState = { ...state, pendingControls: rest };
 
   if (response.subtype === 'error') {
-    return { ...next, notice: response.error || `Could not apply ${pending.subtype}` };
+    return {
+      ...next,
+      notice: response.error || `Could not apply ${pending.subtype}`,
+    };
   }
   if (pending.subtype === 'set_permission_mode') {
-    const mode = normalizePermissionMode(response.response?.mode) ?? pending.value;
+    const mode =
+      normalizePermissionMode(response.response?.mode) ?? pending.value;
     next = { ...next, permissionMode: mode, notice: undefined };
   } else {
     // set_model success carries no body by design: apply what we asked for.
@@ -323,7 +404,10 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
       switch (data.subtype) {
         case 'reconnect_token':
           return data.token
-            ? { state, effects: [{ type: 'saveReconnectToken', token: data.token }] }
+            ? {
+                state,
+                effects: [{ type: 'saveReconnectToken', token: data.token }],
+              }
             : { state, effects: [] };
         case 'init':
           return {
@@ -332,15 +416,22 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
               phase: 'attached',
               model: data.model || state.model,
               cwd: data.cwd || state.cwd,
-              permissionMode: normalizePermissionMode(data.permissionMode) ?? state.permissionMode,
+              permissionMode:
+                normalizePermissionMode(data.permissionMode) ??
+                state.permissionMode,
             },
             effects: [],
           };
         case 'compact_boundary':
-          return { state: addSystem(state, 'Conversation compacted'), effects: [] };
+          return {
+            state: addSystem(state, 'Conversation compacted'),
+            effects: [],
+          };
         case 'status': {
-          const status = typeof data.status === 'string' ? data.status.trim() : '';
-          if (!status || status === 'idle' || status === 'ready') return { state, effects: [] };
+          const status =
+            typeof data.status === 'string' ? data.status.trim() : '';
+          if (!status || status === 'idle' || status === 'ready')
+            return { state, effects: [] };
           return { state: addSystem(state, status), effects: [] };
         }
         default:
@@ -350,14 +441,19 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
     case 'worker_connected': {
       const wasDetached = state.phase === 'open' && state.entries.length > 0;
       const next = { ...state, phase: 'attached' as const };
-      return { state: wasDetached ? addSystem(next, 'Reconnected to your laptop') : next, effects: [] };
+      return {
+        state: wasDetached
+          ? addSystem(next, 'Reconnected to your laptop')
+          : next,
+        effects: [],
+      };
     }
 
     case 'worker_disconnected':
       return {
         state: addSystem(
           { ...state, phase: 'open', isWorking: false },
-          'Laptop CLI disconnected. Waiting for it to come back…'
+          'Laptop CLI disconnected. Waiting for it to come back…',
         ),
         effects: [],
       };
@@ -365,8 +461,13 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
     case 'client_replaced':
       return {
         state: addSystem(
-          { ...state, phase: 'closed', isWorking: false, pendingPrompt: undefined },
-          'Another device took over this session.'
+          {
+            ...state,
+            phase: 'closed',
+            isWorking: false,
+            pendingPrompt: undefined,
+          },
+          'Another device took over this session.',
         ),
         effects: [{ type: 'close' }],
       };
@@ -374,8 +475,13 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
     case 'session_end':
       return {
         state: addSystem(
-          { ...state, phase: 'closed', isWorking: false, pendingPrompt: undefined },
-          'The session ended on your laptop.'
+          {
+            ...state,
+            phase: 'closed',
+            isWorking: false,
+            pendingPrompt: undefined,
+          },
+          'The session ended on your laptop.',
         ),
         effects: [{ type: 'close' }],
       };
@@ -406,18 +512,34 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
       return { state: applyStreamEvent(state, data), effects: [] };
 
     case 'result': {
-      const failed = data.is_error || (data.subtype && data.subtype !== 'success');
+      const failed =
+        data.is_error || (data.subtype && data.subtype !== 'success');
       // Tools still "running" when the turn ends never reported back.
       const entries = state.entries.map(e =>
         e.kind === 'tool' && e.tool.status === 'running'
-          ? { ...e, tool: { ...e.tool, status: failed ? ('error' as const) : ('success' as const) } }
+          ? {
+              ...e,
+              tool: {
+                ...e.tool,
+                status: failed ? ('error' as const) : ('success' as const),
+              },
+            }
           : e.kind === 'assistant' && e.streaming
           ? { ...e, streaming: false }
-          : e
+          : e,
       );
-      let next: RemoteSessionState = { ...state, entries, isWorking: false, pendingPrompt: undefined };
+      let next: RemoteSessionState = {
+        ...state,
+        entries,
+        isWorking: false,
+        pendingPrompt: undefined,
+      };
       if (failed) {
-        next = addSystem(next, `Run ended: ${data.subtype || 'error'}`, 'error');
+        next = addSystem(
+          next,
+          `Run ended: ${data.subtype || 'error'}`,
+          'error',
+        );
       }
       return { state: next, effects: [] };
     }
@@ -445,7 +567,8 @@ export function parseMessage(raw: string): { frames: any[]; text: string[] } {
       try {
         frames.push(JSON.parse(l));
       } catch {
-        if (!l.startsWith('{') && !l.startsWith('[') && !l.startsWith('"')) text.push(line);
+        if (!l.startsWith('{') && !l.startsWith('[') && !l.startsWith('"'))
+          text.push(line);
       }
     }
     return { frames, text };
@@ -464,10 +587,18 @@ export function userFrame(text: string, sessionId: string) {
 }
 
 export function interruptFrame() {
-  return { type: 'control_request', request_id: makeRequestId(), request: { subtype: 'interrupt' } };
+  return {
+    type: 'control_request',
+    request_id: makeRequestId(),
+    request: { subtype: 'interrupt' },
+  };
 }
 
-export function permissionReply(requestId: string, allow: boolean, message?: string) {
+export function permissionReply(
+  requestId: string,
+  allow: boolean,
+  message?: string,
+) {
   return {
     type: 'control_response',
     response: {
@@ -488,7 +619,7 @@ export function permissionReply(requestId: string, allow: boolean, message?: str
 export function questionReply(
   prompt: PendingPrompt,
   answers: Record<string, string[]> | null,
-  denyMessage?: string
+  denyMessage?: string,
 ) {
   if (!answers) {
     return {
@@ -496,7 +627,10 @@ export function questionReply(
       response: {
         subtype: 'success',
         request_id: prompt.requestId,
-        response: { behavior: 'deny', message: denyMessage || 'Let me clarify before you proceed.' },
+        response: {
+          behavior: 'deny',
+          message: denyMessage || 'Let me clarify before you proceed.',
+        },
       },
     };
   }
@@ -519,11 +653,19 @@ export function questionReply(
 
 export function controlFrame(
   requestId: string,
-  control: PendingControl
+  control: PendingControl,
 ): Record<string, any> {
   return control.subtype === 'set_permission_mode'
-    ? { type: 'control_request', request_id: requestId, request: { subtype: control.subtype, mode: control.value } }
-    : { type: 'control_request', request_id: requestId, request: { subtype: control.subtype, model: control.value } };
+    ? {
+        type: 'control_request',
+        request_id: requestId,
+        request: { subtype: control.subtype, mode: control.value },
+      }
+    : {
+        type: 'control_request',
+        request_id: requestId,
+        request: { subtype: control.subtype, model: control.value },
+      };
 }
 
 /** Close codes per the guide: 1000 = clean, 4xxx = session gone. Anything else retries. */

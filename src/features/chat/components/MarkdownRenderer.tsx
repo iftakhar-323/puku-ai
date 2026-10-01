@@ -11,6 +11,7 @@ import {
 import { ThemeColors } from '../../../theme/theme';
 import { CheckmarkIcon, CopyIcon } from '../../../components/common/Icons';
 import { NativeClipboard } from '../../../services/nativeModules';
+import { ignore } from '../../../utils/devLog';
 
 /**
  * Claude Code-style accents: colored inline code, tappable links and
@@ -60,7 +61,7 @@ export function renderFormattedText(
       parts.push(
         <Text
           key={match.index}
-          onPress={isWebUrl ? () => Linking.openURL(url).catch(() => {}) : undefined}
+          onPress={isWebUrl ? () => Linking.openURL(url).catch(ignore('MarkdownRenderer')) : undefined}
           style={[baseStyle, { color: cliColors!.link, textDecorationLine: 'underline' }]}>
           {linkMatch[1]}
         </Text>

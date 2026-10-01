@@ -26,7 +26,10 @@ async function isSecureAvailable(): Promise<boolean> {
       secureAvailable = false;
     }
     if (!secureAvailable) {
-      devWarn('secureStorage', 'expo-secure-store unavailable, using AsyncStorage');
+      devWarn(
+        'secureStorage',
+        'expo-secure-store unavailable, using AsyncStorage',
+      );
     }
   }
   return secureAvailable;
@@ -67,7 +70,8 @@ export const secureStorage = {
     await Promise.all([
       AsyncStorage.removeItem(key),
       (async () => {
-        if (await isSecureAvailable()) await SecureStore.deleteItemAsync(toSecureKey(key));
+        if (await isSecureAvailable())
+          await SecureStore.deleteItemAsync(toSecureKey(key));
       })(),
     ]);
   },

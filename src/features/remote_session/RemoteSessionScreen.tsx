@@ -19,7 +19,10 @@ import {
   TrashIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
-import { useRelaySessionPolling, useRemoteSession } from '../../store/RemoteSessionContext';
+import {
+  useRelaySessionPolling,
+  useRemoteSession,
+} from '../../store/RemoteSessionContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 import { NativeClipboard } from '../../services/nativeModules';
 import { useToast } from '../../components/ui/Toast';
@@ -80,10 +83,13 @@ export function RemoteSessionScreen() {
       }
       show({ title: 'Copied to clipboard' });
     },
-    [show]
+    [show],
   );
 
-  const handleResend = useCallback((text: string) => sendMessage(text), [sendMessage]);
+  const handleResend = useCallback(
+    (text: string) => sendMessage(text),
+    [sendMessage],
+  );
 
   const linkColor = isAttached
     ? theme.success
@@ -106,7 +112,8 @@ export function RemoteSessionScreen() {
               ? keyboardHeight
               : Math.max(insets.bottom, 10),
         },
-      ]}>
+      ]}
+    >
       <View style={styles.header}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -114,15 +121,36 @@ export function RemoteSessionScreen() {
           accessibilityLabel="Back"
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           onPress={goBack}
-          style={[styles.circleBtn, { backgroundColor: theme.cardBackground, borderColor: theme.outline }]}>
+          style={[
+            styles.circleBtn,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.outline,
+            },
+          ]}
+        >
           <BackIcon size={20} color={theme.textPrimary} />
         </TouchableOpacity>
 
-        <View style={[styles.headerCard, { backgroundColor: theme.cardBackground, borderColor: theme.outline }]}>
-          <Text numberOfLines={1} style={[styles.headerTitle, { color: theme.textPrimary }]}>
+        <View
+          style={[
+            styles.headerCard,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.outline,
+            },
+          ]}
+        >
+          <Text
+            numberOfLines={1}
+            style={[styles.headerTitle, { color: theme.textPrimary }]}
+          >
             {session.title || 'Laptop CLI'}
           </Text>
-          <Text numberOfLines={1} style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.headerSubtitle, { color: theme.textSecondary }]}
+          >
             {isAttached && session.cwd ? session.cwd : PHASE_SUBTITLE[phase]}
           </Text>
         </View>
@@ -136,9 +164,13 @@ export function RemoteSessionScreen() {
           onPress={() => setShowMenu(true)}
           style={[
             styles.circleBtn,
-            { backgroundColor: theme.cardBackground, borderColor: theme.outline },
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.outline,
+            },
             showPairing && styles.dimmed,
-          ]}>
+          ]}
+        >
           <ConnectedLinkIcon size={20} color={linkColor} />
         </TouchableOpacity>
       </View>
@@ -163,13 +195,18 @@ export function RemoteSessionScreen() {
           />
 
           {session.notice ? (
-            <View style={[styles.notice, { backgroundColor: theme.pillBackground }]}>
-              <Text style={[styles.noticeText, { color: theme.error }]}>{session.notice}</Text>
+            <View
+              style={[styles.notice, { backgroundColor: theme.pillBackground }]}
+            >
+              <Text style={[styles.noticeText, { color: theme.error }]}>
+                {session.notice}
+              </Text>
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Dismiss"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                onPress={dismissNotice}>
+                onPress={dismissNotice}
+              >
                 <CloseIcon size={12} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -197,7 +234,9 @@ export function RemoteSessionScreen() {
           <RemoteComposer
             theme={theme}
             enabled={isAttached}
-            disabledHint={phase === 'closed' ? 'Session closed' : 'Waiting for your laptop…'}
+            disabledHint={
+              phase === 'closed' ? 'Session closed' : 'Waiting for your laptop…'
+            }
             isWorking={session.isWorking}
             permissionMode={session.permissionMode}
             model={session.model}
@@ -209,29 +248,56 @@ export function RemoteSessionScreen() {
         </View>
       )}
 
-      <ToolDetailSheet tool={selectedTool} theme={theme} onClose={() => setSelectedTool(null)} />
+      <ToolDetailSheet
+        tool={selectedTool}
+        theme={theme}
+        onClose={() => setSelectedTool(null)}
+      />
 
-      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
-        <TouchableOpacity activeOpacity={1} onPress={() => setShowMenu(false)} style={styles.backdrop}>
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+          style={styles.backdrop}
+        >
           <TouchableOpacity
             activeOpacity={1}
             onPress={e => e.stopPropagation()}
             style={[
               styles.menuSheet,
-              { backgroundColor: theme.cardBackground, paddingBottom: Math.max(insets.bottom + 12, 24) },
-            ]}>
-            <View style={[styles.menuHandle, { backgroundColor: theme.outline }]} />
-            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Session controls</Text>
+              {
+                backgroundColor: theme.cardBackground,
+                paddingBottom: Math.max(insets.bottom + 12, 24),
+              },
+            ]}
+          >
+            <View
+              style={[styles.menuHandle, { backgroundColor: theme.outline }]}
+            />
+            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>
+              Session controls
+            </Text>
 
             <TouchableOpacity
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Copy session ID"
               onPress={() => handleCopy(session.sessionId)}
-              style={[styles.menuRow, { borderBottomColor: theme.outline }]}>
+              style={[styles.menuRow, { borderBottomColor: theme.outline }]}
+            >
               <View style={styles.menuInfo}>
-                <Text style={[styles.menuLabel, { color: theme.textMuted }]}>Session ID</Text>
-                <Text numberOfLines={1} style={[styles.menuValue, { color: theme.success }]}>
+                <Text style={[styles.menuLabel, { color: theme.textMuted }]}>
+                  Session ID
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.menuValue, { color: theme.success }]}
+                >
                   {session.sessionId}
                 </Text>
               </View>
@@ -301,13 +367,27 @@ function ConnectionBanner({
   return (
     <View
       style={[styles.banner, { backgroundColor: theme.pillBackground }]}
-      accessibilityLiveRegion="polite">
-      <Text style={[styles.bannerText, { color: theme.textSecondary }]}>{message}</Text>
-      {phase === 'reconnecting' && <BannerButton theme={theme} label="Stop" onPress={onStop} />}
+      accessibilityLiveRegion="polite"
+    >
+      <Text style={[styles.bannerText, { color: theme.textSecondary }]}>
+        {message}
+      </Text>
+      {phase === 'reconnecting' && (
+        <BannerButton theme={theme} label="Stop" onPress={onStop} />
+      )}
       {phase === 'closed' && (
         <>
-          <BannerButton theme={theme} label="Sessions" onPress={onChangeSession} />
-          <BannerButton theme={theme} label="Reconnect" onPress={onReconnect} primary />
+          <BannerButton
+            theme={theme}
+            label="Sessions"
+            onPress={onChangeSession}
+          />
+          <BannerButton
+            theme={theme}
+            label="Reconnect"
+            onPress={onReconnect}
+            primary
+          />
         </>
       )}
     </View>
@@ -332,9 +412,17 @@ function BannerButton({
       onPress={onPress}
       style={[
         styles.bannerBtn,
-        primary ? { backgroundColor: theme.textPrimary } : [styles.bannerBtnOutline, { borderColor: theme.outline }],
-      ]}>
-      <Text style={[styles.bannerBtnText, { color: primary ? theme.background : theme.textPrimary }]}>
+        primary
+          ? { backgroundColor: theme.textPrimary }
+          : [styles.bannerBtnOutline, { borderColor: theme.outline }],
+      ]}
+    >
+      <Text
+        style={[
+          styles.bannerBtnText,
+          { color: primary ? theme.background : theme.textPrimary },
+        ]}
+      >
         {label}
       </Text>
     </TouchableOpacity>
@@ -370,9 +458,14 @@ function MenuAction({
         { borderBottomColor: theme.outline },
         last && styles.menuActionLast,
         disabled && styles.dimmed,
-      ]}>
+      ]}
+    >
       {icon}
-      <Text style={[styles.menuActionText, { color: color || theme.textPrimary }]}>{label}</Text>
+      <Text
+        style={[styles.menuActionText, { color: color || theme.textPrimary }]}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }

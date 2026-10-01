@@ -10,7 +10,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CheckmarkIcon, CloseIcon, TerminalWindowIcon } from '../../../components/common/Icons';
+import {
+  CheckmarkIcon,
+  CloseIcon,
+  TerminalWindowIcon,
+} from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import type { ToolCall } from '../relay/protocol';
 import { describeTool, toolCommand } from '../relay/feed';
@@ -27,13 +31,30 @@ interface Props {
 export function ToolDetailSheet({ tool, theme, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const statusColor =
-    tool?.status === 'error' ? theme.error : tool?.status === 'success' ? theme.success : theme.textMuted;
+    tool?.status === 'error'
+      ? theme.error
+      : tool?.status === 'success'
+      ? theme.success
+      : theme.textMuted;
   const statusLabel =
-    tool?.status === 'error' ? 'Failed' : tool?.status === 'success' ? 'Success' : 'Running';
+    tool?.status === 'error'
+      ? 'Failed'
+      : tool?.status === 'success'
+      ? 'Success'
+      : 'Running';
 
   return (
-    <Modal visible={!!tool} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.backdrop}>
+    <Modal
+      visible={!!tool}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onClose}
+        style={styles.backdrop}
+      >
         <TouchableOpacity
           activeOpacity={1}
           onPress={e => e.stopPropagation()}
@@ -43,32 +64,50 @@ export function ToolDetailSheet({ tool, theme, onClose }: Props) {
               backgroundColor: theme.secondaryBackground,
               paddingBottom: Math.max(insets.bottom + 12, 28),
             },
-          ]}>
+          ]}
+        >
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>{tool?.name || 'Tool'}</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>
+              {tool?.name || 'Tool'}
+            </Text>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onClose}
               accessibilityLabel="Close tool details"
               accessibilityRole="button"
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[styles.closeBtn, { backgroundColor: theme.pillBackground }]}>
+              style={[
+                styles.closeBtn,
+                { backgroundColor: theme.pillBackground },
+              ]}
+            >
               <CloseIcon size={14} color={theme.textPrimary} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.summaryRow}>
-            <View style={[styles.iconCircle, { backgroundColor: theme.cardBackground }]}>
+            <View
+              style={[
+                styles.iconCircle,
+                { backgroundColor: theme.cardBackground },
+              ]}
+            >
               <TerminalWindowIcon size={20} color={theme.accent} />
             </View>
-            <Text numberOfLines={1} style={[styles.summary, { color: theme.textPrimary }]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.summary, { color: theme.textPrimary }]}
+            >
               {tool ? describeTool(tool) : ''}
             </Text>
           </View>
 
           <View style={[styles.box, { backgroundColor: theme.codeBackground }]}>
             <ScrollView nestedScrollEnabled style={styles.inputScroll}>
-              <Text selectable style={[styles.mono, { color: theme.textPrimary }]}>
+              <Text
+                selectable
+                style={[styles.mono, { color: theme.textPrimary }]}
+              >
                 <Text style={{ color: theme.accent }}>$ </Text>
                 {tool ? toolCommand(tool) : ''}
               </Text>
@@ -76,7 +115,9 @@ export function ToolDetailSheet({ tool, theme, onClose }: Props) {
           </View>
 
           <View style={styles.outputHeader}>
-            <Text style={[styles.outputLabel, { color: theme.textMuted }]}>OUTPUT</Text>
+            <Text style={[styles.outputLabel, { color: theme.textMuted }]}>
+              OUTPUT
+            </Text>
             <View style={styles.status}>
               {tool?.status === 'running' ? (
                 <ActivityIndicator size="small" color={statusColor} />
@@ -85,15 +126,28 @@ export function ToolDetailSheet({ tool, theme, onClose }: Props) {
               ) : (
                 <CloseIcon size={11} color={statusColor} />
               )}
-              <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {statusLabel}
+              </Text>
             </View>
           </View>
 
-          <View style={[styles.box, styles.outputBox, { backgroundColor: theme.codeBackground }]}>
+          <View
+            style={[
+              styles.box,
+              styles.outputBox,
+              { backgroundColor: theme.codeBackground },
+            ]}
+          >
             <ScrollView nestedScrollEnabled>
-              <Text selectable style={[styles.mono, { color: theme.textPrimary }]}>
+              <Text
+                selectable
+                style={[styles.mono, { color: theme.textPrimary }]}
+              >
                 {tool?.output?.trim() ||
-                  (tool?.status === 'running' ? 'Waiting for output…' : 'No output.')}
+                  (tool?.status === 'running'
+                    ? 'Waiting for output…'
+                    : 'No output.')}
               </Text>
             </ScrollView>
           </View>

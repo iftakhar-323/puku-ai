@@ -17,10 +17,18 @@ import {
   RemoteIcon,
 } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
-import { CliColors, MarkdownRenderer } from '../../chat/components/MarkdownRenderer';
+import {
+  CliColors,
+  MarkdownRenderer,
+} from '../../chat/components/MarkdownRenderer';
 import { TypingIndicator } from '../../chat/components/TypingIndicator';
 import type { RemoteEntry, ToolCall } from '../relay/protocol';
-import { FeedItem, buildFeed, describeTool, summarizeTools } from '../relay/feed';
+import {
+  FeedItem,
+  buildFeed,
+  describeTool,
+  summarizeTools,
+} from '../relay/feed';
 
 const monoFont = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 const NEAR_BOTTOM_PX = 160;
@@ -35,7 +43,15 @@ interface Props {
   onOpenTool: (tool: ToolCall) => void;
 }
 
-export function RemoteFeed({ entries, isWorking, canResend, theme, onCopy, onResend, onOpenTool }: Props) {
+export function RemoteFeed({
+  entries,
+  isWorking,
+  canResend,
+  theme,
+  onCopy,
+  onResend,
+  onOpenTool,
+}: Props) {
   const listRef = useRef<FlatList<FeedItem>>(null);
   const nearBottom = useRef(true);
   const [showJump, setShowJump] = useState(false);
@@ -48,7 +64,7 @@ export function RemoteFeed({ entries, isWorking, canResend, theme, onCopy, onRes
       inlineCodeBackground: theme.inlineCodeBackground,
       link: theme.link,
     }),
-    [theme]
+    [theme],
   );
 
   const toggleGroup = useCallback((id: string) => {
@@ -62,7 +78,9 @@ export function RemoteFeed({ entries, isWorking, canResend, theme, onCopy, onRes
 
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-    const isNear = layoutMeasurement.height + contentOffset.y >= contentSize.height - NEAR_BOTTOM_PX;
+    const isNear =
+      layoutMeasurement.height + contentOffset.y >=
+      contentSize.height - NEAR_BOTTOM_PX;
     nearBottom.current = isNear;
     setShowJump(prev => (prev === !isNear ? prev : !isNear));
   }, []);
@@ -73,7 +91,8 @@ export function RemoteFeed({ entries, isWorking, canResend, theme, onCopy, onRes
   }, []);
 
   const last = entries[entries.length - 1];
-  const showTyping = isWorking && !(last?.kind === 'assistant' && last.streaming);
+  const showTyping =
+    isWorking && !(last?.kind === 'assistant' && last.streaming);
 
   const renderItem = useCallback(
     ({ item }: { item: FeedItem }) => (
@@ -89,7 +108,16 @@ export function RemoteFeed({ entries, isWorking, canResend, theme, onCopy, onRes
         onToggleGroup={toggleGroup}
       />
     ),
-    [expanded, canResend, theme, cliColors, onCopy, onResend, onOpenTool, toggleGroup]
+    [
+      expanded,
+      canResend,
+      theme,
+      cliColors,
+      onCopy,
+      onResend,
+      onOpenTool,
+      toggleGroup,
+    ],
   );
 
   return (
@@ -107,11 +135,20 @@ export function RemoteFeed({ entries, isWorking, canResend, theme, onCopy, onRes
         onContentSizeChange={onContentSizeChange}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <View style={[styles.emptyIcon, { backgroundColor: theme.pillBackground }]}>
+            <View
+              style={[
+                styles.emptyIcon,
+                { backgroundColor: theme.pillBackground },
+              ]}
+            >
               <RemoteIcon size={24} color={theme.success} />
             </View>
-            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>Laptop connected</Text>
-            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+              Laptop connected
+            </Text>
+            <Text
+              style={[styles.emptySubtitle, { color: theme.textSecondary }]}
+            >
               Ask Puku to do something on your laptop.
             </Text>
           </View>
@@ -130,7 +167,14 @@ export function RemoteFeed({ entries, isWorking, canResend, theme, onCopy, onRes
           accessibilityRole="button"
           accessibilityLabel="Scroll to latest"
           onPress={() => listRef.current?.scrollToEnd({ animated: true })}
-          style={[styles.jump, { backgroundColor: theme.cardBackground, borderColor: theme.outline }]}>
+          style={[
+            styles.jump,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.outline,
+            },
+          ]}
+        >
           <ChevronDownIcon size={18} color={theme.textPrimary} />
         </TouchableOpacity>
       )}
@@ -169,8 +213,12 @@ const FeedRow = memo(function FeedRowView({
             activeOpacity={0.85}
             delayLongPress={200}
             onLongPress={() => onCopy(item.text)}
-            style={[styles.userBubble, { backgroundColor: theme.userBubble }]}>
-            <Text selectable style={[styles.userText, { color: theme.onUserBubble }]}>
+            style={[styles.userBubble, { backgroundColor: theme.userBubble }]}
+          >
+            <Text
+              selectable
+              style={[styles.userText, { color: theme.onUserBubble }]}
+            >
               {item.text}
             </Text>
           </TouchableOpacity>
@@ -180,7 +228,8 @@ const FeedRow = memo(function FeedRowView({
               accessibilityRole="button"
               accessibilityLabel="Copy message"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => onCopy(item.text)}>
+              onPress={() => onCopy(item.text)}
+            >
               <CopyIcon size={14} color={theme.textMuted} />
             </TouchableOpacity>
             {canResend && (
@@ -189,7 +238,8 @@ const FeedRow = memo(function FeedRowView({
                 accessibilityRole="button"
                 accessibilityLabel="Send this message again"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                onPress={() => onResend(item.text)}>
+                onPress={() => onResend(item.text)}
+              >
                 <RefreshIcon size={14} color={theme.textMuted} />
               </TouchableOpacity>
             )}
@@ -208,10 +258,15 @@ const FeedRow = memo(function FeedRowView({
             accessibilityRole="button"
             accessibilityState={{ expanded: isExpanded }}
             onPress={() => onToggleGroup(item.id)}
-            style={styles.toolGroupHeader}>
+            style={styles.toolGroupHeader}
+          >
             <Text
               numberOfLines={1}
-              style={[styles.toolGroupText, { color: failed ? theme.error : theme.textSecondary }]}>
+              style={[
+                styles.toolGroupText,
+                { color: failed ? theme.error : theme.textSecondary },
+              ]}
+            >
               {summarizeTools(tools)}
               {running ? '…' : ''}
             </Text>
@@ -230,13 +285,20 @@ const FeedRow = memo(function FeedRowView({
                   accessibilityRole="button"
                   accessibilityHint="Shows the command and its output"
                   onPress={() => onOpenTool(tool)}
-                  style={styles.toolRow}>
+                  style={styles.toolRow}
+                >
                   <Text
                     numberOfLines={1}
                     style={[
                       styles.toolRowText,
-                      { color: tool.status === 'error' ? theme.error : theme.textSecondary },
-                    ]}>
+                      {
+                        color:
+                          tool.status === 'error'
+                            ? theme.error
+                            : theme.textSecondary,
+                      },
+                    ]}
+                  >
                     {describeTool(tool)}
                   </Text>
                   <ChevronRightIcon size={14} color={theme.textMuted} />
@@ -251,12 +313,21 @@ const FeedRow = memo(function FeedRowView({
     case 'system':
       return (
         <View style={styles.systemRow}>
-          <View style={[styles.systemPill, { backgroundColor: theme.pillBackground }]}>
+          <View
+            style={[
+              styles.systemPill,
+              { backgroundColor: theme.pillBackground },
+            ]}
+          >
             <Text
               style={[
                 styles.systemText,
-                { color: item.tone === 'error' ? theme.error : theme.textSecondary },
-              ]}>
+                {
+                  color:
+                    item.tone === 'error' ? theme.error : theme.textSecondary,
+                },
+              ]}
+            >
               {item.text}
             </Text>
           </View>
@@ -266,7 +337,11 @@ const FeedRow = memo(function FeedRowView({
     case 'assistant':
       return (
         <View style={styles.assistantRow}>
-          <MarkdownRenderer content={item.text} theme={theme} cliColors={cliColors} />
+          <MarkdownRenderer
+            content={item.text}
+            theme={theme}
+            cliColors={cliColors}
+          />
         </View>
       );
   }

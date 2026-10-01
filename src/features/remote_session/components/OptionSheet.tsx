@@ -21,25 +21,45 @@ interface Props {
 }
 
 /** Bottom sheet with a single-choice list (permission mode, model). */
-export function OptionSheet({ visible, title, options, selectedKey, theme, onSelect, onClose }: Props) {
+export function OptionSheet({
+  visible,
+  title,
+  options,
+  selectedKey,
+  theme,
+  onSelect,
+  onClose,
+}: Props) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <TouchableOpacity
         activeOpacity={1}
         onPress={onClose}
         style={styles.backdrop}
         accessibilityLabel="Close"
-        accessibilityRole="button">
+        accessibilityRole="button"
+      >
         <TouchableOpacity
           activeOpacity={1}
           onPress={e => e.stopPropagation()}
           style={[
             styles.sheet,
-            { backgroundColor: theme.cardBackground, paddingBottom: Math.max(insets.bottom + 12, 24) },
-          ]}>
+            {
+              backgroundColor: theme.cardBackground,
+              paddingBottom: Math.max(insets.bottom + 12, 24),
+            },
+          ]}
+        >
           <View style={[styles.handle, { backgroundColor: theme.outline }]} />
-          <Text style={[styles.title, { color: theme.textPrimary }]}>{title}</Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>
+            {title}
+          </Text>
           {options.map(option => {
             const selected = option.key === selectedKey;
             return (
@@ -49,16 +69,23 @@ export function OptionSheet({ visible, title, options, selectedKey, theme, onSel
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
                 onPress={() => onSelect(option.key)}
-                style={[styles.row, { borderBottomColor: theme.outline }]}>
+                style={[styles.row, { borderBottomColor: theme.outline }]}
+              >
                 <View style={styles.rowText}>
-                  <Text style={[styles.label, { color: theme.textPrimary }]}>{option.label}</Text>
+                  <Text style={[styles.label, { color: theme.textPrimary }]}>
+                    {option.label}
+                  </Text>
                   {option.description ? (
-                    <Text style={[styles.description, { color: theme.textMuted }]}>
+                    <Text
+                      style={[styles.description, { color: theme.textMuted }]}
+                    >
                       {option.description}
                     </Text>
                   ) : null}
                 </View>
-                {selected && <CheckmarkIcon size={16} color={theme.textPrimary} />}
+                {selected && (
+                  <CheckmarkIcon size={16} color={theme.textPrimary} />
+                )}
               </TouchableOpacity>
             );
           })}

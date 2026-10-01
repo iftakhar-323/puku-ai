@@ -38,6 +38,7 @@ import {
   ThreeDotsHorizontalIcon,
   TrashIcon,
 } from './Icons';
+import { ignore } from '../../utils/devLog';
 
 export function AppDrawer() {
   const insets = useSafeAreaInsets();
@@ -83,7 +84,7 @@ export function AppDrawer() {
 
   React.useEffect(() => {
     if (isDrawerOpen && conversations.length === 0) {
-      refreshConversations().catch(() => {});
+      refreshConversations().catch(ignore('AppDrawer'));
     }
   }, [isDrawerOpen, conversations.length, refreshConversations]);
 

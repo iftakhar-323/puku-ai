@@ -30,22 +30,50 @@ function run(frames: any[], start: RemoteSessionState = createInitialState()) {
 
 const delta = (text: string) => ({
   type: 'stream_event',
-  event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+  event: {
+    type: 'content_block_delta',
+    index: 0,
+    delta: { type: 'text_delta', text },
+  },
 });
 
 describe('connection lifecycle', () => {
   test('input is only enabled once the CLI attaches', () => {
     const opened = { ...createInitialState(), phase: 'open' as const };
-    expect(run([{ type: 'system', subtype: 'reconnect_token', token: 'rt1' }], opened).state.phase).toBe('open');
-    expect(run([{ type: 'worker_connected' }], opened).state.phase).toBe('attached');
     expect(
-      run([{ type: 'system', subtype: 'init', model: 'puku-ai-2.8', cwd: '/repo', permissionMode: 'plan' }], opened)
-        .state
-    ).toMatchObject({ phase: 'attached', model: 'puku-ai-2.8', cwd: '/repo', permissionMode: 'plan' });
+      run(
+        [{ type: 'system', subtype: 'reconnect_token', token: 'rt1' }],
+        opened,
+      ).state.phase,
+    ).toBe('open');
+    expect(run([{ type: 'worker_connected' }], opened).state.phase).toBe(
+      'attached',
+    );
+    expect(
+      run(
+        [
+          {
+            type: 'system',
+            subtype: 'init',
+            model: 'puku-ai-2.8',
+            cwd: '/repo',
+            permissionMode: 'plan',
+          },
+        ],
+        opened,
+      ).state,
+    ).toMatchObject({
+      phase: 'attached',
+      model: 'puku-ai-2.8',
+      cwd: '/repo',
+      permissionMode: 'plan',
+    });
   });
 
   test('reconnect_token is handed to the caller to persist', () => {
-    const { effects } = run([{ type: 'system', subtype: 'reconnect_token', token: 'rt1' }]);
+    const { effects } = run([
+      { type: 'system', subtype: 'reconnect_token', token: 'rt1' },
+    ]);
     expect(effects).toEqual([{ type: 'saveReconnectToken', token: 'rt1' }]);
   });
 
@@ -56,45 +84,81 @@ describe('connection lifecycle', () => {
     expect(effects).toEqual([]);
   });
 
-  test.each(['client_replaced', 'session_end'])('%s closes the session', type => {
-    const { state, effects } = run([{ type }], { ...createInitialState(), phase: 'attached' });
-    expect(state.phase).toBe('closed');
-    expect(effects).toContainEqual({ type: 'close' });
-  });
+  test.each(['client_replaced', 'session_end'])(
+    '%s closes the session',
+    type => {
+      const { state, effects } = run([{ type }], {
+        ...createInitialState(),
+        phase: 'attached',
+      });
+      expect(state.phase).toBe('closed');
+      expect(effects).toContainEqual({ type: 'close' });
+    },
+  );
 
   test('close codes: 1000 and 4xxx stop, network drops retry with backoff', () => {
     expect(shouldReconnect(1000)).toBe(false);
     expect(shouldReconnect(4001)).toBe(false);
     expect(shouldReconnect(1006)).toBe(true);
     expect(shouldReconnect(1011)).toBe(true);
-    expect([0, 1, 2, 3, 9].map(reconnectDelay)).toEqual([3000, 6000, 12000, 30000, 30000]);
+    expect([0, 1, 2, 3, 9].map(reconnectDelay)).toEqual([
+      3000, 6000, 12000, 30000, 30000,
+    ]);
   });
 });
 
 describe('streaming output', () => {
   test('stream_event deltas show live, then the final assistant frame replaces them', () => {
     const live = run([
-      { type: 'stream_event', event: { type: 'content_block_start', content_block: { type: 'text' } } },
+      {
+        type: 'stream_event',
+        event: { type: 'content_block_start', content_block: { type: 'text' } },
+      },
       delta('Hel'),
       delta('lo'),
     ]);
     expect(live.state.entries).toEqual([
-      expect.objectContaining({ kind: 'assistant', text: 'Hello', streaming: true }),
+      expect.objectContaining({
+        kind: 'assistant',
+        text: 'Hello',
+        streaming: true,
+      }),
     ]);
 
     const done = run(
-      [{ type: 'assistant', message: { content: [{ type: 'text', text: 'Hello!' }] } }],
-      live.state
+      [
+        {
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'Hello!' }] },
+        },
+      ],
+      live.state,
     );
     expect(done.state.entries).toEqual([
-      expect.objectContaining({ kind: 'assistant', text: 'Hello!', streaming: false }),
+      expect.objectContaining({
+        kind: 'assistant',
+        text: 'Hello!',
+        streaming: false,
+      }),
     ]);
   });
 
   test('thinking and tool-input deltas are not rendered as text', () => {
     const { state } = run([
-      { type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'thinking_delta', thinking: 'hmm' } } },
-      { type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'input_json_delta', partial_json: '{' } } },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          delta: { type: 'thinking_delta', thinking: 'hmm' },
+        },
+      },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          delta: { type: 'input_json_delta', partial_json: '{' },
+        },
+      },
     ]);
     expect(state.entries).toEqual([]);
   });
@@ -102,7 +166,10 @@ describe('streaming output', () => {
   test('without streaming, assistant frames append as before', () => {
     const { state } = run([
       { type: 'assistant', message: { content: 'one' } },
-      { type: 'assistant', message: { content: [{ type: 'text', text: 'two' }] } },
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'two' }] },
+      },
     ]);
     expect(state.entries.map(e => (e as any).text)).toEqual(['one', 'two']);
   });
@@ -115,8 +182,18 @@ describe('tool calls', () => {
         type: 'assistant',
         message: {
           content: [
-            { type: 'tool_use', id: 'call_a', name: 'Bash', input: { command: 'ls' } },
-            { type: 'tool_use', id: 'call_b', name: 'Bash', input: { command: 'false' } },
+            {
+              type: 'tool_use',
+              id: 'call_a',
+              name: 'Bash',
+              input: { command: 'ls' },
+            },
+            {
+              type: 'tool_use',
+              id: 'call_b',
+              name: 'Bash',
+              input: { command: 'false' },
+            },
           ],
         },
       },
@@ -124,8 +201,17 @@ describe('tool calls', () => {
         type: 'user',
         message: {
           content: [
-            { type: 'tool_result', tool_use_id: 'call_b', content: 'exit 1', is_error: true },
-            { type: 'tool_result', tool_use_id: 'call_a', content: [{ type: 'text', text: 'a.txt' }] },
+            {
+              type: 'tool_result',
+              tool_use_id: 'call_b',
+              content: 'exit 1',
+              is_error: true,
+            },
+            {
+              type: 'tool_result',
+              tool_use_id: 'call_a',
+              content: [{ type: 'text', text: 'a.txt' }],
+            },
           ],
         },
       },
@@ -139,7 +225,12 @@ describe('tool calls', () => {
 
   test('result frame ends the turn and settles tools that never reported', () => {
     const { state } = run([
-      { type: 'assistant', message: { content: [{ type: 'tool_use', id: 't1', name: 'Read', input: {} }] } },
+      {
+        type: 'assistant',
+        message: {
+          content: [{ type: 'tool_use', id: 't1', name: 'Read', input: {} }],
+        },
+      },
       { type: 'result', subtype: 'success' },
     ]);
     expect(state.isWorking).toBe(false);
@@ -150,13 +241,20 @@ describe('tool calls', () => {
 describe('user echo', () => {
   test('a prompt sent from this device is not shown twice when the CLI echoes it', () => {
     const local = addLocalUser(createInitialState(), 'git status');
-    const { state } = run([{ type: 'user', message: { content: 'git status' } }], local);
+    const { state } = run(
+      [{ type: 'user', message: { content: 'git status' } }],
+      local,
+    );
     expect(state.entries.filter(e => e.kind === 'user')).toHaveLength(1);
   });
 
   test('a prompt typed on the laptop does show up', () => {
-    const { state } = run([{ type: 'user', message: { content: 'typed on laptop' } }]);
-    expect(state.entries).toEqual([expect.objectContaining({ kind: 'user', text: 'typed on laptop' })]);
+    const { state } = run([
+      { type: 'user', message: { content: 'typed on laptop' } },
+    ]);
+    expect(state.entries).toEqual([
+      expect.objectContaining({ kind: 'user', text: 'typed on laptop' }),
+    ]);
   });
 });
 
@@ -164,30 +262,54 @@ describe('control requests', () => {
   const canUseTool = {
     type: 'control_request',
     request_id: 'req-1',
-    request: { subtype: 'can_use_tool', tool_name: 'Bash', input: { command: 'rm -rf build' }, description: 'Run' },
+    request: {
+      subtype: 'can_use_tool',
+      tool_name: 'Bash',
+      input: { command: 'rm -rf build' },
+      description: 'Run',
+    },
   };
 
   test('can_use_tool opens a prompt and vibrates', () => {
     const { state, effects } = run([canUseTool]);
-    expect(state.pendingPrompt).toMatchObject({ requestId: 'req-1', toolName: 'Bash' });
+    expect(state.pendingPrompt).toMatchObject({
+      requestId: 'req-1',
+      toolName: 'Bash',
+    });
     expect(effects).toEqual([{ type: 'vibrate' }]);
   });
 
   test('control_cancel_request dismisses the matching prompt only', () => {
-    const other = run([canUseTool, { type: 'control_cancel_request', request_id: 'req-2' }]);
+    const other = run([
+      canUseTool,
+      { type: 'control_cancel_request', request_id: 'req-2' },
+    ]);
     expect(other.state.pendingPrompt).toBeDefined();
-    const same = run([canUseTool, { type: 'control_cancel_request', request_id: 'req-1' }]);
+    const same = run([
+      canUseTool,
+      { type: 'control_cancel_request', request_id: 'req-1' },
+    ]);
     expect(same.state.pendingPrompt).toBeUndefined();
   });
 
   test('unknown subtypes get an error reply so the CLI does not hang', () => {
-    const { effects } = run([{ type: 'control_request', request_id: 'r9', request: { subtype: 'mystery' } }]);
+    const { effects } = run([
+      {
+        type: 'control_request',
+        request_id: 'r9',
+        request: { subtype: 'mystery' },
+      },
+    ]);
     expect(effects).toEqual([
       {
         type: 'send',
         payload: {
           type: 'control_response',
-          response: { subtype: 'error', request_id: 'r9', error: 'Unsupported request subtype: mystery' },
+          response: {
+            subtype: 'error',
+            request_id: 'r9',
+            error: 'Unsupported request subtype: mystery',
+          },
         },
       },
     ]);
@@ -207,30 +329,51 @@ describe('control requests', () => {
 
   test('AskUserQuestion renders as a picker and joins multi-select answers', () => {
     const questions = [
-      { question: 'Target?', options: [{ label: 'Staging' }, { label: 'Production' }] },
-      { question: 'Checks?', multiSelect: true, options: [{ label: 'Lint' }, { label: 'Tests' }] },
+      {
+        question: 'Target?',
+        options: [{ label: 'Staging' }, { label: 'Production' }],
+      },
+      {
+        question: 'Checks?',
+        multiSelect: true,
+        options: [{ label: 'Lint' }, { label: 'Tests' }],
+      },
     ];
     const { state } = run([
       {
         type: 'control_request',
         request_id: 'req-q',
-        request: { subtype: 'can_use_tool', tool_name: 'AskUserQuestion', input: { questions } },
+        request: {
+          subtype: 'can_use_tool',
+          tool_name: 'AskUserQuestion',
+          input: { questions },
+        },
       },
     ]);
     expect(state.pendingPrompt?.questions).toHaveLength(2);
 
-    const reply = questionReply(state.pendingPrompt!, { 'Target?': ['Staging'], 'Checks?': ['Lint', 'Tests'] });
+    const reply = questionReply(state.pendingPrompt!, {
+      'Target?': ['Staging'],
+      'Checks?': ['Lint', 'Tests'],
+    });
     expect(reply.response.response).toEqual({
       behavior: 'allow',
-      updatedInput: { questions, answers: { 'Target?': 'Staging', 'Checks?': 'Lint, Tests' } },
+      updatedInput: {
+        questions,
+        answers: { 'Target?': 'Staging', 'Checks?': 'Lint, Tests' },
+      },
     });
-    expect(questionReply(state.pendingPrompt!, null).response.response.behavior).toBe('deny');
+    expect(
+      questionReply(state.pendingPrompt!, null).response.response.behavior,
+    ).toBe('deny');
   });
 
   test('set_model success applies the pending value; errors surface as a notice', () => {
     const pending = {
       ...createInitialState(),
-      pendingControls: { m1: { subtype: 'set_model' as const, value: 'puku-ai-2.8' } },
+      pendingControls: {
+        m1: { subtype: 'set_model' as const, value: 'puku-ai-2.8' },
+      },
     };
     expect(controlFrame('m1', pending.pendingControls.m1)).toEqual({
       type: 'control_request',
@@ -238,13 +381,30 @@ describe('control requests', () => {
       request: { subtype: 'set_model', model: 'puku-ai-2.8' },
     });
 
-    const ok = run([{ type: 'control_response', response: { subtype: 'success', request_id: 'm1' } }], pending);
+    const ok = run(
+      [
+        {
+          type: 'control_response',
+          response: { subtype: 'success', request_id: 'm1' },
+        },
+      ],
+      pending,
+    );
     expect(ok.state.model).toBe('puku-ai-2.8');
     expect(ok.state.pendingControls).toEqual({});
 
     const bad = run(
-      [{ type: 'control_response', response: { subtype: 'error', request_id: 'm1', error: 'Unknown model' } }],
-      pending
+      [
+        {
+          type: 'control_response',
+          response: {
+            subtype: 'error',
+            request_id: 'm1',
+            error: 'Unknown model',
+          },
+        },
+      ],
+      pending,
     );
     expect(bad.state.model).toBeUndefined();
     expect(bad.state.notice).toBe('Unknown model');
@@ -254,7 +414,10 @@ describe('control requests', () => {
 describe('parseMessage', () => {
   test('accepts a single JSON frame, NDJSON, and plain text lines', () => {
     expect(parseMessage('{"type":"a"}').frames).toEqual([{ type: 'a' }]);
-    expect(parseMessage('{"type":"a"}\n{"type":"b"}').frames).toEqual([{ type: 'a' }, { type: 'b' }]);
+    expect(parseMessage('{"type":"a"}\n{"type":"b"}').frames).toEqual([
+      { type: 'a' },
+      { type: 'b' },
+    ]);
     expect(parseMessage('{"type":"a"}\nhello').text).toEqual(['hello']);
   });
 });
@@ -273,14 +436,24 @@ describe('feed', () => {
       { kind: 'assistant', id: 'x', text: 'done' },
       tool('c', 'Read'),
     ]);
-    expect(feed.map(f => (f.kind === 'tools' ? f.tools.length : f.kind))).toEqual([2, 'assistant', 1]);
+    expect(
+      feed.map(f => (f.kind === 'tools' ? f.tools.length : f.kind)),
+    ).toEqual([2, 'assistant', 1]);
   });
 
   test('summaries read like Claude Code', () => {
-    expect(summarizeTools([tool('a', 'Bash').tool, tool('b', 'Bash').tool])).toBe('Ran 2 commands');
+    expect(
+      summarizeTools([tool('a', 'Bash').tool, tool('b', 'Bash').tool]),
+    ).toBe('Ran 2 commands');
     expect(summarizeTools([tool('a', 'Read').tool])).toBe('Read a file');
-    expect(summarizeTools([tool('a', 'Bash').tool, tool('b', 'Read').tool])).toBe('Used 2 tools');
-    expect(describeTool(tool('a', 'Read', { file_path: '/src/app/main.ts' }).tool)).toBe('Read main.ts');
-    expect(describeTool(tool('a', 'Bash', { command: 'npm test' }).tool)).toBe('npm test');
+    expect(
+      summarizeTools([tool('a', 'Bash').tool, tool('b', 'Read').tool]),
+    ).toBe('Used 2 tools');
+    expect(
+      describeTool(tool('a', 'Read', { file_path: '/src/app/main.ts' }).tool),
+    ).toBe('Read main.ts');
+    expect(describeTool(tool('a', 'Bash', { command: 'npm test' }).tool)).toBe(
+      'npm test',
+    );
   });
 });

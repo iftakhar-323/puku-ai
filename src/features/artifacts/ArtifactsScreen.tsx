@@ -21,6 +21,7 @@ import {
 import { useApp } from '../../store/AppContext';
 import { Artifact } from '../../types';
 import { NativeClipboard } from '../../services/nativeModules';
+import { ignore } from '../../utils/devLog';
 
 export function ArtifactsScreen() {
   const insets = useSafeAreaInsets();
@@ -40,7 +41,7 @@ export function ArtifactsScreen() {
   });
 
   const handleCopy = (content: string) => {
-    NativeClipboard.setString(content).catch(() => {});
+    NativeClipboard.setString(content).catch(ignore('ArtifactsScreen'));
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 1500);
   };
