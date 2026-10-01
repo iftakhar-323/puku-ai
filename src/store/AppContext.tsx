@@ -1525,6 +1525,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
 
           for (const data of dataObjects) {
+            if (__DEV__) {
+              console.log('[RemoteRelay] frame', data.type, data.event?.type || data.subtype || '');
+            }
             if (data.type === 'control_request') {
               if (data.request?.subtype === 'can_use_tool') {
                 const toolName = data.request.tool_name || 'Tool Execution';
@@ -1602,39 +1605,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 }
               }
               if (items.length > 0) {
-                setRemoteSession(prev => ({
-                  ...prev,
-                  progressStatus: 'idle',
-                  logs: [...prev.logs, ...items],
-                }));
+                setRemoteSession(prev => {
+                  // The final frame is authoritative: drop the live-streamed copies.
+                  const streamed = new Set(prev.streamingLogIndices ?? []);
+                  const kept = streamed.size
+                    ? prev.logs.filter((_, idx) => !streamed.has(idx))
+                    : prev.logs;
+                  return {
+                    ...prev,
+                    progressStatus: 'idle',
+                    logs: [...kept, ...items],
+                    streamingLogIndices: [],
+                  };
+                });
               }
             } else if (data.type === 'stream_event' || data.type === 'content_block_delta') {
-              const deltaText = data.delta?.text || data.text || '';
-              if (deltaText) {
+              // Partial output while the CLI is still writing. Claude-style
+              // stream-json nests the Anthropic event under `event`.
+              const ev = data.type === 'stream_event' ? data.event || {} : data;
+              const startsTextBlock =
+                ev.type === 'content_block_start' && ev.content_block?.type === 'text';
+              // Only text deltas carry `delta.text`; thinking and tool-input
+              // deltas use other keys, so they are skipped here.
+              const deltaText =
+                ev.type === 'content_block_delta' ? ev.delta?.text || '' : data.text || '';
+              if (startsTextBlock || deltaText) {
                 setRemoteSession(prev => {
-                  const lastIndex = prev.logs.length - 1;
-                  const lastLog = prev.logs[lastIndex];
-                  if (
-                    lastIndex >= 0 &&
-                    typeof lastLog === 'string' &&
-                    !lastLog.startsWith('> ') &&
-                    !lastLog.startsWith('[Tool]') &&
-                    !lastLog.startsWith('[Running]') &&
-                    !lastLog.startsWith('✓ Done') &&
-                    !lastLog.startsWith('[Status]') &&
-                    !lastLog.startsWith('[System]') &&
-                    !lastLog.startsWith('⚠️')
-                  ) {
-                    const updated = [...prev.logs];
-                    updated[lastIndex] = lastLog + deltaText;
-                    return { ...prev, progressStatus: 'thinking', logs: updated };
-                  } else {
+                  const indices = prev.streamingLogIndices ?? [];
+                  const current = indices[indices.length - 1];
+                  // Each text block streams into its own log entry.
+                  if (startsTextBlock || current === undefined) {
                     return {
                       ...prev,
                       progressStatus: 'thinking',
                       logs: [...prev.logs, deltaText],
+                      streamingLogIndices: [...indices, prev.logs.length],
                     };
                   }
+                  const updated = [...prev.logs];
+                  updated[current] = (updated[current] || '') + deltaText;
+                  return { ...prev, progressStatus: 'thinking', logs: updated };
                 });
               }
             } else if (data.type === 'tool_progress') {
@@ -1649,6 +1659,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 currentTool: undefined,
                 progressStatus: 'idle',
                 logs: [...prev.logs, `✓ Done (${data.subtype || 'success'})`],
+                streamingLogIndices: [],
               }));
             } else if (data.type === 'system') {
               if (data.subtype === 'status') {
@@ -1753,6 +1764,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       progressStatus: 'idle',
       logs: [],
+      streamingLogIndices: [],
     }));
   }, []);
 

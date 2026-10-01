@@ -111,6 +111,11 @@ export interface RemoteSession {
   progressStatus: 'thinking' | 'idle' | 'ready' | 'completed' | 'failed';
   diffLines?: Array<{ type: 'add' | 'remove' | 'context'; text: string }>;
   logs: string[];
+  /**
+   * Indices in `logs` holding text streamed live from `stream_event` deltas for
+   * the assistant message in progress. The final `assistant` frame replaces them.
+   */
+  streamingLogIndices?: number[];
   messages?: RemoteMessage[];
 }
 
