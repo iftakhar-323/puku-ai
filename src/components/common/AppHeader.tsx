@@ -35,14 +35,14 @@ export function AppHeader({
       <View style={styles.contentRow}>
         <View style={styles.leftContainer}>
           {showBack ? (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back"
               onPress={onBack || goBack}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.actionBtn}>
               <BackIcon size={22} color={theme.textPrimary} />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open menu"
               onPress={() => setDrawerOpen(true)}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.actionBtn}>

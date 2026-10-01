@@ -188,7 +188,7 @@ export function ArtifactsScreen() {
                 Type: {activeArtifact?.type} • Language: {activeArtifact?.language || 'plain'}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => setActiveArtifact(null)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setActiveArtifact(null)}>
               <CloseIcon size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>

@@ -153,7 +153,7 @@ export function TranscribeScreen() {
           </View>
 
           {/* Record Control Button */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Voice input"
             activeOpacity={0.7}
             onPress={toggleRecording}
             style={[

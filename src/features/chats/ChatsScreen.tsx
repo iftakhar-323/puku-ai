@@ -144,12 +144,12 @@ export function ChatsScreen() {
         rightAction={
           isSelectionMode ? (
             <View style={styles.selectionActions}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete"
                 onPress={confirmDelete}
                 style={[styles.deleteBtn, { backgroundColor: theme.buttonBackground }]}>
                 <DeleteIcon size={18} color={theme.error} />
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                 onPress={() => {
                   setIsSelectionMode(false);
                   setSelectedIds([]);
@@ -180,7 +180,7 @@ export function ChatsScreen() {
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setSearchQuery('')}>
               <CloseIcon size={16} color={theme.textMuted} />
             </TouchableOpacity>
           )}

@@ -86,7 +86,7 @@ export function SettingsScreen() {
             backgroundColor: theme.background,
           },
         ]}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back"
           activeOpacity={0.7}
           onPress={goBack}
           style={styles.headerBtn}>
@@ -97,7 +97,7 @@ export function SettingsScreen() {
           Settings
         </Text>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="About"
           activeOpacity={0.7}
           onPress={() => setInfoModalVisible(true)}
           style={styles.headerBtn}>
@@ -425,7 +425,7 @@ export function SettingsScreen() {
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
                 Puku AI Information
               </Text>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                 onPress={() => setInfoModalVisible(false)}
                 style={styles.closeBtn}>
                 <CloseIcon size={20} color={theme.textPrimary} />

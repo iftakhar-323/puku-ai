@@ -83,7 +83,7 @@ export function LiveVoiceScreen() {
           <Text style={styles.badgeText}>LIVE CONVERSATION</Text>
         </View>
 
-        <TouchableOpacity onPress={goBack} style={styles.closeBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={goBack} style={styles.closeBtn}>
           <CloseIcon size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
@@ -145,7 +145,7 @@ export function LiveVoiceScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Voice input"
           onPress={() => setIsMuted(!isMuted)}
           style={[
             styles.micBtn,

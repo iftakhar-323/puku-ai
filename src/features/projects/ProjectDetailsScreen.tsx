@@ -91,7 +91,7 @@ export function ProjectDetailsScreen() {
         showBack
         title={activeProject.name}
         rightAction={
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete"
             onPress={confirmDeleteProject}
             style={[styles.actionBtn, { backgroundColor: theme.buttonBackground }]}>
             <DeleteIcon size={18} color={theme.error} />
@@ -280,7 +280,7 @@ export function ProjectDetailsScreen() {
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
                 Custom Instructions
               </Text>
-              <TouchableOpacity onPress={() => setShowInstructionsModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowInstructionsModal(false)}>
                 <CloseIcon size={20} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -336,7 +336,7 @@ export function ProjectDetailsScreen() {
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
                 Add Knowledge Content
               </Text>
-              <TouchableOpacity onPress={() => setShowAddContentModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowAddContentModal(false)}>
                 <CloseIcon size={20} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>

@@ -63,7 +63,7 @@ export function UsageScreen() {
       ]}>
       {/* Authentic Header */}
       <View style={styles.header}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open menu"
           activeOpacity={0.7}
           onPress={() => setDrawerOpen(true)}
           style={styles.actionBtn}>
@@ -71,21 +71,21 @@ export function UsageScreen() {
         </TouchableOpacity>
 
         <View style={styles.trailingGroup}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remote laptop sessions"
             activeOpacity={0.7}
             onPress={() => navigate('code')}
             style={styles.actionBtn}>
             <TerminalPromptIcon size={20} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Puku Bot"
             activeOpacity={0.7}
             onPress={() => navigate('pukuBot')}
             style={styles.actionBtn}>
             <BotIcon size={20} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Toggle theme"
             activeOpacity={0.7}
             onPress={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
             style={styles.actionBtn}>
@@ -115,7 +115,7 @@ export function UsageScreen() {
           <Text style={[styles.mainTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
             Usage
           </Text>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh"
             activeOpacity={0.7}
             onPress={handleRefresh}
             style={[styles.refreshBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>

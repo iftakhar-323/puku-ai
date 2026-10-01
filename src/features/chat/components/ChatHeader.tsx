@@ -52,7 +52,7 @@ export function ChatHeader({
         </View>
       ) : (
         <View style={styles.leftGroup}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={showsBackButton ? 'Back' : 'Open menu'}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
             onPress={onLeadingTap}
@@ -74,7 +74,7 @@ export function ChatHeader({
       )}
 
       {isIncognitoMode ? (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Exit incognito"
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 16 }}
           onPress={onTrailingTap}
@@ -84,7 +84,7 @@ export function ChatHeader({
       ) : (
         <View style={styles.trailingGroup}>
           {onTrailingTap && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Incognito chat"
               activeOpacity={0.7}
               onPress={onTrailingTap}
               style={styles.actionBtn}>
@@ -93,7 +93,7 @@ export function ChatHeader({
           )}
 
           {onTerminalTap && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remote laptop sessions"
               activeOpacity={0.7}
               onPress={onTerminalTap}
               style={styles.actionBtn}>
@@ -106,7 +106,7 @@ export function ChatHeader({
           )}
 
           {onBotTap && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Puku Bot"
               activeOpacity={0.7}
               onPress={onBotTap}
               style={styles.actionBtn}>
@@ -115,7 +115,7 @@ export function ChatHeader({
           )}
 
           {onThemeTap && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Toggle theme"
               activeOpacity={0.7}
               hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
               onPress={onThemeTap}

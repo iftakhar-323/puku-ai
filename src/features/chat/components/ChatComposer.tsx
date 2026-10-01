@@ -148,7 +148,7 @@ export function ChatComposer({
               ) : null}
             </View>
             {onRemoveAttachment && (
-              <TouchableOpacity onPress={onRemoveAttachment} style={styles.removeAttBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove attachment" onPress={onRemoveAttachment} style={styles.removeAttBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <CloseIcon size={14} color={theme.textMuted} />
               </TouchableOpacity>
             )}
@@ -182,7 +182,7 @@ export function ChatComposer({
         <View style={styles.bottomControls}>
           {/* Left Group: Plus (+) and Model selector */}
           <View style={styles.leftGroup}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add attachment"
               activeOpacity={0.7}
               onPress={() => {
                 setDropdownOpen(false);
@@ -217,7 +217,7 @@ export function ChatComposer({
           <View style={styles.rightGroup}>
             <View style={[styles.statusDot, { backgroundColor: theme.success }]} />
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Voice input"
               activeOpacity={0.7}
               onPress={onMicrophoneTap}
               style={[
@@ -228,7 +228,7 @@ export function ChatComposer({
             </TouchableOpacity>
 
             {isSending ? (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Stop generating"
                 activeOpacity={0.7}
                 onPress={() => {
                   setDropdownOpen(false);
@@ -238,7 +238,7 @@ export function ChatComposer({
                 <View style={styles.stopSquare} />
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send"
                 activeOpacity={0.7}
                 disabled={!canSubmit}
                 onPress={() => {

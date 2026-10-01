@@ -218,7 +218,7 @@ export function AppDrawer() {
                   <BotIcon size={22} color={isDark ? '#35D6B4' : theme.textPrimary} />
                   <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku Bot</Text>
                 </View>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                   activeOpacity={0.7}
                   onPress={() => setDrawerOpen(false)}
                   style={styles.closeBtn}>
@@ -239,7 +239,7 @@ export function AppDrawer() {
                   <ChevronDownIcon size={12} color={theme.textMuted} />
                 </TouchableOpacity>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Settings"
                   activeOpacity={0.7}
                   onPress={() => {
                     setDrawerOpen(false);
@@ -302,13 +302,13 @@ export function AppDrawer() {
                     style={[styles.searchInput, { color: theme.textPrimary }]}
                   />
                   {botSearchQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => setBotSearchQuery('')}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setBotSearchQuery('')}>
                       <CloseIcon size={14} color={theme.textMuted} />
                     </TouchableOpacity>
                   )}
                 </View>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="New chat"
                   activeOpacity={0.7}
                   onPress={() => {
                     createBotConversation(activeBotId);
@@ -325,7 +325,7 @@ export function AppDrawer() {
                 <Text style={[styles.recentHeaderText, { color: theme.textPrimary }]}>
                   Recent Bot Chats
                 </Text>
-                <TouchableOpacity activeOpacity={0.7}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Sort" activeOpacity={0.7}>
                   <SortIcon size={14} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -368,7 +368,7 @@ export function AppDrawer() {
                             {conv.title || 'Bot Session'}
                           </Text>
 
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button" accessibilityLabel="More options"
                             activeOpacity={0.7}
                             onPress={() =>
                               setActiveMenuBotConvId(prev => (prev === conv.id ? null : conv.id))
@@ -472,7 +472,7 @@ export function AppDrawer() {
               <PukuLogoIcon size={24} />
               <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku AI</Text>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
               activeOpacity={0.7}
               onPress={() => setDrawerOpen(false)}
               style={styles.closeBtn}>
@@ -493,7 +493,7 @@ export function AppDrawer() {
               <ChevronDownIcon size={12} color={theme.textMuted} />
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Archived chats"
               activeOpacity={0.7}
               onPress={() => {
                 setDrawerOpen(false);
@@ -548,7 +548,7 @@ export function AppDrawer() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="New chat"
               activeOpacity={0.7}
               onPress={() => {
                 startNewChat();
@@ -565,7 +565,7 @@ export function AppDrawer() {
             <Text style={[styles.recentHeaderText, { color: theme.textPrimary }]}>
               Recent
             </Text>
-            <TouchableOpacity activeOpacity={0.7}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Sort" activeOpacity={0.7}>
               <SortIcon size={14} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -601,7 +601,7 @@ export function AppDrawer() {
                       {conv.title || 'Untitled conversation'}
                     </Text>
 
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="More options"
                       activeOpacity={0.7}
                       onPress={() =>
                         setActiveMenuConvId(prev => (prev === conv.id ? null : conv.id))
@@ -784,10 +784,10 @@ export function AppDrawer() {
               </TouchableOpacity>
 
               <View style={styles.rightActionIcons}>
-                <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Download" activeOpacity={0.7} style={styles.footerIconBtn}>
                   <DownloadIcon size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
-                <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Help" activeOpacity={0.7} style={styles.footerIconBtn}>
                   <HelpCircleIcon size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -871,7 +871,7 @@ export function AppDrawer() {
                   ]}>
                   Find a conversation
                 </Text>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                   activeOpacity={0.7}
                   onPress={() => setIsFindModalOpen(false)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

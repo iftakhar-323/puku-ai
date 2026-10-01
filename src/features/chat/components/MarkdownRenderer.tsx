@@ -148,7 +148,7 @@ function CodeBlockItem({
           contentContainerStyle={[styles.codeScrollContent, styles.codeScrollCompact]}>
           <Text style={[styles.codeText, { color: theme.textPrimary }]}>{code}</Text>
         </ScrollView>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy"
           onPress={handleCopy}
           style={styles.codeCopyFloating}
           activeOpacity={0.7}

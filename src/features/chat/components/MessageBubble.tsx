@@ -85,7 +85,7 @@ export function MessageBubble({
         {!!message.content && (
           <View style={styles.userActionRow}>
             {/* Copy button */}
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy"
               activeOpacity={0.6}
               onPress={handleCopy}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -99,7 +99,7 @@ export function MessageBubble({
 
             {/* Edit and resend button */}
             {!!onEditPrompt && (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit"
                 activeOpacity={0.6}
                 onPress={() => onEditPrompt(message.content)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -145,7 +145,7 @@ export function MessageBubble({
       {!!message.content && (
         <View style={styles.assistantActionRow}>
           {/* Copy button */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy"
             activeOpacity={0.6}
             onPress={handleCopy}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -159,7 +159,7 @@ export function MessageBubble({
 
           {/* Again search / Regenerate button */}
           {!!onRegenerate && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Regenerate response"
               activeOpacity={0.6}
               onPress={() => onRegenerate(message.id)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -170,7 +170,7 @@ export function MessageBubble({
 
           {/* Branch / Share button */}
           {!!onBranch && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Branch conversation"
               activeOpacity={0.6}
               onPress={handleBranchClick}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

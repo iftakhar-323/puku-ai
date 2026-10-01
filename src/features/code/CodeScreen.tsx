@@ -70,7 +70,7 @@ export function CodeScreen() {
       {/* Sleek, Minimal Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open menu"
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
             onPress={() => setDrawerOpen(true)}
@@ -84,7 +84,7 @@ export function CodeScreen() {
         </View>
 
         <View style={styles.trailingGroup}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh"
             activeOpacity={0.7}
             onPress={handleRefresh}
             style={styles.actionBtn}>
@@ -95,7 +95,7 @@ export function CodeScreen() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Toggle theme"
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
             onPress={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}

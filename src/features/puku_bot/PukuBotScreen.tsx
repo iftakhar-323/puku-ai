@@ -729,7 +729,7 @@ export function PukuBotScreen() {
       {/* Authentic Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open menu"
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
             onPress={() => setDrawerOpen(true)}
@@ -759,7 +759,7 @@ export function PukuBotScreen() {
 
         <View style={styles.trailingGroup}>
           {isAuthenticated && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="New conversation"
               activeOpacity={0.7}
               onPress={handleNewConversation}
               style={styles.actionBtn}>
@@ -768,7 +768,7 @@ export function PukuBotScreen() {
           )}
 
           {isAuthenticated && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Computer control"
               activeOpacity={0.7}
               onPress={handleOpenComputerModal}
               style={[styles.actionBtn, styles.computerBtn, { backgroundColor: isDark ? '#1C271E' : '#E0F3E5' }]}>
@@ -776,28 +776,28 @@ export function PukuBotScreen() {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Settings"
             activeOpacity={0.7}
             onPress={() => setShowSettingsModal(true)}
             style={styles.actionBtn}>
             <SettingsIcon size={19} color={theme.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remote laptop sessions"
             activeOpacity={0.7}
             onPress={() => navigate('code')}
             style={styles.actionBtn}>
             <TerminalPromptIcon size={20} color={theme.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to Puku chat"
             activeOpacity={0.7}
             onPress={() => navigate('chat')}
             style={styles.actionBtn}>
             <PukuLogoIcon size={19} />
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Toggle theme"
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
             onPress={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
@@ -825,7 +825,7 @@ export function PukuBotScreen() {
             <Text style={[styles.needsPersonTitle, { color: isDark ? '#F5D070' : '#A36800', fontFamily: monoFont }]}>
               {needsPerson.kind === 'secret' ? '🔐 Secret Needed' : '⚠️ Assistance Needed'}
             </Text>
-            <TouchableOpacity onPress={() => setNeedsPerson(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setNeedsPerson(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <CloseIcon size={16} color={isDark ? '#F5D070' : '#A36800'} />
             </TouchableOpacity>
           </View>
@@ -845,7 +845,7 @@ export function PukuBotScreen() {
                   placeholderTextColor={theme.placeholderText}
                   style={[styles.secretTextInput, { color: theme.textPrimary, fontFamily: monoFont }]}
                 />
-                <TouchableOpacity onPress={() => setIsSecretMasked(!isSecretMasked)} style={styles.eyeBtn}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Show or hide password" onPress={() => setIsSecretMasked(!isSecretMasked)} style={styles.eyeBtn}>
                   {isSecretMasked ? (
                     <EyeIcon size={18} color={theme.textMuted} />
                   ) : (
@@ -1122,14 +1122,14 @@ export function PukuBotScreen() {
 
                     {isUser && (
                       <View style={styles.botUserActionRow}>
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy"
                           activeOpacity={0.6}
                           onPress={() => NativeClipboard.setString(item.text)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                           style={styles.actionBtnSmall}>
                           <CopyIcon size={14} color={theme.textMuted} />
                         </TouchableOpacity>
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit"
                           activeOpacity={0.6}
                           onPress={() => handleEditMessage(item.text)}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1184,7 +1184,7 @@ export function PukuBotScreen() {
                 </Text>
               ) : null}
             </View>
-            <TouchableOpacity onPress={() => setPendingAttachment(null)} style={styles.removeAttBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setPendingAttachment(null)} style={styles.removeAttBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <CloseIcon size={14} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
@@ -1202,7 +1202,7 @@ export function PukuBotScreen() {
 
         <View style={styles.composerBottomRow}>
           <View style={styles.composerLeftMeta}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Attach file"
               activeOpacity={0.7}
               onPress={handlePickMedia}
               style={[styles.composerIconBtn, { borderColor: theme.border }]}>
@@ -1211,14 +1211,14 @@ export function PukuBotScreen() {
           </View>
 
           {isStreaming ? (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Stop"
               activeOpacity={0.7}
               onPress={handleStopStream}
               style={[styles.sendBtn, { backgroundColor: '#FF4D4F' }]}>
               <StopSquareIcon size={14} color="#FFFFFF" />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send"
               activeOpacity={0.7}
               disabled={(!inputVal.trim() && !pendingAttachment) || isTyping}
               onPress={() => handleSend()}
@@ -1254,7 +1254,7 @@ export function PukuBotScreen() {
                   Bot Computer
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setShowComputerModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowComputerModal(false)}>
                 <CloseIcon size={20} color={theme.textPrimary} />
               </TouchableOpacity>
             </View>
@@ -1363,7 +1363,7 @@ export function PukuBotScreen() {
               <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
                 Puku Bot Settings
               </Text>
-              <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowSettingsModal(false)}>
                 <CloseIcon size={20} color={theme.textPrimary} />
               </TouchableOpacity>
             </View>
@@ -1464,7 +1464,7 @@ export function PukuBotScreen() {
               <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
                 Select Bot
               </Text>
-              <TouchableOpacity onPress={() => setShowBotModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowBotModal(false)}>
                 <CloseIcon size={20} color={theme.textPrimary} />
               </TouchableOpacity>
             </View>

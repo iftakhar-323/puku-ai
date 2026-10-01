@@ -83,7 +83,7 @@ export function ChatModelSelectionSheet({
           <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
             Select Model
           </Text>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
             activeOpacity={0.7}
             onPress={onClose}
             style={styles.closeBtn}>

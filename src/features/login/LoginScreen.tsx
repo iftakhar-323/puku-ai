@@ -674,7 +674,7 @@ export function LoginScreen() {
                   <EmailIcon size={18} color={AppColors.blueLite} />
                   <Text style={styles.modalTitleText}>Sign in with Email</Text>
                 </View>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                   onPress={() => setIsEmailModalOpen(false)}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   <CloseIcon size={20} color={AppColors.coolGrey} />
@@ -727,7 +727,7 @@ export function LoginScreen() {
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                   />
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Show or hide password"
                     onPress={() => setShowPassword(p => !p)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     {showPassword ? (

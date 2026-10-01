@@ -227,7 +227,7 @@ export function ProjectsScreen() {
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
                 New Project
               </Text>
-              <TouchableOpacity onPress={() => setShowCreateModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowCreateModal(false)}>
                 <CloseIcon size={20} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
