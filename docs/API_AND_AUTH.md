@@ -42,7 +42,7 @@ sequenceDiagram
     AuthServer-->>App: { access_token, refresh_token, expires_in }
     App->>APIServer: GET /v1/me (Bearer access_token)
     APIServer-->>App: User Profile { email, name, avatar, plan }
-    App->>App: Save tokens to AsyncStorage & route to ChatScreen
+    App->>App: Save tokens to encrypted storage & route to ChatScreen
 ```
 
 #### Manual Code Fallback
@@ -61,7 +61,8 @@ For enterprise users or automated workflows:
 
 ## 3. Token Manager (`src/services/tokenManager.ts`)
 
-- **Secure Storage**: Caches `accessToken`, `refreshToken`, and expiry timestamp in `@react-native-async-storage/async-storage`.
+- **Secure Storage**: `accessToken` and `refreshToken` live in encrypted storage via `src/services/secureStorage.ts` (`expo-secure-store`: Keychain on iOS, Keystore-backed storage on Android). Tokens saved in plaintext AsyncStorage by older versions migrate on first read. The expiry timestamp and login flags stay in AsyncStorage. The OAuth PKCE verifier and state also use encrypted storage and are deleted after sign-in.
+- **Fallback**: if the native module is missing (for example an iOS build made before `pod install`), `secureStorage` falls back to AsyncStorage instead of crashing.
 - **Automatic Header Injection**: Attaches `Authorization: Bearer <token>` to all HTTP requests via `pukuApi`.
 - **Session Auto-Validation**: On cold boot, checks token validity; if valid, skips the login screen and opens the workspace immediately.
 
@@ -69,11 +70,29 @@ For enterprise users or automated workflows:
 
 ## 4. Desktop Remote Session Relay Protocol
 
-Puku AI can pair with a developer's desktop command-line environment (`puku-cli`):
+Puku AI can pair with a developer's desktop command-line environment (`puku-cli`), started there with `/remote-control`. The full wire protocol is in the Flutter app's `REMOTE_SESSION_GUIDE.md`; this is how the React Native app implements it.
 
-1. **Connection**:
-   - The user inputs the `Relay Session ID` (e.g. `puku-relay-xxxx`) and `Session Token` (e.g. `tk_live_xxxx`).
-   - The app establishes an authenticated connection to `https://puku-cli.relay.puku.sh`.
-2. **Tool Execution Confirmation**:
-   - When the remote AI agent proposes terminal commands or edits on the developer's computer, the mobile app receives an actionable prompt.
-   - The user can inspect the proposed command/diff and tap **Approve** or **Reject** directly from the phone.
+**Code layout**
+
+| File | Role |
+|---|---|
+| `src/features/remote_session/relay/protocol.ts` | Pure reducer: `applyFrame(state, frame)` returns the next state plus effects (send, vibrate, save reconnect token, close). Outgoing frame builders. Unit-tested in `__tests__/RemoteRelayProtocol.test.ts`. |
+| `src/features/remote_session/relay/feed.ts` | Groups consecutive tool calls into "Ran N commands" rows. |
+| `src/store/RemoteSessionContext.tsx` | `RemoteSessionProvider` / `useRemoteSession()`: owns the WebSocket, reconnects, runs effects. Separate from `AppContext` so streamed output only re-renders remote-session screens. |
+| `src/features/remote_session/` | Screen and components (feed, composer, permission card, tool sheet, pairing). |
+
+**Connection**
+
+1. Sessions on the user's account are listed from `GET /v1/sessions?mine=1`, polled every 5s while the pairing view is open (30s after a 401/403, paused in the background). Only sessions with `workerConnected` and not `expired` count as live.
+2. The app opens `wss://puku-cli.relay.puku.sh/client/<sessionId>?token=<mobileToken>[&reconnectToken=<token>]` with the `X-Puku-Mobile-Token` and `X-Puku-Account-Token` headers.
+3. Input stays disabled until `worker_connected` or `system/init` arrives (phase `attached`), not merely when the socket opens.
+4. The `system/reconnect_token` frame is saved in encrypted storage per session and sent on the next connect.
+
+**Disconnects**: close code 1000 or any 4xxx ends the session. Anything else (1006 network drop, 1011 CLI gone) retries with backoff 3s, 6s, 12s, then every 30s, for up to 20 attempts, and immediately when the app returns to the foreground. `worker_disconnected` disables input but keeps the socket; `client_replaced` and `session_end` close it. Frames replayed after a reconnect are de-duplicated by `uuid`.
+
+**Output**: `assistant` frames add text and tool calls. `stream_event` text deltas show live and are replaced by the final `assistant` frame. `tool_result` blocks attach to their `tool_use` by id, with `is_error` shown as a failure.
+
+**Prompts** (`control_request` / `can_use_tool`): shown as an Allow/Deny card; `AskUserQuestion` renders as a picker whose answers go back in `updatedInput.answers` (multi-select joined with `", "`). `control_cancel_request` dismisses the card. Unknown `control_request` subtypes get an `error` reply so the CLI does not hang.
+
+**Composer controls**: the permission mode and model pickers send `set_permission_mode` / `set_model` and apply the change on a `success` response; an `error` response is shown to the user.
+
