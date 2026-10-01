@@ -29,10 +29,12 @@ import {
   PlusIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
+  RemoteIcon,
   SearchIcon,
   SettingsIcon,
   SlidersIcon,
   SortIcon,
+  TerminalPromptIcon,
   ThreeDotsHorizontalIcon,
   TrashIcon,
 } from './Icons';
@@ -63,6 +65,7 @@ export function AppDrawer() {
     deleteBotConversation,
     renameBotConversation,
     selectBot,
+    activeRelaySessions,
   } = useApp();
 
   const isBotMode = activeRoute === 'pukuBot';
@@ -701,6 +704,41 @@ export function AppDrawer() {
                   </Text>
                   <Text style={[styles.switchHubSub, { color: theme.textMuted }]}>
                     Autonomous computer & laptop agent
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Remote Laptop Sessions Card */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setDrawerOpen(false);
+                navigate('code');
+              }}
+              style={[
+                styles.switchHubCard,
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderColor: activeRelaySessions.length > 0 ? '#52C41A' : theme.border,
+                  marginTop: 8,
+                },
+              ]}>
+              <View style={styles.switchHubLeft}>
+                <RemoteIcon size={20} color={activeRelaySessions.length > 0 ? '#52C41A' : theme.primary} />
+                <View style={styles.switchHubTextWrap}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
+                      Remote Laptop Sessions
+                    </Text>
+                    {activeRelaySessions.length > 0 && (
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#52C41A' }} />
+                    )}
+                  </View>
+                  <Text style={[styles.switchHubSub, { color: theme.textMuted }]}>
+                    {activeRelaySessions.length > 0
+                      ? `${activeRelaySessions.length} live session(s) active`
+                      : 'Mirror & control laptop terminal'}
                   </Text>
                 </View>
               </View>

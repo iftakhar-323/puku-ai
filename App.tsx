@@ -29,7 +29,7 @@ import { UpdateService } from './src/services/updateService';
 import { pukuBotApi } from './src/services/pukuBotApi';
 
 function MainNavigator(): React.JSX.Element {
-  const { activeRoute, isDark, isRestoringSession, navigate } = useApp();
+  const { activeRoute, isDark, isRestoringSession, navigate, connectRemoteSession } = useApp();
 
   useEffect(() => {
     try {
@@ -46,6 +46,19 @@ function MainNavigator(): React.JSX.Element {
           navigate('pukuBot');
         } catch (e) {
           console.warn('[PukuBot] Deep link auth callback failed:', e);
+        }
+      } else if (url.startsWith('puku://remote')) {
+        try {
+          const queryPart = url.split('?')[1] || '';
+          const params = new URLSearchParams(queryPart);
+          const s = params.get('s');
+          const t = params.get('t') || undefined;
+          if (s) {
+            connectRemoteSession(s, t);
+            navigate('remoteSession');
+          }
+        } catch (e) {
+          console.warn('[RemoteSession] Deep link parsing failed:', e);
         }
       }
     };

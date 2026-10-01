@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  ActiveRelaySession,
   AppRoute,
   AppSettings,
   Artifact,
@@ -76,9 +77,15 @@ interface AppContextValue {
   runCodeSession: (sessionId: string, code: string) => void;
   // Remote sessions
   remoteSession: RemoteSession;
-  connectRemoteSession: (sessionId: string, token: string) => void;
+  activeRelaySessions: ActiveRelaySession[];
+  isLoadingRelaySessions: boolean;
+  fetchActiveRelaySessions: () => Promise<ActiveRelaySession[]>;
+  connectRemoteSession: (sessionId: string, token?: string) => void;
   disconnectRemoteSession: () => void;
-  respondToTool: (approved: boolean) => void;
+  sendRemoteMessage: (content: string) => boolean;
+  sendRemoteInterrupt: () => boolean;
+  clearRemoteLogs: () => void;
+  respondToTool: (approved: boolean, requestId?: string) => void;
   // Puku Bot state
   botConversations: BotConversation[];
   activeBotConversationId: string | null;
@@ -610,15 +617,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     initialCodeSessions[0]?.id || null
   );
 
+  const [activeRelaySessions, setActiveRelaySessions] = useState<ActiveRelaySession[]>([]);
+  const [isLoadingRelaySessions, setIsLoadingRelaySessions] = useState<boolean>(false);
+
   const [remoteSession, setRemoteSession] = useState<RemoteSession>({
-    sessionId: 'puku-relay-9281',
-    token: 'tk_live_secure_9201948',
+    sessionId: '',
+    token: '',
     title: 'Remote Agent Desktop Relay',
     status: 'idle',
     progressStatus: 'ready',
     logs: [
-      '[System] Relay client connected to puku-relay-9281',
-      '[Worker] CLI agent ready for tasks.',
+      '[System] Relay ready to connect to your laptop CLI.',
     ],
   });
 
@@ -1353,7 +1362,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, 1000);
   };
 
-  const connectRemoteSession = (sessionId: string, token: string) => {
+  const fetchActiveRelaySessions = useCallback(async (): Promise<ActiveRelaySession[]> => {
+    setIsLoadingRelaySessions(true);
+    try {
+      const accessToken =
+        (await tokenManager.ensureValidToken().catch(() => null)) ||
+        (await tokenManager.getAccessToken().catch(() => null)) ||
+        pukuApi.getAuthToken() ||
+        (await AsyncStorage.getItem('@puku_auth_token'));
+
+      if (!accessToken) {
+        console.warn('[RemoteRelay] No access token available, user may need to log in');
+        setIsLoadingRelaySessions(false);
+        return [];
+      }
+      const response = await fetch(`${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions?mine=1`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'User-Agent': 'puku-ai-app/1.0',
+        },
+      });
+      if (!response.ok) {
+        console.warn('[RemoteRelay] Relay server responded with HTTP', response.status);
+        setIsLoadingRelaySessions(false);
+        return [];
+      }
+      const data = await response.json();
+      const sessions: ActiveRelaySession[] = Array.isArray(data.sessions) ? data.sessions : [];
+      setActiveRelaySessions(sessions);
+      setIsLoadingRelaySessions(false);
+      return sessions;
+    } catch (e) {
+      console.warn('[RemoteRelay] Failed to fetch active sessions:', e);
+      setIsLoadingRelaySessions(false);
+      return [];
+    }
+  }, []);
+
+  const connectRemoteSession = async (sessionId: string, token?: string) => {
     if (wsRef.current) {
       try {
         wsRef.current.close();
@@ -1361,38 +1408,67 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       wsRef.current = null;
     }
 
+    let activeToken = (token || '').trim();
+    if (!activeToken) {
+      const match = activeRelaySessions.find(s => s.sessionId === sessionId);
+      if (match?.mobileToken) {
+        activeToken = match.mobileToken;
+      } else {
+        try {
+          const accessToken =
+            (await tokenManager.ensureValidToken().catch(() => null)) ||
+            (await tokenManager.getAccessToken().catch(() => null)) ||
+            pukuApi.getAuthToken() ||
+            (await AsyncStorage.getItem('@puku_auth_token'));
+
+          if (accessToken) {
+            const authRes = await fetch(`${ENV.REMOTE_SESSION_RELAY_HOST}/v1/sessions/${sessionId}/auth`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'User-Agent': 'puku-ai-app/1.0',
+              },
+            });
+            if (authRes.ok) {
+              const authData = await authRes.json();
+              activeToken = authData.mobileToken || '';
+            }
+          }
+        } catch (err) {
+          console.warn('[RemoteRelay] Error resolving token:', err);
+        }
+      }
+    }
+
     setRemoteSession(prev => ({
       ...prev,
       sessionId,
-      token,
+      token: activeToken,
       status: 'connecting',
       logs: [...prev.logs, `[Connection] Connecting to relay session ${sessionId}...`],
     }));
 
     try {
-      const wsUrl = `${ENV.REMOTE_SESSION_RELAY_HOST.replace(/^http/, 'ws')}/v1/sessions/${sessionId}/stream?token=${token}`;
-      const ws = new WebSocket(wsUrl);
+      const wsUrl = `${ENV.REMOTE_SESSION_RELAY_HOST.replace(/^http/, 'ws')}/client/${sessionId}?token=${activeToken}`;
+      // Provide mobile token and account token headers for relay authentication
+      const ws = new WebSocket(wsUrl, undefined, {
+        headers: {
+          'X-Puku-Mobile-Token': activeToken,
+          'X-Puku-Account-Token': activeToken,
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) PukuMobile/1.0',
+        },
+      });
       wsRef.current = ws;
 
       let fallbackTimer: any = setTimeout(() => {
         setRemoteSession(prev => ({
           ...prev,
           status: 'connected',
-          progressStatus: 'thinking',
-          currentTool: {
-            name: 'run_command',
-            description: 'npm test -- --watchAll=false',
-            status: 'pending',
-          },
-          diffLines: [
-            { type: 'context', text: '  const apiVersion = "2.7";' },
-            { type: 'remove', text: '- function authenticateUser() { return false; }' },
-            { type: 'add', text: '+ function authenticateUser() { return verifyPKCEToken(); }' },
-          ],
+          progressStatus: 'ready',
           logs: [
             ...prev.logs,
-            `[Connection] Authenticated successfully with token ${token.slice(0, 6)}***`,
-            `[Agent] Remote workspace synced. Awaiting tool approval.`,
+            `[System] Connected to laptop session (${sessionId.slice(0, 8)}...).`,
+            `[Terminal] Ready. Type your commands or prompts below to control your laptop.`,
           ],
         }));
       }, 1500);
@@ -1407,38 +1483,110 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           status: 'connected',
           logs: [
             ...prev.logs,
-            `[Connection] Live WebSocket connected to ${ENV.REMOTE_SESSION_RELAY_HOST}`,
-            `[Agent] Remote workspace synced. Awaiting tool commands.`,
+            `[Connection] Live WebSocket connected to laptop CLI!`,
+            `[Terminal] Type a prompt or bash command to run on your laptop.`,
           ],
         }));
       };
 
       ws.onmessage = (event: any) => {
         try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'tool_request') {
-            setRemoteSession(prev => ({
-              ...prev,
-              currentTool: {
-                id: data.id || 'tool_' + Date.now(),
-                name: data.name || 'Remote Tool Execution',
-                description: data.description || data.command || '',
-                timestamp: 'Just now',
-                status: 'pending',
-              },
-              logs: [...prev.logs, `[Incoming Tool] ${data.name}: ${data.description || ''}`],
-            }));
-          } else if (data.log) {
-            setRemoteSession(prev => ({
-              ...prev,
-              logs: [...prev.logs, `[Remote] ${data.log}`],
-            }));
+          const raw = typeof event.data === 'string' ? event.data : '';
+          const lines = raw.split('\n').filter((l: string) => l.trim().length > 0);
+          for (const line of lines) {
+            let data: any;
+            try {
+              data = JSON.parse(line);
+            } catch {
+              setRemoteSession(prev => ({
+                ...prev,
+                logs: [...prev.logs, line],
+              }));
+              continue;
+            }
+
+            if (data.type === 'control_request') {
+              if (data.request?.subtype === 'can_use_tool') {
+                const toolName = data.request.tool_name || 'Tool Execution';
+                const desc = data.request.description || JSON.stringify(data.request.input || {});
+                setRemoteSession(prev => ({
+                  ...prev,
+                  currentTool: {
+                    id: data.request_id || 'req_' + Date.now(),
+                    name: toolName,
+                    description: desc,
+                    status: 'pending',
+                  },
+                  logs: [...prev.logs, `⚠️ [Permission Required] ${toolName}: ${desc}`],
+                }));
+              }
+            } else if (data.type === 'user') {
+              const msg = data.message?.content;
+              const text =
+                typeof msg === 'string'
+                  ? msg
+                  : Array.isArray(msg)
+                  ? msg.map((m: any) => m.text || '').join('\n')
+                  : '';
+              if (text) {
+                setRemoteSession(prev => ({
+                  ...prev,
+                  logs: [...prev.logs, `> ${text}`],
+                }));
+              }
+            } else if (data.type === 'assistant') {
+              const msg = data.message?.content;
+              let text = '';
+              if (typeof msg === 'string') text = msg;
+              else if (Array.isArray(msg)) {
+                text = msg
+                  .map((m: any) => {
+                    if (m.type === 'text') return m.text || '';
+                    if (m.type === 'tool_use')
+                      return `[Tool] ${m.name || 'exec'}(${JSON.stringify(m.input || {})})`;
+                    return '';
+                  })
+                  .filter(Boolean)
+                  .join('\n');
+              }
+              if (text) {
+                setRemoteSession(prev => ({
+                  ...prev,
+                  logs: [...prev.logs, text],
+                }));
+              }
+            } else if (data.type === 'tool_progress') {
+              setRemoteSession(prev => ({
+                ...prev,
+                logs: [...prev.logs, `[Running] ${data.tool_name || ''}...`],
+              }));
+            } else if (data.type === 'result') {
+              setRemoteSession(prev => ({
+                ...prev,
+                currentTool: undefined,
+                logs: [...prev.logs, `✓ Done (${data.subtype || 'success'})`],
+              }));
+            } else if (data.type === 'system') {
+              if (data.subtype === 'status') {
+                setRemoteSession(prev => ({
+                  ...prev,
+                  logs: [...prev.logs, `[Status] ${data.status || ''}`],
+                }));
+              } else if (data.subtype === 'compact_boundary') {
+                setRemoteSession(prev => ({
+                  ...prev,
+                  logs: [...prev.logs, `[System] Conversation compacted`],
+                }));
+              }
+            } else if (data.log) {
+              setRemoteSession(prev => ({
+                ...prev,
+                logs: [...prev.logs, data.log],
+              }));
+            }
           }
-        } catch {
-          setRemoteSession(prev => ({
-            ...prev,
-            logs: [...prev.logs, `[Remote] ${event.data}`],
-          }));
+        } catch (err) {
+          console.warn('[RemoteRelay] onmessage parse error:', err);
         }
       };
 
@@ -1464,18 +1612,86 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRemoteSession(prev => ({
       ...prev,
       status: 'disconnected',
-      logs: [...prev.logs, '[Connection] Session closed.'],
+      logs: [...prev.logs, '[Connection] Disconnected from laptop.'],
     }));
   };
 
-  const respondToTool = (approved: boolean) => {
+  const sendRemoteMessage = useCallback(
+    (content: string): boolean => {
+      const trimmed = content.trim();
+      if (!trimmed) return false;
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        const payload = JSON.stringify({
+          type: 'user',
+          message: {
+            role: 'user',
+            content: trimmed,
+          },
+          parent_tool_use_id: null,
+          session_id: remoteSession.sessionId,
+        });
+        wsRef.current.send(payload);
+        setRemoteSession(prev => ({
+          ...prev,
+          logs: [...prev.logs, `> ${trimmed}`],
+        }));
+        return true;
+      } else {
+        setRemoteSession(prev => ({
+          ...prev,
+          logs: [
+            ...prev.logs,
+            `> ${trimmed}`,
+            `[Relay Warning] WebSocket not connected to laptop. Message queued.`,
+          ],
+        }));
+        return false;
+      }
+    },
+    [remoteSession.sessionId]
+  );
+
+  const sendRemoteInterrupt = useCallback((): boolean => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const payload = JSON.stringify({
+        type: 'control_request',
+        request_id: 'req_' + Date.now(),
+        request: { subtype: 'interrupt' },
+      });
+      wsRef.current.send(payload);
+      setRemoteSession(prev => ({
+        ...prev,
+        logs: [...prev.logs, `^C (Interrupt signal sent to laptop)`],
+      }));
+      return true;
+    }
+    return false;
+  }, []);
+
+  const clearRemoteLogs = useCallback(() => {
+    setRemoteSession(prev => ({
+      ...prev,
+      logs: [],
+    }));
+  }, []);
+
+  const respondToTool = (approved: boolean, requestId?: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const targetId = requestId || remoteSession.currentTool?.id || 'req_tool';
       try {
         wsRef.current.send(
           JSON.stringify({
-            action: 'tool_response',
-            approved,
-            toolId: remoteSession.currentTool?.id,
+            type: 'control_response',
+            response: {
+              subtype: 'success',
+              request_id: targetId,
+              response: {
+                behavior: approved ? 'allow' : 'deny',
+                ...(approved
+                  ? { decisionClassification: 'user_temporary' }
+                  : { message: 'Denied by user from mobile' }),
+              },
+            },
           })
         );
       } catch {}
@@ -1661,8 +1877,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createCodeSession,
         runCodeSession,
         remoteSession,
+        activeRelaySessions,
+        isLoadingRelaySessions,
+        fetchActiveRelaySessions,
         connectRemoteSession,
         disconnectRemoteSession,
+        sendRemoteMessage,
+        sendRemoteInterrupt,
+        clearRemoteLogs,
         respondToTool,
         botConversations,
         activeBotConversationId,

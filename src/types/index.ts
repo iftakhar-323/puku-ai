@@ -88,6 +88,13 @@ export interface CodeSession {
   status: 'idle' | 'running' | 'completed' | 'expired';
 }
 
+export interface RemoteMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  timestamp: number;
+}
+
 export interface RemoteSession {
   sessionId: string;
   token: string;
@@ -104,6 +111,22 @@ export interface RemoteSession {
   progressStatus: 'thinking' | 'idle' | 'ready' | 'completed' | 'failed';
   diffLines?: Array<{ type: 'add' | 'remove' | 'context'; text: string }>;
   logs: string[];
+  messages?: RemoteMessage[];
+}
+
+export interface ActiveRelaySession {
+  sessionId: string;
+  createdAt: number;
+  workerConnected: boolean;
+  clientConnected: boolean;
+  clientCount: number;
+  live: boolean;
+  resumableUntil?: number;
+  expired?: boolean;
+  mobileToken?: string;
+  title: string;
+  titleUpdatedAt?: number;
+  ownerEmail?: string;
 }
 
 export interface UserProfile {

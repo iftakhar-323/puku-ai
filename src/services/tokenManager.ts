@@ -329,6 +329,13 @@ export class TokenManager {
     return this.accessToken;
   }
 
+  /**
+   * Convenience alias for ensureValidToken
+   */
+  async getValidAccessToken(): Promise<string | null> {
+    return this.ensureValidToken();
+  }
+
   private async handleAuthFailure() {
     await this.clearTokens();
     this.notifySessionExpired();
