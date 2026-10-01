@@ -665,5 +665,46 @@ describe('turn completion & working state', () => {
     const systemEntries = connected.state.entries.filter(e => e.kind === 'system');
     expect(systemEntries).toHaveLength(0);
   });
+
+  test('can_use_tool request with object or missing description is sanitized safely', () => {
+    const { state } = run([
+      {
+        type: 'control_request',
+        request_id: 'req-perm-1',
+        request: {
+          subtype: 'can_use_tool',
+          tool_name: 'Bash',
+          description: { text: 'Search for directory' },
+          input: {
+            command: 'find / -type d -name test',
+          },
+        },
+      },
+    ]);
+
+    expect(state.pendingPrompt).toBeDefined();
+    expect(typeof state.pendingPrompt?.description).toBe('string');
+    expect(state.pendingPrompt?.description).toBe('Search for directory');
+    expect(state.pendingPrompt?.toolName).toBe('Bash');
+  });
+
+  test('permissionReply with always produces user_permanent classification', () => {
+    const reply = permissionReply('req-perm-1', 'always');
+    expect(reply.response).toEqual({
+      subtype: 'success',
+      request_id: 'req-perm-1',
+      response: {
+        behavior: 'allow',
+        decisionClassification: 'user_permanent',
+      },
+    });
+  });
+
+  test('describeTool and summarizeTools never throw on null/undefined names and inputs', () => {
+    expect(() => describeTool({} as any)).not.toThrow();
+    expect(describeTool({} as any)).toBe('Tool');
+    expect(() => summarizeTools([{} as any])).not.toThrow();
+    expect(summarizeTools([{} as any])).toBe('Tool');
+  });
 });
 

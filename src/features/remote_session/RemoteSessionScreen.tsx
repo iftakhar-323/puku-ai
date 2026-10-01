@@ -43,6 +43,92 @@ const PHASE_SUBTITLE: Record<ConnectionPhase, string> = {
   closed: 'Disconnected',
 };
 
+class RemoteSessionErrorBoundary extends React.Component<
+  {
+    theme: ThemeColors;
+    onReset: () => void;
+    children: React.ReactNode;
+  },
+  { hasError: boolean; error: Error | null }
+> {
+  state: { hasError: boolean; error: Error | null } = {
+    hasError: false,
+    error: null,
+  };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: any) {
+    console.error('RemoteSessionScreen caught error:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const { theme, onReset } = this.props;
+      return (
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            backgroundColor: theme.background,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: '700',
+              color: theme.textPrimary,
+              marginBottom: 8,
+              textAlign: 'center',
+            }}
+          >
+            Session Display Recovered
+          </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              color: theme.textSecondary,
+              textAlign: 'center',
+              marginBottom: 20,
+              lineHeight: 18,
+            }}
+          >
+            {this.state.error?.message ||
+              'A display glitch was caught. Tap below to reload the session.'}
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              this.setState({ hasError: false, error: null });
+              onReset();
+            }}
+            style={{
+              backgroundColor: theme.textPrimary,
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              borderRadius: 10,
+            }}
+          >
+            <Text
+              style={{
+                color: theme.background,
+                fontWeight: '700',
+                fontSize: 14,
+              }}
+            >
+              Resume Session
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function RemoteSessionScreen() {
   const insets = useSafeAreaInsets();
   const { keyboardHeight } = useKeyboardHeight();
@@ -101,20 +187,28 @@ export function RemoteSessionScreen() {
     : theme.warning;
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme.background,
-          paddingTop: Math.max(insets.top, 10),
-          paddingBottom:
-            Platform.OS === 'android' && keyboardHeight > 0
-              ? keyboardHeight + 10
-              : Math.max(insets.bottom, 10),
-        },
-      ]}
+    <RemoteSessionErrorBoundary
+      theme={theme}
+      onReset={() => {
+        if (session.sessionId) {
+          connect(session.sessionId, session.token);
+        }
+      }}
     >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            paddingTop: Math.max(insets.top, 10),
+            paddingBottom:
+              Platform.OS === 'android' && keyboardHeight > 0
+                ? keyboardHeight + 10
+                : Math.max(insets.bottom, 10),
+          },
+        ]}
+      >
       <View style={styles.header}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -340,6 +434,7 @@ export function RemoteSessionScreen() {
         </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
+    </RemoteSessionErrorBoundary>
   );
 }
 

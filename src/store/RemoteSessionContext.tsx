@@ -64,7 +64,7 @@ interface RemoteSessionContextValue {
   sendMessage: (text: string) => boolean;
   interrupt: () => void;
   clearFeed: () => void;
-  answerPrompt: (allow: boolean, message?: string) => void;
+  answerPrompt: (allow: boolean | 'always', message?: string) => void;
   answerQuestions: (answers: Record<string, string[]> | null) => void;
   setPermissionMode: (mode: PermissionMode) => void;
   setModel: (model: string) => void;
@@ -507,7 +507,7 @@ export function RemoteSessionProvider({
   }, [update]);
 
   const answerPrompt = useCallback(
-    (allow: boolean, message?: string) => {
+    (allow: boolean | 'always', message?: string) => {
       const prompt = stateRef.current.pendingPrompt;
       if (!prompt) return;
       send(permissionReply(prompt.requestId, allow, message));

@@ -396,33 +396,83 @@ function applyStreamEvent(
   return { ...state, entries, isWorking: true };
 }
 
+function sanitizePromptString(val: unknown): string {
+  if (typeof val === 'string') return val.trim();
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (val && typeof val === 'object') {
+    const obj = val as Record<string, any>;
+    if (typeof obj.text === 'string') return obj.text.trim();
+    if (typeof obj.message === 'string') return obj.message.trim();
+    if (typeof obj.description === 'string') return obj.description.trim();
+    if (typeof obj.reason === 'string') return obj.reason.trim();
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+function sanitizePromptInput(val: unknown): Record<string, any> {
+  if (val && typeof val === 'object' && !Array.isArray(val)) {
+    return val as Record<string, any>;
+  }
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      return { raw: val };
+    }
+  }
+  return {};
+}
+
 function applyControlRequest(
   state: RemoteSessionState,
   data: any,
 ): FrameResult {
-  const requestId: string = data.request_id || data.request?.request_id || '';
-  const request = data.request || {};
+  const requestId: string = String(
+    data?.request_id || data?.request?.request_id || makeRequestId(),
+  );
+  const request =
+    data?.request && typeof data.request === 'object' ? data.request : {};
+  const subtype = request.subtype || data?.subtype;
 
-  if (request.subtype !== 'can_use_tool') {
+  if (subtype !== 'can_use_tool') {
     // Silence makes the CLI hang: always answer unknown subtypes.
     return {
       state,
       effects: [
         controlError(
           requestId,
-          `Unsupported request subtype: ${request.subtype}`,
+          `Unsupported request subtype: ${subtype || 'unknown'}`,
         ),
       ],
     };
   }
 
-  const input = request.input || {};
+  const input = sanitizePromptInput(request.input);
+  const toolName =
+    sanitizePromptString(request.tool_name || request.tool || 'Tool') || 'Tool';
+  const description =
+    sanitizePromptString(request.description) ||
+    sanitizePromptString(request.reason) ||
+    sanitizePromptString(request.message) ||
+    sanitizePromptString(input.description) ||
+    '';
+
   const isQuestion =
-    request.tool_name === 'AskUserQuestion' && Array.isArray(input.questions);
+    (toolName === 'AskUserQuestion' || toolName === 'ask_question') &&
+    Array.isArray(input.questions);
+
   const pendingPrompt: PendingPrompt = {
     requestId,
-    toolName: request.tool_name || 'Tool',
-    description: request.description || '',
+    toolName,
+    description,
     input,
     questions: isQuestion ? input.questions : undefined,
   };
@@ -684,19 +734,27 @@ export function interruptFrame() {
 
 export function permissionReply(
   requestId: string,
-  allow: boolean,
+  allow: boolean | 'always',
   message?: string,
 ) {
+  const isAllow = allow === true || allow === 'always';
+  const decisionClassification =
+    allow === 'always'
+      ? 'user_permanent'
+      : isAllow
+      ? 'user_temporary'
+      : 'user_reject';
+
   return {
     type: 'control_response',
     response: {
       subtype: 'success',
       request_id: requestId,
-      response: allow
-        ? { behavior: 'allow', decisionClassification: 'user_temporary' }
+      response: isAllow
+        ? { behavior: 'allow', decisionClassification }
         : {
             behavior: 'deny',
-            decisionClassification: 'user_reject',
+            decisionClassification,
             message: message || 'Denied from the Puku mobile app.',
           },
     },
