@@ -11,12 +11,14 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppHeader } from '../../components/common/AppHeader';
 import {
+  BackIcon,
   CheckmarkIcon,
   CloseIcon,
+  LogoutIcon,
   RemoteIcon,
   SendIcon,
+  TrashIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
@@ -26,6 +28,7 @@ export function RemoteSessionScreen() {
   const { keyboardHeight } = useKeyboardHeight();
   const {
     theme,
+    goBack,
     remoteSession,
     activeRelaySessions,
     fetchActiveRelaySessions,
@@ -44,6 +47,7 @@ export function RemoteSessionScreen() {
 
   const scrollViewRef = useRef<any>(null);
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+  const isConnected = remoteSession.status === 'connected';
 
   useEffect(() => {
     fetchActiveRelaySessions().catch(() => {});
@@ -62,11 +66,18 @@ export function RemoteSessionScreen() {
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    }, 80);
     return () => clearTimeout(timer);
   }, [remoteSession.logs, remoteSession.currentTool]);
 
-  const isConnected = remoteSession.status === 'connected';
+  // Auto-scroll when keyboard opens
+  useEffect(() => {
+    if (keyboardHeight > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    }
+  }, [keyboardHeight]);
 
   const handleConnect = () => {
     if (!inputSessionId.trim()) return;
@@ -92,76 +103,168 @@ export function RemoteSessionScreen() {
     }
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* App Header with Terminal title and quick controls */}
-      <AppHeader
-        showBack
-        title="puku-cli Remote"
-        rightAction={
-          isConnected ? (
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={sendRemoteInterrupt}
-                style={[styles.headerBtn, { backgroundColor: 'rgba(255, 77, 79, 0.15)' }]}>
-                <Text style={[styles.headerBtnText, { color: '#FF4D4F', fontFamily: monoFont }]}>
-                  ^C
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={clearRemoteLogs}
-                style={[styles.headerBtn, { backgroundColor: theme.buttonBackground }]}>
-                <Text style={[styles.headerBtnText, { color: theme.textSecondary, fontFamily: monoFont }]}>
-                  Clear
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={disconnectRemoteSession}
-                style={[styles.headerBtn, { backgroundColor: theme.buttonBackground }]}>
-                <Text style={[styles.headerBtnText, { color: theme.error, fontFamily: monoFont }]}>
-                  Disconnect
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : null
-        }
-      />
+  // Helper to format each log item into clean, modern UI components
+  const renderLogItem = (log: string, index: number) => {
+    // 1. User command (e.g. "> ls -la")
+    if (log.startsWith('> ')) {
+      const cmd = log.slice(2);
+      return (
+        <View key={index} style={styles.userCmdContainer}>
+          <View style={styles.userCmdBubble}>
+            <Text style={[styles.userCmdPrompt, { fontFamily: monoFont }]}>❯</Text>
+            <Text style={[styles.userCmdText, { fontFamily: monoFont }]}>{cmd}</Text>
+          </View>
+        </View>
+      );
+    }
 
-      {/* Connection Status Pill Banner */}
-      <View
-        style={[
-          styles.statusBanner,
-          {
-            backgroundColor: isConnected ? '#0F1E13' : theme.secondaryBackground,
-            borderColor: isConnected ? '#237804' : theme.border,
-          },
-        ]}>
-        <View style={styles.statusBannerLeft}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: isConnected ? '#52C41A' : '#FAAD14' },
-            ]}
-          />
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.statusBannerTitle,
-              { color: isConnected ? '#73D13D' : theme.textPrimary, fontFamily: monoFont },
-            ]}>
-            {isConnected ? 'LIVE RELAY ACTIVE' : 'DISCONNECTED FROM LAPTOP'}
+    // 2. Tool invocation (e.g. "[Tool] Bash(...)")
+    if (log.startsWith('[Tool]')) {
+      const toolDetail = log.replace('[Tool]', '').trim();
+      return (
+        <View key={index} style={styles.toolCard}>
+          <View style={styles.toolHeader}>
+            <View style={styles.toolBadge}>
+              <Text style={[styles.toolBadgeText, { fontFamily: monoFont }]}>⚡ TOOL</Text>
+            </View>
+            <Text
+              numberOfLines={2}
+              style={[styles.toolTitle, { fontFamily: monoFont }]}>
+              {toolDetail}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // 3. Tool execution progress
+    if (log.startsWith('[Running]')) {
+      const runningDetail = log.replace('[Running]', '').trim();
+      return (
+        <View key={index} style={styles.runningRow}>
+          <ActivityIndicator size="small" color="#52C41A" style={{ transform: [{ scale: 0.75 }] }} />
+          <Text style={[styles.runningText, { fontFamily: monoFont }]}>
+            {runningDetail}
           </Text>
         </View>
-        {remoteSession.sessionId ? (
-          <Text
-            numberOfLines={1}
-            style={[styles.statusSessionId, { color: theme.textSecondary, fontFamily: monoFont }]}>
-            {remoteSession.sessionId.slice(0, 14)}...
-          </Text>
-        ) : null}
+      );
+    }
+
+    // 4. Completed tool / success
+    if (log.startsWith('✓ Done')) {
+      return (
+        <View key={index} style={styles.doneRow}>
+          <CheckmarkIcon size={12} color="#52C41A" />
+          <Text style={[styles.doneText, { fontFamily: monoFont }]}>{log}</Text>
+        </View>
+      );
+    }
+
+    // 5. Permission / Notice
+    if (log.includes('Permission') || log.includes('Warning')) {
+      return (
+        <View key={index} style={styles.warningCard}>
+          <Text style={[styles.warningText, { fontFamily: monoFont }]}>{log}</Text>
+        </View>
+      );
+    }
+
+    // 6. Error / Rejection
+    if (log.includes('Error') || log.includes('REJECTED') || log.includes('Failed')) {
+      return (
+        <View key={index} style={styles.errorCard}>
+          <Text style={[styles.errorText, { fontFamily: monoFont }]}>{log}</Text>
+        </View>
+      );
+    }
+
+    // 7. General output / stdout
+    return (
+      <View key={index} style={styles.logRow}>
+        <Text style={[styles.logText, { fontFamily: monoFont }]}>{log}</Text>
+      </View>
+    );
+  };
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      style={[
+        styles.container,
+        {
+          backgroundColor: '#0D1117',
+          paddingTop: Math.max(insets.top, 10),
+          paddingBottom:
+            Platform.OS === 'android'
+              ? (keyboardHeight > 0 ? keyboardHeight : Math.max(insets.bottom, 10))
+              : Math.max(insets.bottom, 10),
+        },
+      ]}>
+      {/* Sleek, Compact Minimal Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            onPress={goBack}
+            style={styles.backBtn}>
+            <BackIcon size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <View style={styles.headerTitleRow}>
+            <Text style={[styles.headerTitle, { fontFamily: monoFont }]}>
+              Laptop CLI
+            </Text>
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: isConnected ? 'rgba(82, 196, 26, 0.15)' : 'rgba(250, 173, 20, 0.15)',
+                  borderColor: isConnected ? '#52C41A' : '#FAAD14',
+                },
+              ]}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: isConnected ? '#52C41A' : '#FAAD14' },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.statusPillText,
+                  { color: isConnected ? '#52C41A' : '#FAAD14', fontFamily: monoFont },
+                ]}>
+                {isConnected ? 'LIVE' : 'OFFLINE'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {isConnected && (
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={sendRemoteInterrupt}
+              style={styles.interruptBtn}>
+              <Text style={[styles.interruptBtnText, { fontFamily: monoFont }]}>^C</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={clearRemoteLogs}
+              style={styles.actionIconBtn}>
+              <TrashIcon size={16} color="#8C8C8C" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={disconnectRemoteSession}
+              style={[styles.actionIconBtn, { backgroundColor: 'rgba(255, 77, 79, 0.12)' }]}>
+              <LogoutIcon size={16} color="#FF4D4F" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Main Terminal Window or Pairing Form */}
@@ -169,32 +272,26 @@ export function RemoteSessionScreen() {
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.pairingContent, { paddingBottom: Math.max(insets.bottom, 24) }]}>
-          <View
-            style={[
-              styles.pairingCard,
-              { backgroundColor: theme.secondaryBackground, borderColor: theme.border },
-            ]}>
+          <View style={styles.pairingCard}>
             <View style={styles.pairingHeader}>
               <RemoteIcon size={24} color={theme.primary} />
-              <Text style={[styles.pairingTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+              <Text style={[styles.pairingTitle, { color: '#FFFFFF', fontFamily: monoFont }]}>
                 Connect to Laptop CLI
               </Text>
             </View>
 
             {activeRelaySessions.length > 0 && (
-              <View
-                style={[
-                  styles.detectedCard,
-                  { backgroundColor: theme.cardBackground, borderColor: '#52C41A' },
-                ]}>
+              <View style={styles.detectedCard}>
                 <View style={styles.detectedHeader}>
                   <View style={styles.liveDot} />
-                  <Text style={[styles.detectedTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                  <Text style={[styles.detectedTitle, { color: '#FFFFFF', fontFamily: monoFont }]}>
                     Active Laptop Session Detected
                   </Text>
                 </View>
-                <Text style={[styles.detectedId, { color: theme.textSecondary, fontFamily: monoFont }]}>
-                  {activeRelaySessions[0].title || 'puku-cli'} · {activeRelaySessions[0].sessionId}
+                <Text
+                  numberOfLines={1}
+                  style={[styles.detectedId, { color: '#8C8C8C', fontFamily: monoFont }]}>
+                  {activeRelaySessions[0].title || 'puku-cli'} · {activeRelaySessions[0].sessionId.slice(0, 16)}...
                 </Text>
                 <TouchableOpacity
                   activeOpacity={0.8}
@@ -210,42 +307,42 @@ export function RemoteSessionScreen() {
               </View>
             )}
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary, fontFamily: monoFont }]}>
+            <Text style={[styles.inputLabel, { color: '#8C8C8C', fontFamily: monoFont }]}>
               Relay Session ID
             </Text>
             <TextInput
               style={[
                 styles.terminalInput,
                 {
-                  backgroundColor: theme.background,
-                  color: theme.textPrimary,
-                  borderColor: theme.border,
+                  backgroundColor: '#161B22',
+                  color: '#FFFFFF',
+                  borderColor: '#30363D',
                   fontFamily: monoFont,
                 },
               ]}
               placeholder="e.g. af689a1b-2858-..."
-              placeholderTextColor={theme.placeholderText}
+              placeholderTextColor="#595959"
               value={inputSessionId}
               onChangeText={setInputSessionId}
               autoCapitalize="none"
               autoCorrect={false}
             />
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary, fontFamily: monoFont }]}>
+            <Text style={[styles.inputLabel, { color: '#8C8C8C', fontFamily: monoFont }]}>
               Mobile Session Token (Optional)
             </Text>
             <TextInput
               style={[
                 styles.terminalInput,
                 {
-                  backgroundColor: theme.background,
-                  color: theme.textPrimary,
-                  borderColor: theme.border,
+                  backgroundColor: '#161B22',
+                  color: '#FFFFFF',
+                  borderColor: '#30363D',
                   fontFamily: monoFont,
                 },
               ]}
               placeholder="Auto-resolved if logged into same account"
-              placeholderTextColor={theme.placeholderText}
+              placeholderTextColor="#595959"
               secureTextEntry
               value={inputToken}
               onChangeText={setInputToken}
@@ -263,13 +360,10 @@ export function RemoteSessionScreen() {
         </ScrollView>
       ) : (
         /* Connected Interactive Terminal View */
-        <KeyboardAvoidingView
-          style={styles.terminalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          
+        <View style={styles.terminalContainer}>
           {/* Tool Permission Approval Banner */}
           {remoteSession.currentTool && remoteSession.currentTool.status === 'pending' && (
-            <View style={[styles.toolPromptBanner, { backgroundColor: '#1F1A0A', borderColor: '#D48806' }]}>
+            <View style={styles.toolPromptBanner}>
               <View style={styles.toolPromptHeader}>
                 <View style={styles.toolPromptTag}>
                   <Text style={[styles.toolPromptTagText, { fontFamily: monoFont }]}>
@@ -278,25 +372,25 @@ export function RemoteSessionScreen() {
                 </View>
                 <Text
                   numberOfLines={1}
-                  style={[styles.toolPromptName, { color: '#FFE58F', fontFamily: monoFont }]}>
+                  style={[styles.toolPromptName, { fontFamily: monoFont }]}>
                   {remoteSession.currentTool.name}
                 </Text>
               </View>
-              <Text style={[styles.toolPromptDesc, { color: '#D9D9D9', fontFamily: monoFont }]}>
+              <Text style={[styles.toolPromptDesc, { fontFamily: monoFont }]}>
                 {remoteSession.currentTool.description}
               </Text>
               <View style={styles.toolPromptActions}>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => respondToTool(false)}
-                  style={[styles.toolRejectBtn, { backgroundColor: 'rgba(255, 77, 79, 0.2)' }]}>
+                  style={styles.toolRejectBtn}>
                   <CloseIcon size={14} color="#FF4D4F" />
                   <Text style={[styles.toolRejectText, { fontFamily: monoFont }]}>Reject</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => respondToTool(true)}
-                  style={[styles.toolApproveBtn, { backgroundColor: '#52C41A' }]}>
+                  style={styles.toolApproveBtn}>
                   <CheckmarkIcon size={14} color="#FFFFFF" />
                   <Text style={[styles.toolApproveText, { fontFamily: monoFont }]}>Approve & Run</Text>
                 </TouchableOpacity>
@@ -310,107 +404,48 @@ export function RemoteSessionScreen() {
             style={styles.terminalOutputBox}
             contentContainerStyle={styles.terminalOutputContent}
             keyboardShouldPersistTaps="handled">
-            {/* Terminal Banner */}
-            <View style={styles.terminalWelcome}>
-              <Text style={[styles.terminalAscii, { color: '#4DD0E1', fontFamily: monoFont }]}>
-                {` __          __  _                           \n` +
-                 ` \\ \\        / / | |                          \n` +
-                 `  \\ \\  /\\  / /__| | ___ ___  _ __ ___   ___  \n` +
-                 `   \\ \\/  \\/ / _ \\ |/ __/ _ \\| '_ \` _ \\ / _ \\ \n` +
-                 `    \\  /\\  /  __/ | (_| (_) | | | | | |  __/ \n` +
-                 `     \\/  \\/ \\___|_|\\___\\___/|_| |_| |_|\\___| `}
-              </Text>
-              <Text style={[styles.terminalInfoLine, { color: '#73D13D', fontFamily: monoFont }]}>
-                ● Connected to laptop session ({remoteSession.sessionId.slice(0, 8)}...)
-              </Text>
-              <Text style={[styles.terminalInfoLine, { color: '#8C8C8C', fontFamily: monoFont }]}>
-                Type instructions below to control and edit code on your laptop.
-              </Text>
-            </View>
-
-            {/* Log / Terminal lines */}
-            {remoteSession.logs.map((log, index) => {
-              const isUser = log.startsWith('>');
-              const isWarning = log.includes('Warning') || log.includes('Required');
-              const isError = log.includes('Error') || log.includes('REJECTED');
-              const isDone = log.includes('✓');
-              const isTool = log.includes('[Tool]') || log.includes('[Running]');
-
-              return (
-                <View
-                  key={index}
-                  style={[
-                    styles.logLineContainer,
-                    isUser && styles.userLogContainer,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.logText,
-                      { fontFamily: monoFont },
-                      isUser
-                        ? { color: '#4DD0E1', fontWeight: '700' }
-                        : isWarning
-                        ? { color: '#FAAD14' }
-                        : isError
-                        ? { color: '#FF7875' }
-                        : isDone
-                        ? { color: '#52C41A' }
-                        : isTool
-                        ? { color: '#B37FEB' }
-                        : { color: '#D9D9D9' },
-                    ]}>
-                    {log}
-                  </Text>
+            {/* Minimal Welcome Placeholder when empty */}
+            {remoteSession.logs.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconCircle}>
+                  <RemoteIcon size={24} color="#52C41A" />
                 </View>
-              );
-            })}
+                <Text style={[styles.emptyTitle, { fontFamily: monoFont }]}>
+                  Laptop Connected
+                </Text>
+                <Text style={[styles.emptySubtitle, { fontFamily: monoFont }]}>
+                  Type commands or instructions below to control your laptop terminal.
+                </Text>
+              </View>
+            )}
+
+            {/* Formatted Terminal Logs */}
+            {remoteSession.logs.map((log, index) => renderLogItem(log, index))}
           </ScrollView>
 
           {/* Quick Command Chips */}
-          <View style={[styles.quickBar, { backgroundColor: '#141414', borderColor: '#262626' }]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickBarScroll}>
-              {['git status', 'ls -la', 'npm test', '/help', '^C'].map(cmd => (
+          <View style={styles.quickBar}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickBarScroll}>
+              {['git status', 'git diff', 'ls -la', 'npm test'].map(cmd => (
                 <TouchableOpacity
                   key={cmd}
                   activeOpacity={0.7}
                   onPress={() => handleQuickCommand(cmd)}
-                  style={[
-                    styles.quickChip,
-                    cmd === '^C'
-                      ? { backgroundColor: 'rgba(255, 77, 79, 0.2)', borderColor: '#FF4D4F' }
-                      : { backgroundColor: '#1F1F1F', borderColor: '#303030' },
-                  ]}>
-                  <Text
-                    style={[
-                      styles.quickChipText,
-                      {
-                        color: cmd === '^C' ? '#FF4D4F' : '#A6A6A6',
-                        fontFamily: monoFont,
-                      },
-                    ]}>
-                    {cmd}
-                  </Text>
+                  style={styles.quickChip}>
+                  <Text style={[styles.quickChipText, { fontFamily: monoFont }]}>{cmd}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
 
-          {/* Bottom Interactive Command / Prompt Input Bar */}
-          <View
-            style={[
-              styles.inputBar,
-              {
-                backgroundColor: '#141414',
-                borderColor: '#303030',
-                paddingBottom:
-                  Platform.OS === 'android' && keyboardHeight > 0
-                    ? 8
-                    : Math.max(insets.bottom, 10),
-              },
-            ]}>
+          {/* Interactive Command / Prompt Input Bar */}
+          <View style={styles.inputBar}>
             <View style={styles.promptPrefix}>
-              <Text style={[styles.promptPrefixText, { color: '#4DD0E1', fontFamily: monoFont }]}>
-                {'>'}
+              <Text style={[styles.promptPrefixText, { color: theme.primary, fontFamily: monoFont }]}>
+                ❯
               </Text>
             </View>
 
@@ -422,8 +457,8 @@ export function RemoteSessionScreen() {
                   fontFamily: monoFont,
                 },
               ]}
-              placeholder="Type prompt or command for laptop..."
-              placeholderTextColor="#595959"
+              placeholder="Type prompt or command..."
+              placeholderTextColor="#666666"
               value={commandText}
               onChangeText={setCommandText}
               multiline
@@ -439,19 +474,19 @@ export function RemoteSessionScreen() {
               style={[
                 styles.sendBtn,
                 {
-                  backgroundColor: commandText.trim() ? theme.primary : '#262626',
+                  backgroundColor: commandText.trim() ? theme.primary : '#21262D',
                 },
               ]}>
               {isSending ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <SendIcon size={16} color={commandText.trim() ? '#FFFFFF' : '#595959'} />
+                <SendIcon size={16} color={commandText.trim() ? '#FFFFFF' : '#666666'} />
               )}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -459,52 +494,91 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#21262D',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  headerBtn: {
+  interruptBtn: {
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FF4D4F',
+    backgroundColor: 'rgba(255, 77, 79, 0.12)',
   },
-  headerBtnText: {
+  interruptBtnText: {
+    color: '#FF4D4F',
     fontSize: 11,
     fontWeight: '700',
   },
-  statusBanner: {
-    flexDirection: 'row',
+  actionIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    backgroundColor: '#161B22',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-  },
-  statusBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusBannerTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  statusSessionId: {
-    fontSize: 11,
+    justifyContent: 'center',
   },
   pairingContent: {
     padding: 16,
   },
   pairingCard: {
+    backgroundColor: '#161B22',
     borderRadius: 14,
     borderWidth: 1,
+    borderColor: '#30363D',
     padding: 16,
     gap: 12,
   },
@@ -519,11 +593,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   detectedCard: {
+    backgroundColor: '#0D1117',
     borderWidth: 1,
+    borderColor: '#52C41A',
     borderRadius: 10,
     padding: 12,
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   detectedHeader: {
     flexDirection: 'row',
@@ -548,7 +624,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
+    marginTop: 2,
   },
   quickConnectBtnText: {
     color: '#FFFFFF',
@@ -571,7 +647,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   primaryConnectBtnText: {
     color: '#FFFFFF',
@@ -580,13 +656,14 @@ const styles = StyleSheet.create({
   },
   terminalContainer: {
     flex: 1,
-    backgroundColor: '#0D1117',
   },
   toolPromptBanner: {
+    backgroundColor: '#1B1705',
     borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+    borderBottomColor: '#D48806',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 6,
   },
   toolPromptHeader: {
     flexDirection: 'row',
@@ -605,18 +682,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   toolPromptName: {
-    fontSize: 14,
+    color: '#FFE58F',
+    fontSize: 13,
     fontWeight: '700',
     flex: 1,
   },
   toolPromptDesc: {
+    color: '#D9D9D9',
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 17,
   },
   toolPromptActions: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
+    gap: 8,
+    marginTop: 2,
   },
   toolRejectBtn: {
     flex: 1,
@@ -624,8 +703,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 7,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 77, 79, 0.2)',
   },
   toolRejectText: {
     color: '#FF4D4F',
@@ -638,8 +718,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 7,
+    borderRadius: 6,
+    backgroundColor: '#52C41A',
   },
   toolApproveText: {
     color: '#FFFFFF',
@@ -650,43 +731,150 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   terminalOutputContent: {
-    padding: 14,
+    padding: 12,
     gap: 6,
   },
-  terminalWelcome: {
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#21262D',
-    marginBottom: 8,
-    gap: 4,
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 8,
   },
-  terminalAscii: {
-    fontSize: 9,
-    lineHeight: 11,
-    marginBottom: 6,
+  emptyIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(82, 196, 26, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
-  terminalInfoLine: {
-    fontSize: 11,
+  emptyTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
-  logLineContainer: {
-    paddingVertical: 2,
+  emptySubtitle: {
+    color: '#8C8C8C',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    lineHeight: 18,
   },
-  userLogContainer: {
-    backgroundColor: 'rgba(77, 208, 225, 0.08)',
-    borderLeftWidth: 2,
-    borderLeftColor: '#4DD0E1',
-    paddingLeft: 8,
-    borderRadius: 4,
+  userCmdContainer: {
+    alignItems: 'flex-start',
     marginVertical: 4,
+  },
+  userCmdBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(43, 127, 255, 0.12)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#2B7FFF',
+    borderRadius: 6,
+    paddingHorizontal: 10,
     paddingVertical: 6,
   },
+  userCmdPrompt: {
+    color: '#2B7FFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  userCmdText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  toolCard: {
+    backgroundColor: '#161B22',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    borderRadius: 6,
+    padding: 8,
+    marginVertical: 2,
+  },
+  toolHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  toolBadge: {
+    backgroundColor: 'rgba(179, 127, 235, 0.2)',
+    borderWidth: 1,
+    borderColor: '#B37FEB',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  toolBadgeText: {
+    color: '#D3ADF7',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  toolTitle: {
+    color: '#D9D9D9',
+    fontSize: 12,
+    flex: 1,
+  },
+  runningRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  runningText: {
+    color: '#52C41A',
+    fontSize: 12,
+  },
+  doneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  doneText: {
+    color: '#52C41A',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  warningCard: {
+    backgroundColor: 'rgba(250, 173, 20, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FAAD14',
+    padding: 8,
+    borderRadius: 4,
+    marginVertical: 2,
+  },
+  warningText: {
+    color: '#FAAD14',
+    fontSize: 12,
+  },
+  errorCard: {
+    backgroundColor: 'rgba(255, 77, 79, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF4D4F',
+    padding: 8,
+    borderRadius: 4,
+    marginVertical: 2,
+  },
+  errorText: {
+    color: '#FF7875',
+    fontSize: 12,
+  },
+  logRow: {
+    paddingVertical: 1,
+  },
   logText: {
+    color: '#C9D1D9',
     fontSize: 12.5,
-    lineHeight: 19,
+    lineHeight: 18,
   },
   quickBar: {
     borderTopWidth: 1,
+    borderTopColor: '#21262D',
     paddingVertical: 6,
+    backgroundColor: '#0D1117',
   },
   quickBarScroll: {
     paddingHorizontal: 12,
@@ -694,19 +882,25 @@ const styles = StyleSheet.create({
   },
   quickChip: {
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 10,
+    borderColor: '#30363D',
+    backgroundColor: '#161B22',
+    borderRadius: 14,
+    paddingHorizontal: 12,
     paddingVertical: 5,
   },
   quickChipText: {
+    color: '#8C8C8C',
     fontSize: 11,
+    fontWeight: '600',
   },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: 1,
+    borderTopColor: '#21262D',
     paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingVertical: 8,
+    backgroundColor: '#161B22',
     gap: 8,
   },
   promptPrefix: {
@@ -715,19 +909,19 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   promptPrefixText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
   },
   cmdTextInput: {
     flex: 1,
-    fontSize: 13,
-    maxHeight: 90,
-    paddingVertical: 6,
+    fontSize: 13.5,
+    maxHeight: 80,
+    paddingVertical: 4,
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
   },
