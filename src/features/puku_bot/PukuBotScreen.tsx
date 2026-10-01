@@ -1554,9 +1554,6 @@ const styles = StyleSheet.create({
   computerBtn: {
     borderRadius: 8,
   },
-  activeBotBtn: {
-    borderRadius: 8,
-  },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1580,23 +1577,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  modeTabsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  modePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  modePillText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   needsPersonBanner: {
     marginHorizontal: 16,
@@ -1665,45 +1645,6 @@ const styles = StyleSheet.create({
   secretSubmitText: {
     fontSize: 12,
     fontWeight: '700',
-  },
-  emptyHeroContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarGlow: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  heroHeadline: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  heroSubhead: {
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  statusNotice: {
-    width: '100%',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 24,
-  },
-  statusNoticeText: {
-    fontSize: 11,
-    lineHeight: 16,
-    textAlign: 'center',
   },
   promptChipsTitle: {
     fontSize: 12,
@@ -1832,15 +1773,6 @@ const styles = StyleSheet.create({
   composerLeftMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  modeIndicatorTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  modeIndicatorText: {
-    fontSize: 11,
   },
   sendBtn: {
     width: 32,
@@ -2155,9 +2087,6 @@ const styles = StyleSheet.create({
   },
   removeAttBtn: {
     padding: 4,
-  },
-  bubbleAttachmentItem: {
-    marginBottom: 6,
   },
   bubbleImageAttachment: {
     width: 200,

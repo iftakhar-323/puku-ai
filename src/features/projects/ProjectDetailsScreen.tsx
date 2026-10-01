@@ -355,8 +355,16 @@ export function ProjectDetailsScreen() {
               onChangeText={setNewFileName}
             />
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Attach to project"
+              accessibilityState={{ disabled: !newFileName.trim() }}
+              disabled={!newFileName.trim()}
               onPress={handleAddKnowledge}
-              style={[styles.saveBtn, { backgroundColor: theme.primary }]}>
+              style={[
+                styles.saveBtn,
+                { backgroundColor: theme.primary },
+                !newFileName.trim() && styles.saveBtnDisabled,
+              ]}>
               <Text style={styles.saveBtnText}>Attach to Project</Text>
             </TouchableOpacity>
           </View>
@@ -526,6 +534,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 18,
+  },
+  saveBtnDisabled: {
+    opacity: 0.4,
   },
   saveBtnText: {
     color: '#FFFFFF',

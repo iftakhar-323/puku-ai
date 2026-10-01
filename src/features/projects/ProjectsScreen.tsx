@@ -48,7 +48,7 @@ export function ProjectsScreen() {
 
   const filteredProjects = projects.filter(
     p =>
-      (activeTab === 'yours' || p.scope === activeTab) &&
+      p.scope === activeTab &&
       p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -293,8 +293,16 @@ export function ProjectsScreen() {
               />
 
               <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Create project"
+                accessibilityState={{ disabled: !name.trim() }}
+                disabled={!name.trim()}
                 onPress={handleCreate}
-                style={[styles.createBtn, { backgroundColor: theme.primary }]}>
+                style={[
+                  styles.createBtn,
+                  { backgroundColor: theme.primary },
+                  !name.trim() && styles.createBtnDisabled,
+                ]}>
                 <Text style={styles.createBtnText}>Create Project</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -461,6 +469,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 18,
+  },
+  createBtnDisabled: {
+    opacity: 0.4,
   },
   createBtnText: {
     color: '#FFFFFF',

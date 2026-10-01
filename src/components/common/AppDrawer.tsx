@@ -101,7 +101,8 @@ export function AppDrawer() {
     return c.title.toLowerCase().includes(findQuery.toLowerCase());
   });
 
-  const displayName = profile.name || 'iftakhar alam';
+  const displayName =
+    profile.name || (profile.email ? profile.email.split('@')[0] : 'Guest');
 
   const handleDelete = (id: string) => {
     deleteConversations([id]);

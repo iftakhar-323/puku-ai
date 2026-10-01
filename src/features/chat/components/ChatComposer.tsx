@@ -37,10 +37,30 @@ interface ChatComposerProps {
   onRemoveAttachment?: () => void;
 }
 
-const AVAILABLE_MODELS: { id: ChatModelType; label: string; badge: string }[] = [
-  { id: 'puku-ai-2.8', label: 'Puku-ai 2.8', badge: 'Fast' },
-  { id: 'puku-ai-2.7', label: 'Puku-ai 2.7', badge: 'Fast' },
-  { id: 'opus-4.8', label: 'Opus 4.8', badge: 'High' },
+const AVAILABLE_MODELS: {
+  id: ChatModelType;
+  label: string;
+  badge: string;
+  description: string;
+}[] = [
+  {
+    id: 'opus-4.8',
+    label: 'Opus 4.8',
+    badge: 'High',
+    description: 'For complex tasks',
+  },
+  {
+    id: 'puku-ai-2.8',
+    label: 'Puku-ai 2.8',
+    badge: 'Fast',
+    description: 'Most efficient for everyday tasks',
+  },
+  {
+    id: 'puku-ai-2.7',
+    label: 'Puku-ai 2.7',
+    badge: 'Fast',
+    description: 'Fastest for quick answers',
+  },
 ];
 
 export function ChatComposer({
@@ -93,17 +113,27 @@ export function ChatComposer({
                 <View style={styles.checkCol}>
                   {isSelected && <CheckmarkIcon size={14} color={theme.textPrimary} />}
                 </View>
-                <Text
-                  style={[
-                    styles.modelNameText,
-                    {
-                      color: isSelected ? theme.textPrimary : theme.textSecondary,
-                      fontWeight: isSelected ? '600' : '400',
-                      fontFamily: monoFont,
-                    },
-                  ]}>
-                  {modelItem.label}
-                </Text>
+                <View style={styles.modelTextCol}>
+                  <Text
+                    style={[
+                      styles.modelNameText,
+                      {
+                        color: isSelected ? theme.textPrimary : theme.textSecondary,
+                        fontWeight: isSelected ? '600' : '400',
+                        fontFamily: monoFont,
+                      },
+                    ]}>
+                    {modelItem.label}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.modelDescText,
+                      { color: theme.textMuted, fontFamily: monoFont },
+                    ]}>
+                    {modelItem.description}
+                  </Text>
+                </View>
                 <Text
                   style={[
                     styles.modelBadgeText,
@@ -272,7 +302,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 104,
     left: 8,
-    width: 240,
+    width: 280,
     borderWidth: 1,
     borderRadius: 14,
     paddingVertical: 8,
@@ -295,10 +325,17 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
-  modelNameText: {
+  modelTextCol: {
     flex: 1,
+    marginRight: 8,
+  },
+  modelNameText: {
     fontSize: 14,
     letterSpacing: 0.1,
+  },
+  modelDescText: {
+    fontSize: 11,
+    marginTop: 2,
   },
   modelBadgeText: {
     fontSize: 12,

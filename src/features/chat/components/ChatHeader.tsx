@@ -32,6 +32,7 @@ export function ChatHeader({
   isDark = true,
   showsBackButton = false,
   isIncognitoMode = false,
+  title,
   onLeadingTap,
   onTrailingTap,
   onTerminalTap,
@@ -66,9 +67,17 @@ export function ChatHeader({
 
           <View style={styles.brandTitleWrap}>
             <PukuLogoIcon size={20} />
-            <Text style={[styles.brandTitleText, { color: theme.textPrimary, fontFamily: monoFont }]}>
-              puku ai
-            </Text>
+            {title ? (
+              <Text
+                numberOfLines={1}
+                style={[styles.topBarTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                {title}
+              </Text>
+            ) : (
+              <Text style={[styles.brandTitleText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                puku ai
+              </Text>
+            )}
           </View>
         </View>
       )}
@@ -165,6 +174,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   brandTitleWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -176,8 +186,9 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     flex: 1,
-    fontSize: 13,
-    fontWeight: '400',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   actionBtn: {
     width: 32,

@@ -27,8 +27,9 @@ export function ProfileScreen() {
 
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
-  const displayName = profile.name || 'iftakhar alam';
-  const displayEmail = profile.email || 'iftakharalamshihad@gmail.com';
+  const displayName =
+    profile.name || (profile.email ? profile.email.split('@')[0] : 'Guest');
+  const displayEmail = profile.email || 'Not signed in';
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [

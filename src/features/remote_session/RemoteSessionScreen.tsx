@@ -50,6 +50,7 @@ export function RemoteSessionScreen() {
   const {
     session,
     liveRelaySessions,
+    isLoadingRelaySessions,
     connect,
     disconnect,
     sendMessage,
@@ -180,6 +181,7 @@ export function RemoteSessionScreen() {
           theme={theme}
           bottomInset={insets.bottom}
           liveSessions={liveRelaySessions}
+          isLoading={isLoadingRelaySessions}
           initialSessionId={session.sessionId}
           initialToken={session.token}
           onConnect={connect}

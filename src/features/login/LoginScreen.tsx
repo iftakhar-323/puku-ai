@@ -508,19 +508,36 @@ export function LoginScreen() {
         <TouchableOpacity
           activeOpacity={0.85}
           disabled={isGoogleLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in to Puku with Google"
           onPress={handleGoogleSignIn}
-          onLongPress={() => {
-            setEmailErrorMessage(null);
-            setIsEmailModalOpen(true);
-          }}
           style={styles.primarySignInBtn}>
           {isGoogleLoading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={[styles.primarySignInText, { fontFamily: monoFont }]}>
-              Sign in to Puku ↗
-            </Text>
+            <>
+              <GoogleIcon size={18} color="#FFFFFF" />
+              <Text style={[styles.primarySignInText, { fontFamily: monoFont }]}>
+                Sign in with Google
+              </Text>
+            </>
           )}
+        </TouchableOpacity>
+
+        {/* 5. Secondary: email / access-token sign-in */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in with email or access token"
+          onPress={() => {
+            setEmailErrorMessage(null);
+            setIsEmailModalOpen(true);
+          }}
+          style={styles.secondarySignInBtn}>
+          <EmailIcon size={15} color="#A0A0A8" />
+          <Text style={[styles.secondarySignInText, { fontFamily: monoFont }]}>
+            Sign in with email or access token
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -801,15 +818,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
-  aboutPukuBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-  },
-  aboutPukuText: {
-    fontSize: 13,
-    color: '#A0A0A8',
-    fontWeight: '500',
-  },
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
@@ -842,51 +850,30 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   primarySignInBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
     backgroundColor: '#4A54E8',
     borderRadius: 10,
     height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   primarySignInText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  legalBase: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#8E8E93',
-    textAlign: 'left',
-    marginBottom: 14,
-  },
-  legalLink: {
-    textDecorationLine: 'underline',
-    color: '#E0E0E6',
-    fontWeight: '600',
-  },
-  devTokenOptionBtn: {
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  devTokenOptionText: {
-    color: '#7B61FF',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  getLocallyRow: {
+  secondarySignInBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 8,
-    paddingVertical: 8,
+    height: 44,
+    marginBottom: 16,
   },
-  getLocallyText: {
-    color: '#8E8E93',
+  secondarySignInText: {
+    color: '#A0A0A8',
     fontSize: 13,
     fontWeight: '500',
   },
@@ -1019,22 +1006,6 @@ const styles = StyleSheet.create({
     color: AppColors.white,
     fontSize: 14,
     fontWeight: '700',
-  },
-  quickDevBtn: {
-    width: '100%',
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(43, 127, 255, 0.35)',
-    backgroundColor: 'rgba(43, 127, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  quickDevBtnText: {
-    color: AppColors.blueLite,
-    fontSize: 13,
-    fontWeight: '600',
   },
   webEmailLinkBtn: {
     marginTop: 14,

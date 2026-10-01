@@ -191,7 +191,7 @@ export function SettingsScreen() {
           {/* Usage */}
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Usage', 'Unlimited fast queries enabled')}
+            onPress={() => navigate('usage')}
             style={styles.sectionRow}>
             <View
               style={[

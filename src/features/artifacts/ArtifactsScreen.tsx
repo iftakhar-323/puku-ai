@@ -202,7 +202,7 @@ export function ArtifactsScreen() {
             <Text
               style={[
                 styles.codeText,
-                { color: '#A5A5FF', fontFamily: 'monospace' },
+                { color: theme.inlineCode, fontFamily: 'monospace' },
               ]}>
               {activeArtifact?.content}
             </Text>

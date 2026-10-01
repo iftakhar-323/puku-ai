@@ -17,7 +17,6 @@ import { ChatComposer } from './components/ChatComposer';
 import { ChatEmptyState } from './components/ChatEmptyState';
 import { ChatHeader } from './components/ChatHeader';
 import { ChatIncognitoView } from './components/ChatIncognitoView';
-import { ChatModelSelectionSheet } from './components/ChatModelSelectionSheet';
 import { MessageBubble } from './components/MessageBubble';
 import { TypingIndicator } from './components/TypingIndicator';
 import { NativePicker, NativeSpeech, PickedMedia } from '../../services/nativeModules';
@@ -49,7 +48,6 @@ export function ChatScreen() {
     useRemoteSession();
 
   const [inputVal, setInputVal] = useState('');
-  const [showModelSheet, setShowModelSheet] = useState(false);
   const [showAttachmentSheet, setShowAttachmentSheet] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<PickedMedia | null>(null);
@@ -310,16 +308,6 @@ export function ChatScreen() {
         onMicrophoneTap={handleToggleMic}
       />
 
-      {/* 1:1 Model Selection Bottom Sheet */}
-      <ChatModelSelectionSheet
-        visible={showModelSheet}
-        selectedModel={selectedModel}
-        theme={theme}
-        onClose={() => setShowModelSheet(false)}
-        onSelectModel={model => setSelectedModel(model)}
-        onEffortTap={() => {}}
-        onMoreModelsTap={() => {}}
-      />
 
       {/* 1:1 Attachment Bottom Sheet */}
       <ChatAttachmentSheet

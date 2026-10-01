@@ -25,6 +25,7 @@ export function TranscribeScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
+  const [hasTranscript, setHasTranscript] = useState(false);
   const [transcript, setTranscript] = useState(
     'Press the microphone below to speak and transcribe your voice to text in real-time.'
   );
@@ -47,6 +48,7 @@ export function TranscribeScreen() {
         setTranscript(prev =>
           prev && !prev.startsWith('Press the microphone') ? `${prev} ${text}` : text
         );
+        setHasTranscript(true);
       }
       setIsRecording(false);
     });
@@ -54,6 +56,7 @@ export function TranscribeScreen() {
     const unsubPartial = NativeSpeech.onSpeechPartialResults(text => {
       if (text) {
         setTranscript(text);
+        setHasTranscript(true);
       }
     });
 
@@ -198,8 +201,16 @@ export function TranscribeScreen() {
           {/* Actions */}
           <View style={styles.actionsRow}>
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Copy transcript"
+              accessibilityState={{ disabled: !hasTranscript }}
+              disabled={!hasTranscript}
               onPress={handleCopy}
-              style={[styles.actionBtn, { backgroundColor: theme.buttonBackground }]}>
+              style={[
+                styles.actionBtn,
+                { backgroundColor: theme.buttonBackground },
+                !hasTranscript && styles.actionBtnDisabled,
+              ]}>
               {isCopied ? (
                 <CheckmarkIcon size={16} color={theme.success} />
               ) : (
@@ -211,8 +222,16 @@ export function TranscribeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Send transcript to chat"
+              accessibilityState={{ disabled: !hasTranscript }}
+              disabled={!hasTranscript}
               onPress={handleSendToChat}
-              style={[styles.actionBtn, { backgroundColor: theme.primary }]}>
+              style={[
+                styles.actionBtn,
+                { backgroundColor: theme.primary },
+                !hasTranscript && styles.actionBtnDisabled,
+              ]}>
               <SendIcon size={16} color="#FFFFFF" />
               <Text style={[styles.actionText, { color: '#FFFFFF' }]}>
                 Send to Chat
@@ -315,6 +334,9 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     gap: 8,
+  },
+  actionBtnDisabled: {
+    opacity: 0.4,
   },
   actionText: {
     fontSize: 14,
