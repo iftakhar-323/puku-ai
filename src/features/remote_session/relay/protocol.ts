@@ -84,6 +84,7 @@ export interface PendingPrompt {
   input: Record<string, any>;
   /** Set when the tool is AskUserQuestion: render a picker, not Allow/Deny. */
   questions?: AskQuestion[];
+  permissionSuggestions?: any[];
 }
 
 /** A control_request this app sent and is waiting on. */
@@ -481,6 +482,9 @@ function applyControlRequest(
     description,
     input,
     questions: isQuestion ? input.questions : undefined,
+    permissionSuggestions: Array.isArray(request.permission_suggestions)
+      ? request.permission_suggestions
+      : undefined,
   };
   return { state: { ...state, pendingPrompt }, effects: [{ type: 'vibrate' }] };
 }
@@ -633,14 +637,16 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
     case 'control_request':
       return applyControlRequest(state, data);
 
-    case 'control_cancel_request':
+    case 'control_cancel_request': {
+      const cancelId = data?.request_id || data?.request?.request_id;
       return {
         state:
-          state.pendingPrompt?.requestId === data.request_id
+          !cancelId || state.pendingPrompt?.requestId === cancelId
             ? { ...state, pendingPrompt: undefined }
             : state,
         effects: [],
       };
+    }
 
     case 'control_response':
       return { state: applyControlResponse(state, data), effects: [] };
@@ -742,6 +748,8 @@ export function permissionReply(
   requestId: string,
   allow: boolean | 'always',
   message?: string,
+  input?: Record<string, any>,
+  permissionSuggestions?: any[],
 ) {
   const isAllow = allow === true || allow === 'always';
   const decisionClassification =
@@ -751,18 +759,36 @@ export function permissionReply(
       ? 'user_temporary'
       : 'user_reject';
 
+  const responsePayload: Record<string, any> = isAllow
+    ? {
+        behavior: 'allow',
+        updatedInput:
+          input && typeof input === 'object' && !Array.isArray(input)
+            ? input
+            : {},
+        decisionClassification,
+      }
+    : {
+        behavior: 'deny',
+        decisionClassification,
+        message: message || 'Denied from the Puku mobile app.',
+      };
+
+  if (
+    isAllow &&
+    allow === 'always' &&
+    Array.isArray(permissionSuggestions) &&
+    permissionSuggestions.length > 0
+  ) {
+    responsePayload.updatedPermissions = permissionSuggestions;
+  }
+
   return {
     type: 'control_response',
     response: {
       subtype: 'success',
       request_id: requestId,
-      response: isAllow
-        ? { behavior: 'allow', decisionClassification }
-        : {
-            behavior: 'deny',
-            decisionClassification,
-            message: message || 'Denied from the Puku mobile app.',
-          },
+      response: responsePayload,
     },
   };
 }

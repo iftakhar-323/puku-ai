@@ -439,11 +439,26 @@ describe('control requests', () => {
     ]);
   });
 
-  test('allow and deny replies echo the outer request id', () => {
+  test('allow and deny replies echo the outer request id and pass updatedInput', () => {
     expect(permissionReply('req-1', true).response).toEqual({
       subtype: 'success',
       request_id: 'req-1',
-      response: { behavior: 'allow', decisionClassification: 'user_temporary' },
+      response: {
+        behavior: 'allow',
+        updatedInput: {},
+        decisionClassification: 'user_temporary',
+      },
+    });
+    expect(
+      permissionReply('req-1', true, undefined, { command: 'ls' }).response,
+    ).toEqual({
+      subtype: 'success',
+      request_id: 'req-1',
+      response: {
+        behavior: 'allow',
+        updatedInput: { command: 'ls' },
+        decisionClassification: 'user_temporary',
+      },
     });
     expect(permissionReply('req-1', false).response.response).toMatchObject({
       behavior: 'deny',
@@ -695,6 +710,7 @@ describe('turn completion & working state', () => {
       request_id: 'req-perm-1',
       response: {
         behavior: 'allow',
+        updatedInput: {},
         decisionClassification: 'user_permanent',
       },
     });

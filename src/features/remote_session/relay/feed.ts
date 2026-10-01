@@ -39,24 +39,62 @@ type ToolKind = 'command' | 'read' | 'edit' | 'search' | 'other';
 
 export function toolKind(name?: string | null): ToolKind {
   const n = (name || '').toLowerCase();
-  if (['bash', 'terminal', 'exec', 'run_command', 'shell'].includes(n))
+  if (
+    [
+      'bash',
+      'terminal',
+      'exec',
+      'run_command',
+      'shell',
+      'command',
+      'execute_command',
+    ].includes(n) ||
+    n.includes('bash') ||
+    n.includes('command') ||
+    n.includes('terminal')
+  ) {
     return 'command';
-  if (['read', 'readfile', 'view_file', 'notebookread', 'view'].includes(n))
+  }
+  if (
+    [
+      'read',
+      'readfile',
+      'read_file',
+      'view_file',
+      'notebookread',
+      'view',
+      'fileread',
+    ].includes(n) ||
+    (n.includes('read') && !n.includes('thread'))
+  ) {
     return 'read';
+  }
   if (
     [
       'edit',
       'write',
       'multiedit',
       'writefile',
+      'write_file',
       'write_to_file',
       'replace_file_content',
       'notebookedit',
-    ].includes(n)
+      'filewrite',
+      'fileedit',
+    ].includes(n) ||
+    n.includes('write') ||
+    n.includes('edit')
   ) {
     return 'edit';
   }
-  if (['grep', 'glob', 'search', 'find', 'ls'].includes(n)) return 'search';
+  if (
+    ['grep', 'glob', 'search', 'find', 'ls', 'list_dir'].includes(n) ||
+    n.includes('search') ||
+    n.includes('grep') ||
+    n.includes('glob')
+  ) {
+    return 'search';
+  }
   return 'other';
 }
 
@@ -73,15 +111,38 @@ export function describeTool(tool: ToolCall): string {
     switch (toolKind(name)) {
       case 'command':
         return String(
-          input.command || input.cmd || input.description || name,
+          input.command ||
+            input.cmd ||
+            input.CommandLine ||
+            input.commandLine ||
+            input.description ||
+            name,
         );
       case 'read':
         return `Read ${basename(
-          String(input.file_path || input.path || input.notebook_path || ''),
+          String(
+            input.file_path ||
+              input.path ||
+              input.notebook_path ||
+              input.file ||
+              input.filename ||
+              input.target_file ||
+              input.targetFile ||
+              '',
+          ),
         )}`.trim();
       case 'edit':
-        return `${name === 'Write' || name === 'write' ? 'Write' : 'Edit'} ${basename(
-          String(input.file_path || input.path || input.notebook_path || ''),
+        return `${name.toLowerCase().includes('write') ? 'Write' : 'Edit'} ${basename(
+          String(
+            input.file_path ||
+              input.path ||
+              input.notebook_path ||
+              input.file ||
+              input.filename ||
+              input.target_file ||
+              input.targetFile ||
+              '',
+          ),
         )}`.trim();
       case 'search':
         return `${name} ${String(

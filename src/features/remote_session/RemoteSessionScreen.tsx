@@ -311,29 +311,31 @@ function RemoteSessionScreenContent() {
             onOpenTool={setSelectedTool}
           />
 
-          {session.pendingPrompt && (
+          {session.pendingPrompt ? (
             <PromptCard
               prompt={session.pendingPrompt}
               theme={theme}
               onAnswer={answerPrompt}
               onAnswerQuestions={answerQuestions}
             />
+          ) : (
+            <RemoteComposer
+              theme={theme}
+              enabled={isAttached}
+              disabledHint={
+                phase === 'closed'
+                  ? 'Session closed'
+                  : 'Waiting for your laptop…'
+              }
+              isWorking={session.isWorking}
+              permissionMode={session.permissionMode}
+              model={session.model}
+              onSend={sendMessage}
+              onInterrupt={interrupt}
+              onSetPermissionMode={setPermissionMode}
+              onSetModel={setModel}
+            />
           )}
-
-          <RemoteComposer
-            theme={theme}
-            enabled={isAttached}
-            disabledHint={
-              phase === 'closed' ? 'Session closed' : 'Waiting for your laptop…'
-            }
-            isWorking={session.isWorking}
-            permissionMode={session.permissionMode}
-            model={session.model}
-            onSend={sendMessage}
-            onInterrupt={interrupt}
-            onSetPermissionMode={setPermissionMode}
-            onSetModel={setModel}
-          />
         </View>
       )}
 

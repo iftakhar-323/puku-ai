@@ -10,7 +10,7 @@ import {
 import { CheckmarkIcon, CloseIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import type { PendingPrompt } from '../relay/protocol';
-import { describeTool } from '../relay/feed';
+import { describeTool, toolKind } from '../relay/feed';
 
 const monoFont = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -42,7 +42,7 @@ interface Props {
 class PromptCardErrorBoundary extends React.Component<
   {
     theme: ThemeColors;
-    onAnswer: (allow: boolean) => void;
+    onAnswer: (allow: boolean | 'always') => void;
     children: React.ReactNode;
   },
   { hasError: boolean }
@@ -146,6 +146,12 @@ function PermissionBody({
   onAnswer: (allow: boolean | 'always') => void;
 }) {
   const toolName = safeRenderString(prompt.toolName) || 'Tool';
+  const isExitPlanMode = toolName.toLowerCase() === 'exitplanmode';
+  const kind = toolKind(toolName);
+  const isEdit = kind === 'edit';
+  const isRead = kind === 'read';
+  const isCommand = kind === 'command';
+
   let summary = '';
   try {
     summary = describeTool({
@@ -161,17 +167,71 @@ function PermissionBody({
   const descriptionRaw =
     prompt.description ||
     (prompt.input && typeof prompt.input === 'object'
-      ? prompt.input.description
+      ? prompt.input.description || prompt.input.reason || prompt.input.message
       : '');
   const descriptionText = safeRenderString(descriptionRaw).trim();
+
+  const filePath = safeRenderString(
+    prompt.input?.file_path ||
+      prompt.input?.path ||
+      prompt.input?.notebook_path ||
+      prompt.input?.file ||
+      prompt.input?.filename ||
+      prompt.input?.target_file ||
+      prompt.input?.targetFile ||
+      '',
+  );
+  const fileBasename = filePath.split('/').filter(Boolean).pop() || filePath;
+  const isWrite =
+    toolName.toLowerCase().includes('write') || Boolean(prompt.input?.content);
+
+  const eyebrowText = isExitPlanMode
+    ? 'PLAN READY FOR APPROVAL'
+    : 'PERMISSION REQUIRED';
+
+  const titleText = isExitPlanMode
+    ? 'Ready to start coding?'
+    : isEdit
+    ? fileBasename
+      ? `Allow Puku to ${isWrite ? 'write' : 'edit'} ${fileBasename}?`
+      : `Allow ${toolName}?`
+    : isRead
+    ? fileBasename
+      ? `Allow Puku to read ${fileBasename}?`
+      : `Allow ${toolName}?`
+    : isCommand
+    ? 'Allow running command?'
+    : `Allow ${toolName}?`;
+
+  const commandText = isExitPlanMode
+    ? safeRenderString(prompt.input?.plan || descriptionText || summary)
+    : isCommand
+    ? safeRenderString(
+        prompt.input?.command ||
+          prompt.input?.cmd ||
+          prompt.input?.CommandLine ||
+          prompt.input?.commandLine ||
+          summary,
+      )
+    : isEdit || isRead
+    ? filePath
+      ? `${filePath}${
+          prompt.input?.content
+            ? `\n\n${safeRenderString(prompt.input.content).slice(0, 300)}`
+            : prompt.input?.new_string
+            ? `\n\n${safeRenderString(prompt.input.new_string).slice(0, 300)}`
+            : ''
+        }`
+      : safeRenderString(summary)
+    : safeRenderString(summary);
 
   return (
     <>
       <Text style={[styles.eyebrow, { color: theme.warning }]}>
-        PERMISSION REQUIRED
+        {eyebrowText}
       </Text>
       <Text style={[styles.title, { color: theme.textPrimary }]}>
-        Allow {toolName}?
+        {titleText}
       </Text>
       <View
         style={[styles.commandBox, { backgroundColor: theme.codeBackground }]}
@@ -181,10 +241,10 @@ function PermissionBody({
           numberOfLines={6}
           style={[styles.command, { color: theme.textPrimary }]}
         >
-          {safeRenderString(summary)}
+          {commandText}
         </Text>
       </View>
-      {descriptionText ? (
+      {descriptionText && !isExitPlanMode ? (
         <Text
           numberOfLines={3}
           style={[styles.description, { color: theme.textSecondary }]}
@@ -201,7 +261,9 @@ function PermissionBody({
           style={[styles.secondaryBtn, { borderColor: theme.outline }]}
         >
           <CloseIcon size={13} color={theme.error} />
-          <Text style={[styles.btnText, { color: theme.error }]}>Deny</Text>
+          <Text style={[styles.btnText, { color: theme.error }]}>
+            {isExitPlanMode ? 'Reject' : 'Deny'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           activeOpacity={0.8}
@@ -217,7 +279,7 @@ function PermissionBody({
           ]}
         >
           <Text style={[styles.btnText, { color: theme.textPrimary }]}>
-            Allow Once
+            {isExitPlanMode ? 'Start Coding' : 'Allow Once'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -229,7 +291,7 @@ function PermissionBody({
         >
           <CheckmarkIcon size={13} color={theme.background} />
           <Text style={[styles.btnText, { color: theme.background }]}>
-            Always
+            {isExitPlanMode ? 'Autopilot' : 'Always'}
           </Text>
         </TouchableOpacity>
       </View>

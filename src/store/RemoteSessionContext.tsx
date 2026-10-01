@@ -347,7 +347,7 @@ export function RemoteSessionProvider({
         next = addEntry(next, { kind: 'assistant', text: line });
       for (const frame of frames) {
         const frameId: unknown = frame?.uuid;
-        if (typeof frameId === 'string') {
+        if (typeof frameId === 'string' && frame?.type !== 'control_request') {
           if (seenFrameIds.current.has(frameId)) continue;
           seenFrameIds.current.add(frameId);
         }
@@ -527,26 +527,6 @@ export function RemoteSessionProvider({
     update(s => ({ ...s, entries: [] }));
   }, [update]);
 
-  const answerPrompt = useCallback(
-    (allow: boolean | 'always', message?: string) => {
-      const prompt = stateRef.current.pendingPrompt;
-      if (!prompt) return;
-      send(permissionReply(prompt.requestId, allow, message));
-      update(s => ({ ...s, pendingPrompt: undefined }));
-    },
-    [send, update],
-  );
-
-  const answerQuestions = useCallback(
-    (answers: Record<string, string[]> | null) => {
-      const prompt = stateRef.current.pendingPrompt;
-      if (!prompt) return;
-      send(questionReply(prompt, answers));
-      update(s => ({ ...s, pendingPrompt: undefined }));
-    },
-    [send, update],
-  );
-
   const sendControl = useCallback(
     (control: PendingControl) => {
       const requestId = makeRequestId();
@@ -555,6 +535,37 @@ export function RemoteSessionProvider({
         ...s,
         pendingControls: { ...s.pendingControls, [requestId]: control },
       }));
+    },
+    [send, update],
+  );
+
+  const answerPrompt = useCallback(
+    (allow: boolean | 'always', message?: string) => {
+      const prompt = stateRef.current.pendingPrompt;
+      if (!prompt) return;
+      send(
+        permissionReply(
+          prompt.requestId,
+          allow,
+          message,
+          prompt.input,
+          prompt.permissionSuggestions,
+        ),
+      );
+      if (allow === 'always') {
+        sendControl({ subtype: 'set_permission_mode', value: 'auto' });
+      }
+      update(s => ({ ...s, pendingPrompt: undefined }));
+    },
+    [send, sendControl, update],
+  );
+
+  const answerQuestions = useCallback(
+    (answers: Record<string, string[]> | null) => {
+      const prompt = stateRef.current.pendingPrompt;
+      if (!prompt) return;
+      send(questionReply(prompt, answers));
+      update(s => ({ ...s, pendingPrompt: undefined }));
     },
     [send, update],
   );
