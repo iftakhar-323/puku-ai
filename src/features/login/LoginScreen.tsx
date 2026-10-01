@@ -18,11 +18,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from '../../services/secureStorage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
 import {
-  CheckmarkIcon,
   CloseIcon,
-  DownloadIcon,
   EmailIcon,
   EyeIcon,
   EyeOffIcon,
@@ -141,7 +138,7 @@ function toBase64Url(bytes: Uint8Array): string {
     if (i + 1 < len) base64 += B64_CHARS.charAt(c3);
     if (i + 2 < len) base64 += B64_CHARS.charAt(c4);
   }
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]/g, '');
 }
 
 function generateRandomString(length: number): string {
@@ -179,7 +176,7 @@ export function LoginScreen() {
   const [authState, setAuthState] = useState<string>('');
   const [isOAuthWaiting, setIsOAuthWaiting] = useState(false);
   const [isOpeningWorkspace, setIsOpeningWorkspace] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGoogleLoading] = useState(false);
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   // Helper to get normalized OAuth redirect URI
@@ -203,6 +200,8 @@ export function LoginScreen() {
       } catch {}
     }
     checkExistingSession();
+    // Launch-only check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showSnackBar = (message: string) => {
@@ -311,7 +310,7 @@ export function LoginScreen() {
           let authenticEmail = '';
           let authenticName = '';
           let authenticId = '';
-          let authenticPicture: string | undefined = undefined;
+          let authenticPicture: string | undefined;
 
           // 1. Primary: fetch from /v1/me (matching Flutter ProfileService)
           try {
@@ -415,6 +414,8 @@ export function LoginScreen() {
       sub.remove();
       if (snackBarTimer.current) clearTimeout(snackBarTimer.current);
     };
+    // Re-subscribe only when the PKCE pair changes; the handler reads it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authVerifier, authState]);
 
   // Launches authentic Google OAuth (via In-App Custom Tabs matching Flutter, with browser fallback)
@@ -518,7 +519,7 @@ export function LoginScreen() {
       let activeToken = trimmedCredential;
       let finalEmail = trimmedEmail;
       let finalName = trimmedEmail.split('@')[0];
-      let userId: string | undefined = undefined;
+      let userId: string | undefined;
 
       // If user pasted a Bearer token
       if (trimmedCredential && trimmedCredential.length > 20) {

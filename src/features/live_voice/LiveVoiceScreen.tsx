@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -16,7 +16,7 @@ import { useApp } from '../../store/AppContext';
 
 export function LiveVoiceScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, goBack } = useApp();
+  const { goBack } = useApp();
 
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -24,7 +24,8 @@ export function LiveVoiceScreen() {
     'listening' | 'thinking' | 'speaking'
   >('listening');
 
-  const pulseAnim = new Animated.Value(1);
+  // One Animated.Value for the screen's lifetime; a new one per render detaches the loop.
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.loop(
@@ -52,7 +53,7 @@ export function LiveVoiceScreen() {
     }, 4000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [pulseAnim]);
 
   const getStatusText = () => {
     switch (voiceStatus) {

@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
-  Modal,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import {

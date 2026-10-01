@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -26,7 +25,6 @@ import {
   CopyIcon,
   EyeIcon,
   EyeOffIcon,
-  LockIcon,
   MoonIcon,
   PaperclipIcon,
   PencilIcon,
@@ -50,7 +48,6 @@ import {
   PukuBotComputerInfo,
   PukuBotConversation,
   PukuBotItem,
-  PukuBotMessage,
   PukuBotToolCall,
   PukuBotTurnEvent,
   PukuBotUser,
@@ -129,7 +126,6 @@ export function PukuBotScreen() {
     botConversations,
     activeBotConversationId,
     activeBotId,
-    availableBots: appAvailableBots,
     selectBotConversation,
     createBotConversation,
     addBotMessage,
@@ -304,6 +300,8 @@ export function PukuBotScreen() {
         activeStreamAbortRef.current();
       }
     };
+    // Mount-only: sets up the API client and auth listener once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePickMedia = async () => {

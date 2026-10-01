@@ -2,7 +2,6 @@ import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   BackIcon,
-  BotIcon,
   CloseIcon,
   GhostIcon,
   MoonIcon,
@@ -33,7 +32,6 @@ export function ChatHeader({
   isDark = true,
   showsBackButton = false,
   isIncognitoMode = false,
-  title,
   onLeadingTap,
   onTrailingTap,
   onTerminalTap,

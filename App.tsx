@@ -5,7 +5,7 @@
  * @format
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Linking, Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppDrawer } from './src/components/common/AppDrawer';
@@ -20,7 +20,6 @@ import { ProjectDetailsScreen } from './src/features/projects/ProjectDetailsScre
 import { ProjectsScreen } from './src/features/projects/ProjectsScreen';
 import { PukuBotScreen } from './src/features/puku_bot/PukuBotScreen';
 import { RemoteSessionScreen } from './src/features/remote_session/RemoteSessionScreen';
-import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { UsageScreen } from './src/features/settings/UsageScreen';
 import { TranscribeScreen } from './src/features/transcribe/TranscribeScreen';
 import { AppProvider, useApp } from './src/store/AppContext';
@@ -32,6 +31,13 @@ import { pukuBotApi } from './src/services/pukuBotApi';
 function MainNavigator(): React.JSX.Element {
   const { activeRoute, isDark, isRestoringSession, navigate } = useApp();
   const { connect: connectRemoteSession } = useRemoteSession();
+
+  // `navigate` and `connect` change identity on most renders; the effect below
+  // must run once, or it re-reads the launch URL and reconnects every time.
+  const navigateRef = useRef(navigate);
+  const connectRef = useRef(connectRemoteSession);
+  navigateRef.current = navigate;
+  connectRef.current = connectRemoteSession;
 
   useEffect(() => {
     try {
@@ -45,7 +51,7 @@ function MainNavigator(): React.JSX.Element {
       if (url.startsWith('pukubot://')) {
         try {
           await pukuBotApi.handleAuthCallback(url);
-          navigate('pukuBot');
+          navigateRef.current('pukuBot');
         } catch (e) {
           console.warn('[PukuBot] Deep link auth callback failed:', e);
         }
@@ -56,8 +62,8 @@ function MainNavigator(): React.JSX.Element {
           const s = params.get('s');
           const t = params.get('t') || undefined;
           if (s) {
-            connectRemoteSession(s, t);
-            navigate('remoteSession');
+            connectRef.current(s, t);
+            navigateRef.current('remoteSession');
           }
         } catch (e) {
           console.warn('[RemoteSession] Deep link parsing failed:', e);
@@ -76,7 +82,7 @@ function MainNavigator(): React.JSX.Element {
     return () => {
       sub.remove();
     };
-  }, [navigate]);
+  }, []);
 
   if (isRestoringSession) {
     return (

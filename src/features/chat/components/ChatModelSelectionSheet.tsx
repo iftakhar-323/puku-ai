@@ -92,7 +92,7 @@ export function ChatModelSelectionSheet({
         </View>
 
         {/* Options */}
-        {options.map((opt, index) => {
+        {options.map(opt => {
           const isSelected = selectedModel === opt.id;
           return (
             <React.Fragment key={opt.id}>

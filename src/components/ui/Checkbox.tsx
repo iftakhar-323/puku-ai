@@ -4,7 +4,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
   ViewStyle,
 } from 'react-native';
 import { useApp } from '../../store/AppContext';

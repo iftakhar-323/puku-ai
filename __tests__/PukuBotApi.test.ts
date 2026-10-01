@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PukuBotApiClient } from '../src/services/pukuBotApi';
-import { generatePkcePair, generateRandomString, sha256, toBase64Url } from '../src/utils/auth';
+import { generatePkcePair, sha256, toBase64Url } from '../src/utils/auth';
 
 class MockXMLHttpRequest {
   public open = jest.fn();
@@ -72,7 +72,7 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
 
     // Force re-init from storage
     // @ts-ignore
-    client['isInitialized'] = false;
+    client.isInitialized = false;
     await client.init();
 
     expect(client.isAuthenticated()).toBe(true);

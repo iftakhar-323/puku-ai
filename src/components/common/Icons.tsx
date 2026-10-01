@@ -6,7 +6,6 @@ import Svg, {
   Stop,
   Rect,
   Circle,
-  G,
 } from 'react-native-svg';
 
 interface IconProps {

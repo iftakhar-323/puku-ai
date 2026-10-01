@@ -35,7 +35,6 @@ import {
   SettingsIcon,
   SlidersIcon,
   SortIcon,
-  TerminalPromptIcon,
   ThreeDotsHorizontalIcon,
   TrashIcon,
 } from './Icons';

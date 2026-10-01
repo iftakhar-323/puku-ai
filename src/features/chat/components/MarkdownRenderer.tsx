@@ -378,7 +378,7 @@ export function MarkdownRenderer({ content, theme, cliColors }: MarkdownRenderer
     }
 
     // 4. Bullet Points (• , - , * )
-    const bulletMatch = trimmed.match(/^([•\-\*])\s+(.*)/);
+    const bulletMatch = trimmed.match(/^([•\-*])\s+(.*)/);
     if (bulletMatch) {
       const itemContent = bulletMatch[2];
       elements.push(

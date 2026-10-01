@@ -57,7 +57,7 @@ export interface ModeTabProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const ModeTab = forwardRef<any, ModeTabProps>(function ModeTab(
+export const ModeTab = forwardRef<any, ModeTabProps>(function ModeTabImpl(
   { active, disabled, label, icon, onPress, style },
   _ref,
 ) {
@@ -121,7 +121,7 @@ export interface NavItemProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const NavItem = forwardRef<any, NavItemProps>(function NavItem(
+export const NavItem = forwardRef<any, NavItemProps>(function NavItemImpl(
   { icon, disabled, dim, active, children, onPress, style },
   _ref,
 ) {
@@ -301,7 +301,7 @@ export interface SessionRowProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const SessionRow = forwardRef<any, SessionRowProps>(function SessionRow(
+export const SessionRow = forwardRef<any, SessionRowProps>(function SessionRowImpl(
   { label, icon, iconVariant, unread, active, onPress, onMorePress, style },
   _ref,
 ) {
@@ -414,7 +414,7 @@ export interface FooterActionProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const FooterAction = forwardRef<any, FooterActionProps>(function FooterAction(
+export const FooterAction = forwardRef<any, FooterActionProps>(function FooterActionImpl(
   { label, onPress, children, style },
   _ref,
 ) {

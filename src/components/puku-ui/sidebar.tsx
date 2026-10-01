@@ -81,7 +81,7 @@ type ModeTabProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & 
  *  - otherwise — transparent, `--color-muted` text, hover to `--color-fg`
  *  - `disabled` (overrides both) — `aria-disabled`, no hover, muted color
  */
-const ModeTab = forwardRef<HTMLButtonElement, ModeTabProps>(function ModeTab(
+const ModeTab = forwardRef<HTMLButtonElement, ModeTabProps>(function ModeTabImpl(
   { active, disabled, label, icon, className, type, ...rest },
   ref,
 ) {
@@ -138,7 +138,7 @@ type NavItemProps = ButtonHTMLAttributes<HTMLButtonElement> & {
  *   - disabled      → `opacity-50`, no pointer
  *   - dim           → same as default but `--color-muted` text in resting state
  */
-const NavItem = forwardRef<HTMLButtonElement, NavItemProps>(function NavItem(
+const NavItem = forwardRef<HTMLButtonElement, NavItemProps>(function NavItemImpl(
   { icon, disabled, dim, className, children, type, ...rest },
   ref,
 ) {
@@ -239,7 +239,7 @@ type SessionRowProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
  * `active` to mark the row as the current session. `onMoreClick` attaches a
  * handler to the trailing ⋯ button.
  */
-const SessionRow = forwardRef<HTMLButtonElement, SessionRowProps>(function SessionRow(
+const SessionRow = forwardRef<HTMLButtonElement, SessionRowProps>(function SessionRowImpl(
   { label, icon, iconVariant, unread, active, className, onMoreClick, type, ...rest },
   ref,
 ) {
@@ -402,7 +402,7 @@ type FooterActionProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
 };
 
-const FooterAction = forwardRef<HTMLButtonElement, FooterActionProps>(function FooterAction(
+const FooterAction = forwardRef<HTMLButtonElement, FooterActionProps>(function FooterActionImpl(
   { label, className, type, children, ...rest },
   ref,
 ) {

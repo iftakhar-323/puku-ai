@@ -33,7 +33,6 @@ export function ChatAttachmentSheet({
   visible,
   theme,
   onClose,
-  onCameraTap,
   onPhotosTap,
   onAddToProjectTap,
   onToolAccessTap,

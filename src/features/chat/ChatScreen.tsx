@@ -3,19 +3,15 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Share,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../store/AppContext';
 import { useRemoteSession } from '../../store/RemoteSessionContext';
-import { ChatModelType } from '../../types';
 import { ChatAttachmentSheet } from './components/ChatAttachmentSheet';
 import { ChatComposer } from './components/ChatComposer';
 import { ChatEmptyState } from './components/ChatEmptyState';
@@ -24,21 +20,8 @@ import { ChatIncognitoView } from './components/ChatIncognitoView';
 import { ChatModelSelectionSheet } from './components/ChatModelSelectionSheet';
 import { MessageBubble } from './components/MessageBubble';
 import { TypingIndicator } from './components/TypingIndicator';
-import { NativeClipboard, NativePicker, NativeSpeech, PickedMedia } from '../../services/nativeModules';
-import { useToast } from '../../components/ui/Toast';
+import { NativePicker, NativeSpeech, PickedMedia } from '../../services/nativeModules';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
-
-function getModelLabel(model: ChatModelType): string {
-  switch (model) {
-    case 'opus-4.8':
-      return 'Opus 4.8';
-    case 'puku-ai-2.8':
-      return 'puku-ai-2.8';
-    case 'puku-ai-2.7':
-    default:
-      return 'puku-ai-2.7';
-  }
-}
 
 export function ChatScreen() {
   const insets = useSafeAreaInsets();
@@ -64,7 +47,6 @@ export function ChatScreen() {
   } = useApp();
   const { isActive: isRemoteActive, liveRelaySessions, connect: connectRemoteSession } =
     useRemoteSession();
-  const { show } = useToast();
 
   const [inputVal, setInputVal] = useState('');
   const [showModelSheet, setShowModelSheet] = useState(false);
@@ -73,7 +55,7 @@ export function ChatScreen() {
   const [pendingAttachment, setPendingAttachment] = useState<PickedMedia | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
-  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
+  const { keyboardHeight } = useKeyboardHeight();
 
   const activeMessages = activeConversation?.messages || [];
   const rawMessages = isIncognito ? incognitoMessages : activeMessages;
@@ -100,6 +82,8 @@ export function ChatScreen() {
         clearTimeout(t2);
       };
     }
+    // Only on switching or finishing loading a conversation; new messages scroll elsewhere.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversation?.id, isLoadingConversation]);
 
   // Scroll to bottom when keyboard opens
@@ -191,21 +175,6 @@ export function ChatScreen() {
       if (userMsg && userMsg.role === 'user' && userMsg.content) {
         sendMessage(userMsg.content);
       }
-    }
-  };
-
-  const handleShare = async () => {
-    if (!activeConversation) return;
-    const conversationSummary = messages
-      .map(m => `${m.role === 'user' ? 'User' : 'Puku'}: ${m.content}`)
-      .join('\n\n');
-    try {
-      await Share.share({
-        title: activeConversation.title || 'Puku Chat',
-        message: conversationSummary,
-      });
-    } catch {
-      show({ title: 'Failed to share', variant: 'destructive' });
     }
   };
 
