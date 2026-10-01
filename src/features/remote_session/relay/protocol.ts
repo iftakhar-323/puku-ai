@@ -108,6 +108,8 @@ export interface RemoteSessionState {
   notice?: string;
   /** A worker_disconnected hit mid-turn; cleared once we reconnect. */
   turnInterrupted?: boolean;
+  /** True only if an actual worker_disconnected event occurred during this session. */
+  hadWorkerDisconnect?: boolean;
   /** Monotonic counter for entry ids. */
   seq: number;
 }
@@ -308,7 +310,13 @@ function applyAssistant(
   for (const entry of appended) next = addEntry(next, entry);
 
   const startedTool = blocks.some(b => b?.type === 'tool_use');
-  return startedTool ? { ...next, isWorking: true } : next;
+  const hasRunningTools = next.entries.some(
+    e => e.kind === 'tool' && e.tool.status === 'running',
+  );
+  return {
+    ...next,
+    isWorking: startedTool || hasRunningTools,
+  };
 }
 
 function applyUser(state: RemoteSessionState, data: any): RemoteSessionState {
@@ -352,6 +360,21 @@ function applyStreamEvent(
 ): RemoteSessionState {
   // Claude-style stream-json nests the Anthropic event under `event`.
   const ev = data.type === 'stream_event' ? data.event || {} : data;
+
+  // Handle stream completion events to immediately clear working state
+  if (
+    ev.type === 'message_stop' ||
+    (ev.type === 'message_delta' && ev.delta?.stop_reason)
+  ) {
+    const hasRunningTools = state.entries.some(
+      e => e.kind === 'tool' && e.tool.status === 'running',
+    );
+    return {
+      ...finalizeStreaming(state),
+      isWorking: hasRunningTools,
+    };
+  }
+
   const startsText =
     ev.type === 'content_block_start' && ev.content_block?.type === 'text';
   // Only text deltas carry `delta.text`; thinking and tool-input deltas use other keys.
@@ -471,8 +494,13 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
         case 'status': {
           const status =
             typeof data.status === 'string' ? data.status.trim() : '';
-          if (!status || status === 'idle' || status === 'ready')
-            return { state, effects: [] };
+          if (status === 'idle' || status === 'ready') {
+            return {
+              state: { ...finalizeStreaming(state), isWorking: false },
+              effects: [],
+            };
+          }
+          if (!status) return { state, effects: [] };
           return { state: addSystem(state, status), effects: [] };
         }
         default:
@@ -480,11 +508,13 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
       }
 
     case 'worker_connected': {
-      const wasDetached = state.phase === 'open' && state.entries.length > 0;
+      const wasDetached =
+        Boolean(state.hadWorkerDisconnect) && state.entries.length > 0;
       const next: RemoteSessionState = {
         ...state,
         phase: 'attached' as const,
         turnInterrupted: false,
+        hadWorkerDisconnect: false,
       };
       if (!wasDetached) return { state: next, effects: [] };
       // A turn was in flight when the CLI dropped: the reply may never have
@@ -508,6 +538,7 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
             phase: 'open',
             isWorking: false,
             turnInterrupted: state.turnInterrupted || state.isWorking,
+            hadWorkerDisconnect: true,
           },
           'Laptop CLI disconnected. Waiting for it to come back…',
         ),

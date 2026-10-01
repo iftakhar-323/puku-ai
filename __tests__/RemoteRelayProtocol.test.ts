@@ -581,3 +581,89 @@ describe('feed', () => {
     );
   });
 });
+
+describe('turn completion & working state', () => {
+  test('conversational assistant frame resets isWorking to false when no tools are running', () => {
+    const working = {
+      ...createInitialState(),
+      phase: 'attached' as const,
+      isWorking: true,
+    };
+    const { state } = run(
+      [
+        {
+          type: 'assistant',
+          message: {
+            content: [{ type: 'text', text: 'Here is the answer to your question.' }],
+          },
+        },
+      ],
+      working,
+    );
+    expect(state.isWorking).toBe(false);
+    expect(state.entries).toEqual([
+      expect.objectContaining({
+        kind: 'assistant',
+        text: 'Here is the answer to your question.',
+      }),
+    ]);
+  });
+
+  test('stream completion event resets isWorking to false', () => {
+    const streaming = run([
+      {
+        type: 'stream_event',
+        event: { type: 'content_block_start', content_block: { type: 'text' } },
+      },
+      delta('Thinking complete. Here is the response.'),
+    ]);
+    expect(streaming.state.isWorking).toBe(true);
+
+    const done = run(
+      [
+        {
+          type: 'stream_event',
+          event: { type: 'message_stop' },
+        },
+      ],
+      streaming.state,
+    );
+    expect(done.state.isWorking).toBe(false);
+    expect(done.state.entries[0]).toMatchObject({
+      streaming: false,
+      text: 'Thinking complete. Here is the response.',
+    });
+  });
+
+  test('system status idle resets isWorking to false', () => {
+    const working = {
+      ...createInitialState(),
+      phase: 'attached' as const,
+      isWorking: true,
+    };
+    const { state } = run(
+      [{ type: 'system', subtype: 'status', status: 'idle' }],
+      working,
+    );
+    expect(state.isWorking).toBe(false);
+  });
+
+  test('initial connection with pre-existing entries does not show spurious reconnected pill', () => {
+    const sessionWithHistory: RemoteSessionState = {
+      ...createInitialState(),
+      phase: 'open',
+      entries: [
+        { kind: 'user', id: 'u1', text: 'hello' },
+        { kind: 'assistant', id: 'a1', text: 'Hi! Here is your project.' },
+      ],
+      hadWorkerDisconnect: false,
+    };
+
+    const connected = run([{ type: 'worker_connected' }], sessionWithHistory);
+    expect(connected.state.phase).toBe('attached');
+    // Ensure no 'Reconnected to your laptop' system pill was injected
+    const systemEntries = connected.state.entries.filter(e => e.kind === 'system');
+    expect(systemEntries).toHaveLength(0);
+  });
+});
+

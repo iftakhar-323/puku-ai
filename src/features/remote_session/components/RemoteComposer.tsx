@@ -196,7 +196,8 @@ export function RemoteComposer({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingTop: 2,
+    paddingBottom: 4,
   },
   card: {
     flexDirection: 'row',
@@ -235,8 +236,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingHorizontal: 10,
-    paddingTop: 10,
+    paddingHorizontal: 8,
+    paddingTop: 7,
+    paddingBottom: 2,
   },
   control: {
     flexDirection: 'row',

@@ -38,6 +38,7 @@ interface Props {
   isWorking: boolean;
   canResend: boolean;
   theme: ThemeColors;
+  keyboardHeight?: number;
   onCopy: (text: string) => void;
   onResend: (text: string) => void;
   onOpenTool: (tool: ToolCall) => void;
@@ -48,6 +49,7 @@ export function RemoteFeed({
   isWorking,
   canResend,
   theme,
+  keyboardHeight,
   onCopy,
   onResend,
   onOpenTool,
@@ -85,10 +87,21 @@ export function RemoteFeed({
     setShowJump(prev => (prev === !isNear ? prev : !isNear));
   }, []);
 
-  // Follow new output only while the user is already at the bottom.
+  // Follow new output while near bottom or when Puku is actively working/streaming
   const onContentSizeChange = useCallback(() => {
-    if (nearBottom.current) listRef.current?.scrollToEnd({ animated: true });
-  }, []);
+    if (nearBottom.current || isWorking) {
+      listRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [isWorking]);
+
+  // Scroll to bottom when keyboard opens so Puku's writing is never obscured
+  React.useEffect(() => {
+    if (keyboardHeight && keyboardHeight > 0) {
+      setTimeout(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      }, 60);
+    }
+  }, [keyboardHeight]);
 
   const last = entries[entries.length - 1];
   const showTyping =

@@ -110,7 +110,7 @@ export function RemoteSessionScreen() {
           paddingTop: Math.max(insets.top, 10),
           paddingBottom:
             Platform.OS === 'android' && keyboardHeight > 0
-              ? keyboardHeight
+              ? keyboardHeight + 10
               : Math.max(insets.bottom, 10),
         },
       ]}
@@ -219,6 +219,7 @@ export function RemoteSessionScreen() {
             isWorking={session.isWorking}
             canResend={isAttached}
             theme={theme}
+            keyboardHeight={keyboardHeight}
             onCopy={handleCopy}
             onResend={handleResend}
             onOpenTool={setSelectedTool}
