@@ -66,6 +66,8 @@ export function AppDrawer() {
     renameBotConversation,
     selectBot,
     activeRelaySessions,
+    remoteSession,
+    connectRemoteSession,
   } = useApp();
 
   const isBotMode = activeRoute === 'pukuBot';
@@ -714,30 +716,52 @@ export function AppDrawer() {
               activeOpacity={0.7}
               onPress={() => {
                 setDrawerOpen(false);
-                navigate('code');
+                if (remoteSession.status === 'connected') {
+                  navigate('remoteSession');
+                } else if (activeRelaySessions.length > 0) {
+                  connectRemoteSession(
+                    activeRelaySessions[0].sessionId,
+                    activeRelaySessions[0].mobileToken
+                  );
+                  navigate('remoteSession');
+                } else {
+                  navigate('code');
+                }
               }}
               style={[
                 styles.switchHubCard,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: activeRelaySessions.length > 0 ? '#52C41A' : theme.border,
+                  borderColor:
+                    remoteSession.status === 'connected' || activeRelaySessions.length > 0
+                      ? '#52C41A'
+                      : theme.border,
                   marginTop: 8,
                 },
               ]}>
               <View style={styles.switchHubLeft}>
-                <RemoteIcon size={20} color={activeRelaySessions.length > 0 ? '#52C41A' : theme.primary} />
+                <RemoteIcon
+                  size={20}
+                  color={
+                    remoteSession.status === 'connected' || activeRelaySessions.length > 0
+                      ? '#52C41A'
+                      : theme.primary
+                  }
+                />
                 <View style={styles.switchHubTextWrap}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
                       Remote Laptop Sessions
                     </Text>
-                    {activeRelaySessions.length > 0 && (
+                    {(remoteSession.status === 'connected' || activeRelaySessions.length > 0) && (
                       <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#52C41A' }} />
                     )}
                   </View>
                   <Text style={[styles.switchHubSub, { color: theme.textMuted }]}>
-                    {activeRelaySessions.length > 0
-                      ? `${activeRelaySessions.length} live session(s) active`
+                    {remoteSession.status === 'connected'
+                      ? '● Live connected · Tap to open'
+                      : activeRelaySessions.length > 0
+                      ? `${activeRelaySessions.length} live session(s) detected`
                       : 'Mirror & control laptop terminal'}
                   </Text>
                 </View>

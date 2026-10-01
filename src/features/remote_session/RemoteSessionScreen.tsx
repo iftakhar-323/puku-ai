@@ -8,6 +8,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Vibration,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +23,8 @@ import {
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
+import { NativeClipboard } from '../../services/nativeModules';
+import { useToast } from '../../components/ui/Toast';
 
 export function RemoteSessionScreen() {
   const insets = useSafeAreaInsets();
@@ -84,6 +87,33 @@ export function RemoteSessionScreen() {
     connectRemoteSession(inputSessionId.trim(), inputToken.trim());
   };
 
+  const { show } = useToast();
+  const lastVibratedToolRef = useRef<string | null>(null);
+
+  // Vibrate phone when laptop requests permission
+  useEffect(() => {
+    if (
+      remoteSession.currentTool &&
+      remoteSession.currentTool.status === 'pending' &&
+      lastVibratedToolRef.current !== (remoteSession.currentTool.id || null)
+    ) {
+      lastVibratedToolRef.current = remoteSession.currentTool.id || null;
+      try {
+        Vibration.vibrate([0, 180, 80, 220]);
+      } catch {}
+    }
+  }, [remoteSession.currentTool]);
+
+  const handleCopyText = (text: string) => {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+    NativeClipboard.setString(cleanText);
+    try {
+      Vibration.vibrate(40);
+    } catch {}
+    show({ title: 'Copied to clipboard' });
+  };
+
   const handleSendCommand = (textToSend?: string) => {
     const text = (textToSend ?? commandText).trim();
     if (!text) return;
@@ -109,12 +139,17 @@ export function RemoteSessionScreen() {
     if (log.startsWith('> ')) {
       const cmd = log.slice(2);
       return (
-        <View key={index} style={styles.userCmdContainer}>
+        <TouchableOpacity
+          key={index}
+          activeOpacity={0.8}
+          delayLongPress={250}
+          onLongPress={() => handleCopyText(cmd)}
+          style={styles.userCmdContainer}>
           <View style={styles.userCmdBubble}>
             <Text style={[styles.userCmdPrompt, { fontFamily: monoFont }]}>❯</Text>
             <Text style={[styles.userCmdText, { fontFamily: monoFont }]}>{cmd}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       );
     }
 
@@ -122,7 +157,12 @@ export function RemoteSessionScreen() {
     if (log.startsWith('[Tool]')) {
       const toolDetail = log.replace('[Tool]', '').trim();
       return (
-        <View key={index} style={styles.toolCard}>
+        <TouchableOpacity
+          key={index}
+          activeOpacity={0.8}
+          delayLongPress={250}
+          onLongPress={() => handleCopyText(toolDetail)}
+          style={styles.toolCard}>
           <View style={styles.toolHeader}>
             <View style={styles.toolBadge}>
               <Text style={[styles.toolBadgeText, { fontFamily: monoFont }]}>⚡ TOOL</Text>
@@ -133,7 +173,7 @@ export function RemoteSessionScreen() {
               {toolDetail}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
       );
     }
 
@@ -153,36 +193,56 @@ export function RemoteSessionScreen() {
     // 4. Completed tool / success
     if (log.startsWith('✓ Done')) {
       return (
-        <View key={index} style={styles.doneRow}>
+        <TouchableOpacity
+          key={index}
+          activeOpacity={0.8}
+          delayLongPress={250}
+          onLongPress={() => handleCopyText(log)}
+          style={styles.doneRow}>
           <CheckmarkIcon size={12} color="#52C41A" />
           <Text style={[styles.doneText, { fontFamily: monoFont }]}>{log}</Text>
-        </View>
+        </TouchableOpacity>
       );
     }
 
     // 5. Permission / Notice
     if (log.includes('Permission') || log.includes('Warning')) {
       return (
-        <View key={index} style={styles.warningCard}>
+        <TouchableOpacity
+          key={index}
+          activeOpacity={0.8}
+          delayLongPress={250}
+          onLongPress={() => handleCopyText(log)}
+          style={styles.warningCard}>
           <Text style={[styles.warningText, { fontFamily: monoFont }]}>{log}</Text>
-        </View>
+        </TouchableOpacity>
       );
     }
 
     // 6. Error / Rejection
     if (log.includes('Error') || log.includes('REJECTED') || log.includes('Failed')) {
       return (
-        <View key={index} style={styles.errorCard}>
+        <TouchableOpacity
+          key={index}
+          activeOpacity={0.8}
+          delayLongPress={250}
+          onLongPress={() => handleCopyText(log)}
+          style={styles.errorCard}>
           <Text style={[styles.errorText, { fontFamily: monoFont }]}>{log}</Text>
-        </View>
+        </TouchableOpacity>
       );
     }
 
     // 7. General output / stdout
     return (
-      <View key={index} style={styles.logRow}>
+      <TouchableOpacity
+        key={index}
+        activeOpacity={0.8}
+        delayLongPress={250}
+        onLongPress={() => handleCopyText(log)}
+        style={styles.logRow}>
         <Text style={[styles.logText, { fontFamily: monoFont }]}>{log}</Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 

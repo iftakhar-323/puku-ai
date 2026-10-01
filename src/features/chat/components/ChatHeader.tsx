@@ -23,6 +23,7 @@ interface ChatHeaderProps {
   onLeadingTap: () => void;
   onTrailingTap?: () => void;
   onTerminalTap?: () => void;
+  isTerminalLive?: boolean;
   onBotTap?: () => void;
   onThemeTap?: () => void;
 }
@@ -36,6 +37,7 @@ export function ChatHeader({
   onLeadingTap,
   onTrailingTap,
   onTerminalTap,
+  isTerminalLive = false,
   onBotTap,
   onThemeTap,
 }: ChatHeaderProps) {
@@ -97,7 +99,11 @@ export function ChatHeader({
               activeOpacity={0.7}
               onPress={onTerminalTap}
               style={styles.actionBtn}>
-              <TerminalPromptIcon size={19} color={theme.textSecondary} />
+              <TerminalPromptIcon
+                size={19}
+                color={isTerminalLive ? (isDark ? '#52C41A' : '#389E0D') : theme.textSecondary}
+              />
+              {isTerminalLive && <View style={styles.liveDot} />}
             </TouchableOpacity>
           )}
 
@@ -181,6 +187,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  liveDot: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#52C41A',
   },
   trailingBtn: {
     width: 22,

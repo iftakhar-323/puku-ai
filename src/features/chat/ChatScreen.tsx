@@ -60,6 +60,9 @@ export function ChatScreen() {
     selectBotConversation,
     incognitoMessages,
     profile,
+    remoteSession,
+    activeRelaySessions,
+    connectRemoteSession,
   } = useApp();
   const { show } = useToast();
 
@@ -235,7 +238,20 @@ export function ChatScreen() {
         }
         onLeadingTap={() => setDrawerOpen(true)}
         onTrailingTap={() => setIncognito(!isIncognito)}
-        onTerminalTap={() => navigate('code')}
+        isTerminalLive={remoteSession.status === 'connected' || activeRelaySessions.length > 0}
+        onTerminalTap={() => {
+          if (remoteSession.status === 'connected') {
+            navigate('remoteSession');
+          } else if (activeRelaySessions.length > 0) {
+            connectRemoteSession(
+              activeRelaySessions[0].sessionId,
+              activeRelaySessions[0].mobileToken
+            );
+            navigate('remoteSession');
+          } else {
+            navigate('code');
+          }
+        }}
         onBotTap={() => {
           selectBotConversation(null as any);
           navigate('pukuBot');
