@@ -216,6 +216,41 @@ function streamingIndices(entries: RemoteEntry[]): number[] {
   return out;
 }
 
+/** Finalize any entry still mid-stream, e.g. because the connection died
+ * before its closing frame arrived. Keeps whatever text had streamed in. */
+function finalizeStreaming(state: RemoteSessionState): RemoteSessionState {
+  return {
+    ...state,
+    entries: state.entries.map(e =>
+      e.kind === 'assistant' && e.streaming ? { ...e, streaming: false } : e,
+    ),
+  };
+}
+
+export function hasRunningTool(state: RemoteSessionState): boolean {
+  return state.entries.some(e => e.kind === 'tool' && e.tool.status === 'running');
+}
+
+/** How long a turn can sit idle with no running tool before we give up on it. */
+export const WORKING_TIMEOUT_MS = 45000;
+
+/**
+ * Give up waiting on a turn that's gone silent too long — most often because
+ * the CLI's closing `result` frame never reached us (the reply itself may
+ * have rendered fine). A no-op once a tool is running, since those can
+ * legitimately take a while with no frames in between. The caller (the
+ * context that owns the socket) is responsible for the actual idle timer;
+ * this just applies it.
+ */
+export function giveUpOnTurn(state: RemoteSessionState): RemoteSessionState {
+  if (!state.isWorking || hasRunningTool(state)) return state;
+  return addSystem(
+    { ...finalizeStreaming(state), isWorking: false },
+    "Didn't hear back from your laptop — send your message again if you don't see a reply.",
+    'error',
+  );
+}
+
 function applyAssistant(
   state: RemoteSessionState,
   data: any,
@@ -466,14 +501,10 @@ export function applyFrame(state: RemoteSessionState, data: any): FrameResult {
       // turn's final text wrongly match onto this stale, already-shown entry
       // instead of its own (the matcher pairs final blocks to the oldest
       // still-streaming entry, in order).
-      const entries = state.entries.map(e =>
-        e.kind === 'assistant' && e.streaming ? { ...e, streaming: false } : e,
-      );
       return {
         state: addSystem(
           {
-            ...state,
-            entries,
+            ...finalizeStreaming(state),
             phase: 'open',
             isWorking: false,
             turnInterrupted: state.turnInterrupted || state.isWorking,

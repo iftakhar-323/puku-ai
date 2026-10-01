@@ -31,12 +31,15 @@ import {
   PermissionMode,
   RelayEffect,
   RemoteSessionState,
+  WORKING_TIMEOUT_MS,
   addEntry,
   addLocalUser,
   addSystem,
   applyFrame,
   controlFrame,
   createInitialState,
+  giveUpOnTurn,
+  hasRunningTool,
   interruptFrame,
   makeRequestId,
   parseMessage,
@@ -136,6 +139,10 @@ export function RemoteSessionProvider({
   // setState updater; renders are coalesced to one per animation frame.
   const stateRef = useRef<RemoteSessionState>(session);
   const flushPending = useRef(false);
+  // Gives up on a turn that's gone silent with no running tool — most often
+  // because the CLI's closing `result` frame never reached us. Rearmed on
+  // every state change so it only fires after real inactivity.
+  const workingWatchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const connRef = useRef<{
     sessionId: string;
@@ -153,6 +160,18 @@ export function RemoteSessionProvider({
   const update = useCallback(
     (fn: (s: RemoteSessionState) => RemoteSessionState) => {
       stateRef.current = fn(stateRef.current);
+
+      if (workingWatchdog.current) {
+        clearTimeout(workingWatchdog.current);
+        workingWatchdog.current = null;
+      }
+      if (stateRef.current.isWorking && !hasRunningTool(stateRef.current)) {
+        workingWatchdog.current = setTimeout(() => {
+          workingWatchdog.current = null;
+          update(giveUpOnTurn);
+        }, WORKING_TIMEOUT_MS);
+      }
+
       if (!flushPending.current) {
         flushPending.current = true;
         requestAnimationFrame(() => {
@@ -186,6 +205,10 @@ export function RemoteSessionProvider({
   /** Close the socket without triggering a reconnect. */
   const closeSocket = useCallback(() => {
     clearReconnectTimer();
+    if (workingWatchdog.current) {
+      clearTimeout(workingWatchdog.current);
+      workingWatchdog.current = null;
+    }
     const ws = wsRef.current;
     wsRef.current = null;
     if (ws) {

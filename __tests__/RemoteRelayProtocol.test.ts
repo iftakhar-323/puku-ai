@@ -4,6 +4,8 @@ import {
   applyFrame,
   controlFrame,
   createInitialState,
+  giveUpOnTurn,
+  hasRunningTool,
   parseMessage,
   permissionReply,
   questionReply,
@@ -184,6 +186,48 @@ describe('connection lifecycle', () => {
     expect([0, 1, 2, 3, 9].map(reconnectDelay)).toEqual([
       3000, 6000, 12000, 30000, 30000,
     ]);
+  });
+});
+
+describe('giveUpOnTurn (idle-turn watchdog)', () => {
+  test('clears a stuck isWorking and finalizes any streamed text, with an explanatory message', () => {
+    const live = run([
+      {
+        type: 'stream_event',
+        event: { type: 'content_block_start', content_block: { type: 'text' } },
+      },
+      delta('partial'),
+    ]);
+    expect(live.state.isWorking).toBe(true);
+
+    const gaveUp = giveUpOnTurn(live.state);
+    expect(gaveUp.isWorking).toBe(false);
+    expect(gaveUp.entries).toContainEqual(
+      expect.objectContaining({ text: 'partial', streaming: false }),
+    );
+    expect(gaveUp.entries[gaveUp.entries.length - 1]).toMatchObject({
+      kind: 'system',
+      tone: 'error',
+      text: expect.stringContaining("send your message again"),
+    });
+  });
+
+  test('is a no-op while a tool is still running, or when not working', () => {
+    const notWorking = createInitialState();
+    expect(giveUpOnTurn(notWorking)).toBe(notWorking);
+
+    const withRunningTool = run([
+      {
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'tool_use', id: 'call_a', name: 'Bash', input: { command: 'sleep 60' } },
+          ],
+        },
+      },
+    ]).state;
+    expect(hasRunningTool(withRunningTool)).toBe(true);
+    expect(giveUpOnTurn(withRunningTool)).toBe(withRunningTool);
   });
 });
 
