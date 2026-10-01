@@ -1501,20 +1501,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       ws.onmessage = (event: any) => {
         try {
-          const raw = typeof event.data === 'string' ? event.data : '';
-          const lines = raw.split('\n').filter((l: string) => l.trim().length > 0);
-          for (const line of lines) {
-            let data: any;
-            try {
-              data = JSON.parse(line);
-            } catch {
-              setRemoteSession(prev => ({
-                ...prev,
-                logs: [...prev.logs, line],
-              }));
-              continue;
-            }
+          const raw = typeof event.data === 'string' ? event.data.trim() : '';
+          if (!raw) return;
 
+          const dataObjects: any[] = [];
+          try {
+            dataObjects.push(JSON.parse(raw));
+          } catch {
+            const lines = raw.split('\n').filter((l: string) => l.trim().length > 0);
+            for (const line of lines) {
+              try {
+                dataObjects.push(JSON.parse(line));
+              } catch {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('{') && !trimmed.startsWith('[') && !trimmed.startsWith('"')) {
+                  setRemoteSession(prev => ({
+                    ...prev,
+                    logs: [...prev.logs, line],
+                  }));
+                }
+              }
+            }
+          }
+
+          for (const data of dataObjects) {
             if (data.type === 'control_request') {
               if (data.request?.subtype === 'can_use_tool') {
                 const toolName = data.request.tool_name || 'Tool Execution';

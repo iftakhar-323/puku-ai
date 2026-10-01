@@ -37,7 +37,6 @@ import { NativeClipboard } from '../../services/nativeModules';
 import { useToast } from '../../components/ui/Toast';
 import { MarkdownRenderer } from '../chat/components/MarkdownRenderer';
 import { TypingIndicator } from '../chat/components/TypingIndicator';
-import { lightTheme, ThemeColors } from '../../theme/theme';
 
 interface ParsedToolExecution {
   id: string;
@@ -48,25 +47,12 @@ interface ParsedToolExecution {
   isSuccess: boolean;
 }
 
-const whiteViewTheme: ThemeColors = {
-  ...lightTheme,
-  background: '#FAF9F6',
-  cardBackground: '#FFFFFF',
-  secondaryBackground: '#F4F4F6',
-  chatBarBackground: '#FFFFFF',
-  outline: '#E5E7EB',
-  codeBackground: '#F3F4F6',
-  textPrimary: '#18181B',
-  textSecondary: '#4B5563',
-  primary: '#7C3AED',
-  border: '#E5E7EB',
-};
-
 export function RemoteSessionScreen() {
   const insets = useSafeAreaInsets();
   const { keyboardHeight } = useKeyboardHeight();
   const {
     theme,
+    isDark,
     goBack,
     remoteSession,
     activeRelaySessions,
@@ -94,6 +80,28 @@ export function RemoteSessionScreen() {
   const { show } = useToast();
   const lastVibratedToolRef = useRef<string | null>(null);
 
+  // Dynamic colors based on active theme (Dark vs Light)
+  const screenBg = isDark ? theme.background : '#FAF9F6';
+  const cardBg = isDark ? theme.cardBackground : '#FFFFFF';
+  const secondaryBg = isDark ? theme.secondaryBackground : '#F3F4F6';
+  const textPrimary = isDark ? theme.textPrimary : '#18181B';
+  const textSecondary = isDark ? theme.textSecondary : '#6B7280';
+  const textMuted = isDark ? theme.textMuted : '#9CA3AF';
+  const borderColor = isDark ? theme.outline : '#E5E7EB';
+  const userBubbleBg = isDark ? '#282A3A' : '#ECEEFB';
+  const userBubbleText = isDark ? '#FFFFFF' : '#18181B';
+  const modalBg = isDark ? '#1C1D1A' : '#ECECEE';
+  const modalBoxBg = isDark ? '#242621' : '#E2E2E6';
+  const modalText = isDark ? '#EEEEE5' : '#18181B';
+  const modalCloseBg = isDark ? '#2A2C26' : '#DCDCE0';
+  const bottomBarBg = isDark ? theme.cardBackground : '#FFFFFF';
+  const bottomInputText = isDark ? theme.textPrimary : '#18181B';
+  const bottomPlaceholder = isDark ? theme.placeholderText : '#8E8E93';
+  const chipBg = isDark ? '#282A3A' : '#ECEEFB';
+  const chipText = isDark ? '#A78BFA' : '#4F46E5';
+  const secondaryChipBg = isDark ? '#242621' : '#F3F4F6';
+  const secondaryChipText = isDark ? theme.textSecondary : '#6B7280';
+
   useEffect(() => {
     fetchActiveRelaySessions().catch(() => {});
   }, [fetchActiveRelaySessions]);
@@ -107,7 +115,7 @@ export function RemoteSessionScreen() {
     }
   }, [activeRelaySessions, inputSessionId]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new logs
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -179,21 +187,41 @@ export function RemoteSessionScreen() {
       const rawArgs = callMatch[2].trim();
       try {
         const parsed = JSON.parse(rawArgs);
-        command = parsed.command || parsed.cmd || parsed.file_path || parsed.query || rawArgs;
-        description = parsed.description || parsed.title || command || toolName;
+        command = parsed.command || parsed.cmd || parsed.file_path || parsed.target_file || parsed.query || rawArgs;
+        if (parsed.description) {
+          description = parsed.description;
+        } else if (parsed.title) {
+          description = parsed.title;
+        }
       } catch {
         command = rawArgs;
-        description = rawArgs;
       }
     } else if (rest.includes(':')) {
       const colonIdx = rest.indexOf(':');
       toolName = rest.slice(0, colonIdx).trim();
       command = rest.slice(colonIdx + 1).trim();
-      description = command;
     } else {
       toolName = rest;
       command = rest;
-      description = rest;
+    }
+
+    // Auto-generate clean readable description if not explicitly provided
+    if (!description) {
+      const lowerName = toolName.toLowerCase();
+      if (lowerName === 'read' || lowerName === 'readfile' || lowerName === 'view_file') {
+        const fileName = command.split('/').pop() || command;
+        description = `Read ${fileName}`;
+      } else if (lowerName === 'write' || lowerName === 'writefile' || lowerName === 'write_to_file') {
+        const fileName = command.split('/').pop() || command;
+        description = `Write ${fileName}`;
+      } else if (lowerName === 'edit' || lowerName === 'replace_file_content') {
+        const fileName = command.split('/').pop() || command;
+        description = `Edit ${fileName}`;
+      } else if (lowerName === 'bash' || lowerName === 'terminal' || lowerName === 'exec') {
+        description = command || 'Terminal command';
+      } else {
+        description = command || toolName;
+      }
     }
 
     // Look for tool output in subsequent logs
@@ -236,7 +264,22 @@ export function RemoteSessionScreen() {
         ? JSON.stringify(rawLog)
         : String(rawLog ?? '');
 
-    // 1. User message bubble (soft lavender/periwinkle pill on the right)
+    const trimmed = log.trim();
+
+    // 1. Filter out internal JSON protocol strings that should never be shown in chat
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && (parsed.type || parsed.tool_use_id || parsed.role || parsed.message)) {
+          return null;
+        }
+      } catch {}
+    }
+
+    // 2. User message bubble (right-aligned pill)
     if (log.startsWith('> ')) {
       const cmd = log.slice(2).trim();
       return (
@@ -245,14 +288,14 @@ export function RemoteSessionScreen() {
             activeOpacity={0.85}
             delayLongPress={200}
             onLongPress={() => handleCopyText(cmd)}
-            style={styles.userBubble}>
-            <Text style={styles.userText}>{cmd}</Text>
+            style={[styles.userBubble, { backgroundColor: userBubbleBg }]}>
+            <Text style={[styles.userText, { color: userBubbleText }]}>{cmd}</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    // 2. Tool invocation -> clean minimal row: `<Description>  >` which opens Terminal Modal!
+    // 3. Tool invocation -> clean minimal row: `<Description>  >` which opens Terminal Modal!
     if (log.startsWith('[Tool]')) {
       const parsedTool = parseToolLog(log, index);
       return (
@@ -261,28 +304,34 @@ export function RemoteSessionScreen() {
           activeOpacity={0.7}
           onPress={() => setSelectedTool(parsedTool)}
           style={styles.toolRow}>
-          <Text numberOfLines={1} style={styles.toolRowText}>
+          <Text
+            numberOfLines={1}
+            style={[styles.toolRowText, { color: isDark ? theme.textSecondary : '#6B7280' }]}>
             {parsedTool.description}
           </Text>
-          <ChevronRightIcon size={16} color="#9CA3AF" />
+          <ChevronRightIcon size={16} color={isDark ? theme.textMuted : '#9CA3AF'} />
         </TouchableOpacity>
       );
     }
 
-    // 3. Skip raw tool results, done badges, and running state from cluttering feed
-    // (these are viewed inside the Terminal modal or handled by typing indicator)
-    if (log.startsWith('[ToolResult]') || log.startsWith('✓ Done') || log.startsWith('[Running]')) {
+    // 4. Skip raw tool results, done badges, running states, or permission logs from feed
+    if (
+      log.startsWith('[ToolResult]') ||
+      log.startsWith('✓ Done') ||
+      log.startsWith('[Running]') ||
+      log.startsWith('⚠️ [Permission Required]')
+    ) {
       return null;
     }
 
-    // 4. Status / System info
+    // 5. Status / System info
     if (log.startsWith('[Status]')) {
       const statusText = log.replace('[Status]', '').trim();
-      if (!statusText) return null;
+      if (!statusText || statusText === 'idle' || statusText === 'ready') return null;
       return (
         <View key={index} style={styles.systemPillRow}>
-          <View style={styles.systemPill}>
-            <Text style={styles.systemPillText}>{statusText}</Text>
+          <View style={[styles.systemPill, { backgroundColor: secondaryBg }]}>
+            <Text style={[styles.systemPillText, { color: textSecondary }]}>{statusText}</Text>
           </View>
         </View>
       );
@@ -292,46 +341,18 @@ export function RemoteSessionScreen() {
       const connText = log.replace('[Connection]', '').trim();
       return (
         <View key={index} style={styles.systemPillRow}>
-          <View style={styles.systemPill}>
-            <Text style={styles.systemPillText}>{connText}</Text>
+          <View style={[styles.systemPill, { backgroundColor: secondaryBg }]}>
+            <Text style={[styles.systemPillText, { color: textSecondary }]}>{connText}</Text>
           </View>
         </View>
       );
     }
 
-    // 5. Warning / Notice
-    if (log.includes('Permission') || log.includes('Warning')) {
-      return (
-        <TouchableOpacity
-          key={index}
-          activeOpacity={0.8}
-          delayLongPress={200}
-          onLongPress={() => handleCopyText(log)}
-          style={styles.warningCard}>
-          <Text style={styles.warningText}>{log}</Text>
-        </TouchableOpacity>
-      );
-    }
-
-    // 6. Error / Rejection
-    if (log.includes('Error') || log.includes('REJECTED') || log.includes('Failed')) {
-      return (
-        <TouchableOpacity
-          key={index}
-          activeOpacity={0.8}
-          delayLongPress={200}
-          onLongPress={() => handleCopyText(log)}
-          style={styles.errorCard}>
-          <Text style={styles.errorText}>{log}</Text>
-        </TouchableOpacity>
-      );
-    }
-
-    // 7. Assistant output -> rendered with MarkdownRenderer in white theme!
+    // 6. Assistant output -> rendered with MarkdownRenderer adapting to the active theme!
     return (
       <View key={index} style={styles.assistantRow}>
         <View style={styles.assistantCard}>
-          <MarkdownRenderer content={log} theme={whiteViewTheme} />
+          <MarkdownRenderer content={log} theme={theme} />
         </View>
       </View>
     );
@@ -344,6 +365,7 @@ export function RemoteSessionScreen() {
       style={[
         styles.container,
         {
+          backgroundColor: screenBg,
           paddingTop: Math.max(insets.top, 10),
           paddingBottom:
             Platform.OS === 'android'
@@ -359,15 +381,22 @@ export function RemoteSessionScreen() {
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           onPress={goBack}
-          style={styles.headerCircleBtn}>
-          <BackIcon size={20} color="#18181B" />
+          style={[
+            styles.headerCircleBtn,
+            { backgroundColor: cardBg, borderColor },
+          ]}>
+          <BackIcon size={20} color={textPrimary} />
         </TouchableOpacity>
 
-        <View style={styles.headerCenterCard}>
-          <Text numberOfLines={1} style={styles.headerTitle}>
-            {remoteSession.title || 'Hello and how can I help'}
+        <View
+          style={[
+            styles.headerCenterCard,
+            { backgroundColor: cardBg, borderColor },
+          ]}>
+          <Text numberOfLines={1} style={[styles.headerTitle, { color: textPrimary }]}>
+            {remoteSession.title || 'Laptop CLI'}
           </Text>
-          <Text style={styles.headerSubtitle}>
+          <Text style={[styles.headerSubtitle, { color: textSecondary }]}>
             {isConnected ? 'Remote control attached.' : 'Offline'}
           </Text>
         </View>
@@ -377,12 +406,15 @@ export function RemoteSessionScreen() {
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             onPress={() => setShowSessionMenu(true)}
-            style={styles.headerCircleBtn}>
+            style={[
+              styles.headerCircleBtn,
+              { backgroundColor: cardBg, borderColor },
+            ]}>
             <ConnectedLinkIcon size={20} color="#22C55E" />
           </TouchableOpacity>
         ) : (
-          <View style={[styles.headerCircleBtn, { opacity: 0.4 }]}>
-            <ConnectedLinkIcon size={20} color="#9CA3AF" />
+          <View style={[styles.headerCircleBtn, { backgroundColor: cardBg, borderColor, opacity: 0.4 }]}>
+            <ConnectedLinkIcon size={20} color={textMuted} />
           </View>
         )}
       </View>
@@ -392,23 +424,37 @@ export function RemoteSessionScreen() {
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.pairingContent, { paddingBottom: Math.max(insets.bottom, 24) }]}>
-          <View style={styles.pairingCard}>
+          <View
+            style={[
+              styles.pairingCard,
+              { backgroundColor: cardBg, borderColor },
+            ]}>
             <View style={styles.pairingHeader}>
-              <RemoteIcon size={24} color="#7C3AED" />
-              <Text style={styles.pairingTitle}>Connect to Laptop CLI</Text>
+              <RemoteIcon size={24} color={isDark ? '#A78BFA' : '#7C3AED'} />
+              <Text style={[styles.pairingTitle, { color: textPrimary }]}>Connect to Laptop CLI</Text>
             </View>
 
             {activeRelaySessions.length > 0 && (
-              <View style={styles.detectedCard}>
+              <View
+                style={[
+                  styles.detectedCard,
+                  { backgroundColor: secondaryBg, borderColor: '#22C55E' },
+                ]}>
                 <View style={styles.detectedHeader}>
                   <View style={styles.liveDot} />
-                  <Text style={styles.detectedTitle}>Active Laptop Session Detected</Text>
+                  <Text style={[styles.detectedTitle, { color: textPrimary }]}>
+                    Active Laptop Session Detected
+                  </Text>
                 </View>
-                <Text numberOfLines={1} style={styles.detectedName}>
+                <Text numberOfLines={1} style={[styles.detectedName, { color: textSecondary }]}>
                   {activeRelaySessions[0].title || 'puku-cli'}
                 </Text>
-                <View style={styles.detectedSessionBox}>
-                  <Text style={styles.detectedLabel}>Relay Session ID:</Text>
+                <View
+                  style={[
+                    styles.detectedSessionBox,
+                    { backgroundColor: cardBg, borderColor },
+                  ]}>
+                  <Text style={[styles.detectedLabel, { color: textMuted }]}>Relay Session ID:</Text>
                   <Text selectable numberOfLines={1} style={styles.detectedSessionValue}>
                     {activeRelaySessions[0].sessionId}
                   </Text>
@@ -421,29 +467,36 @@ export function RemoteSessionScreen() {
                       activeRelaySessions[0].mobileToken
                     );
                   }}
-                  style={styles.quickConnectBtn}>
+                  style={[styles.quickConnectBtn, { backgroundColor: isDark ? '#A78BFA' : '#7C3AED' }]}>
                   <Text style={styles.quickConnectBtnText}>1-Tap Connect & Control</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            <Text style={styles.inputLabel}>Relay Session ID</Text>
+            <Text style={[styles.inputLabel, { color: textSecondary }]}>Relay Session ID</Text>
             <TextInput
-              style={styles.terminalInput}
+              style={[
+                styles.terminalInput,
+                { backgroundColor: secondaryBg, borderColor, color: textPrimary },
+              ]}
               placeholder="e.g. af689a1b-2858-..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={textMuted}
               value={inputSessionId}
               onChangeText={setInputSessionId}
               autoCapitalize="none"
               autoCorrect={false}
             />
 
-            <Text style={styles.inputLabel}>Mobile Session Token (Optional)</Text>
-            <View style={styles.tokenInputWrap}>
+            <Text style={[styles.inputLabel, { color: textSecondary }]}>Mobile Session Token (Optional)</Text>
+            <View
+              style={[
+                styles.tokenInputWrap,
+                { backgroundColor: secondaryBg, borderColor },
+              ]}>
               <TextInput
-                style={styles.tokenInputInner}
+                style={[styles.tokenInputInner, { color: textPrimary }]}
                 placeholder="Auto-resolved if logged into same account"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={textMuted}
                 secureTextEntry={!showToken}
                 value={inputToken}
                 onChangeText={setInputToken}
@@ -456,9 +509,9 @@ export function RemoteSessionScreen() {
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={styles.eyeBtn}>
                 {showToken ? (
-                  <EyeOffIcon size={18} color="#6B7280" />
+                  <EyeOffIcon size={18} color={textSecondary} />
                 ) : (
-                  <EyeIcon size={18} color="#6B7280" />
+                  <EyeIcon size={18} color={textSecondary} />
                 )}
               </TouchableOpacity>
             </View>
@@ -466,8 +519,14 @@ export function RemoteSessionScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleConnect}
-              style={styles.primaryConnectBtn}>
-              <Text style={styles.primaryConnectBtnText}>Connect & Open Terminal</Text>
+              style={[styles.primaryConnectBtn, { backgroundColor: isDark ? '#FFFFFF' : '#18181B' }]}>
+              <Text
+                style={[
+                  styles.primaryConnectBtnText,
+                  { color: isDark ? '#18181B' : '#FFFFFF' },
+                ]}>
+                Connect & Open Terminal
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -476,23 +535,33 @@ export function RemoteSessionScreen() {
         <View style={styles.chatContainer}>
           {/* Permission Prompt Banner if needed */}
           {remoteSession.currentTool && remoteSession.currentTool.status === 'pending' && (
-            <View style={styles.toolPromptBanner}>
+            <View
+              style={[
+                styles.toolPromptBanner,
+                {
+                  backgroundColor: isDark ? '#2D2817' : '#FFFBEB',
+                  borderBottomColor: isDark ? '#594514' : '#FDE68A',
+                },
+              ]}>
               <View style={styles.toolPromptHeader}>
                 <View style={styles.toolPromptTag}>
                   <Text style={styles.toolPromptTagText}>PERMISSION REQUIRED</Text>
                 </View>
-                <Text numberOfLines={1} style={styles.toolPromptName}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.toolPromptName, { color: isDark ? '#FDE047' : '#92400E' }]}>
                   {remoteSession.currentTool.name}
                 </Text>
               </View>
-              <Text style={styles.toolPromptDesc}>
+              <Text
+                style={[styles.toolPromptDesc, { color: isDark ? '#FEF08A' : '#78350F' }]}>
                 {remoteSession.currentTool.description}
               </Text>
               <View style={styles.toolPromptActions}>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => respondToTool(false)}
-                  style={styles.toolRejectBtn}>
+                  style={[styles.toolRejectBtn, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }]}>
                   <CloseIcon size={14} color="#EF4444" />
                   <Text style={styles.toolRejectText}>Reject</Text>
                 </TouchableOpacity>
@@ -526,8 +595,8 @@ export function RemoteSessionScreen() {
                 <View style={styles.emptyIconCircle}>
                   <RemoteIcon size={24} color="#22C55E" />
                 </View>
-                <Text style={styles.emptyTitle}>Laptop Connected</Text>
-                <Text style={styles.emptySubtitle}>
+                <Text style={[styles.emptyTitle, { color: textPrimary }]}>Laptop Connected</Text>
+                <Text style={[styles.emptySubtitle, { color: textSecondary }]}>
                   Remote control attached. Type commands or requests below.
                 </Text>
               </View>
@@ -537,7 +606,7 @@ export function RemoteSessionScreen() {
 
             {remoteSession.progressStatus === 'thinking' && (
               <View style={styles.thinkingWrapper}>
-                <TypingIndicator theme={whiteViewTheme} />
+                <TypingIndicator theme={theme} />
               </View>
             )}
           </ScrollView>
@@ -553,8 +622,13 @@ export function RemoteSessionScreen() {
                   key={cmd}
                   activeOpacity={0.7}
                   onPress={() => handleSendCommand(cmd)}
-                  style={styles.quickChipPill}>
-                  <Text style={[styles.quickChipPillText, { fontFamily: monoFont }]}>{cmd}</Text>
+                  style={[
+                    styles.quickChipPill,
+                    { backgroundColor: cardBg, borderColor },
+                  ]}>
+                  <Text style={[styles.quickChipPillText, { color: textSecondary, fontFamily: monoFont }]}>
+                    {cmd}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -566,16 +640,23 @@ export function RemoteSessionScreen() {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-                style={styles.scrollToBottomBtn}>
-                <ChevronDownIcon size={18} color="#18181B" />
+                style={[
+                  styles.scrollToBottomBtn,
+                  { backgroundColor: cardBg, borderColor },
+                ]}>
+                <ChevronDownIcon size={18} color={textPrimary} />
               </TouchableOpacity>
             )}
 
-            <View style={styles.bottomBarCard}>
+            <View
+              style={[
+                styles.bottomBarCard,
+                { backgroundColor: bottomBarBg, borderColor },
+              ]}>
               <TextInput
-                style={styles.bottomBarInput}
+                style={[styles.bottomBarInput, { color: bottomInputText }]}
                 placeholder="Reply to Puku"
-                placeholderTextColor="#8E8E93"
+                placeholderTextColor={bottomPlaceholder}
                 value={commandText}
                 onChangeText={setCommandText}
                 multiline
@@ -589,16 +670,16 @@ export function RemoteSessionScreen() {
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => {}}
-                    style={styles.plusBtn}>
-                    <PlusIcon size={16} color="#18181B" />
+                    style={[styles.plusBtn, { backgroundColor: secondaryBg }]}>
+                    <PlusIcon size={16} color={textPrimary} />
                   </TouchableOpacity>
 
-                  <View style={styles.chipPill}>
-                    <Text style={styles.chipPillText}>puku...</Text>
+                  <View style={[styles.chipPill, { backgroundColor: chipBg }]}>
+                    <Text style={[styles.chipPillText, { color: chipText }]}>puku...</Text>
                   </View>
 
-                  <View style={[styles.chipPill, { backgroundColor: '#F3F4F6' }]}>
-                    <Text style={[styles.chipPillText, { color: '#6B7280' }]}>default</Text>
+                  <View style={[styles.chipPill, { backgroundColor: secondaryChipBg }]}>
+                    <Text style={[styles.chipPillText, { color: secondaryChipText }]}>default</Text>
                   </View>
                 </View>
 
@@ -613,15 +694,21 @@ export function RemoteSessionScreen() {
                   style={[
                     styles.bottomSendBtn,
                     {
-                      backgroundColor: commandText.trim() ? '#18181B' : '#E5E7EB',
+                      backgroundColor: commandText.trim()
+                        ? isDark
+                          ? '#FFFFFF'
+                          : '#18181B'
+                        : isDark
+                        ? '#2A2C26'
+                        : '#E5E7EB',
                     },
                   ]}>
                   {isSending ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color={isDark ? '#18181B' : '#FFFFFF'} />
                   ) : commandText.trim() ? (
-                    <SendIcon size={15} color="#FFFFFF" />
+                    <SendIcon size={15} color={isDark ? '#18181B' : '#FFFFFF'} />
                   ) : (
-                    <SoundWaveIcon size={16} color="#6B7280" />
+                    <SoundWaveIcon size={16} color={textMuted} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -643,25 +730,40 @@ export function RemoteSessionScreen() {
           <TouchableOpacity
             activeOpacity={1}
             onPress={e => e.stopPropagation()}
-            style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom + 12, 28) }]}>
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: modalBg,
+                paddingBottom: Math.max(insets.bottom + 12, 28),
+              },
+            ]}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Terminal</Text>
+              <Text style={[styles.modalTitle, { color: modalText }]}>Terminal</Text>
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setSelectedTool(null)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                style={styles.modalCloseBtn}>
-                <CloseIcon size={14} color="#18181B" />
+                style={[styles.modalCloseBtn, { backgroundColor: modalCloseBg }]}>
+                <CloseIcon size={14} color={modalText} />
               </TouchableOpacity>
             </View>
 
             {/* Row 1: Purple Terminal Icon + Monospace Command + Green Checkmark */}
             <View style={styles.modalCommandRow}>
-              <View style={styles.modalIconCircle}>
-                <TerminalWindowIcon size={20} color="#7C3AED" />
+              <View
+                style={[
+                  styles.modalIconCircle,
+                  { backgroundColor: isDark ? '#2A2C26' : '#FFFFFF' },
+                ]}>
+                <TerminalWindowIcon size={20} color={isDark ? '#A78BFA' : '#7C3AED'} />
               </View>
-              <Text numberOfLines={1} style={[styles.modalCommandTitle, { fontFamily: monoFont }]}>
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.modalCommandTitle,
+                  { color: modalText, fontFamily: monoFont },
+                ]}>
                 {selectedTool?.command}
               </Text>
               <View style={styles.modalCheckBadge}>
@@ -670,10 +772,22 @@ export function RemoteSessionScreen() {
             </View>
 
             {/* Row 2: Executed Box ($ <command>) */}
-            <View style={styles.modalExecBox}>
-              <Text style={[styles.modalDollarSign, { fontFamily: monoFont }]}>
+            <View
+              style={[
+                styles.modalExecBox,
+                { backgroundColor: modalBoxBg },
+              ]}>
+              <Text
+                style={[
+                  styles.modalDollarSign,
+                  { color: isDark ? '#A78BFA' : '#7C3AED', fontFamily: monoFont },
+                ]}>
                 ${' '}
-                <Text style={[styles.modalExecText, { fontFamily: monoFont }]}>
+                <Text
+                  style={[
+                    styles.modalExecText,
+                    { color: modalText, fontFamily: monoFont },
+                  ]}>
                   {selectedTool?.command}
                 </Text>
               </Text>
@@ -681,7 +795,7 @@ export function RemoteSessionScreen() {
 
             {/* Row 3: Output Header (OUTPUT + ✓ Success) */}
             <View style={styles.modalOutputHeader}>
-              <Text style={styles.modalOutputLabel}>OUTPUT</Text>
+              <Text style={[styles.modalOutputLabel, { color: textMuted }]}>OUTPUT</Text>
               <View style={styles.modalSuccessBadge}>
                 <CheckmarkIcon size={12} color="#16A34A" />
                 <Text style={styles.modalSuccessText}>Success</Text>
@@ -689,12 +803,21 @@ export function RemoteSessionScreen() {
             </View>
 
             {/* Row 4: Output Terminal Box */}
-            <View style={styles.modalOutputBox}>
+            <View
+              style={[
+                styles.modalOutputBox,
+                { backgroundColor: modalBoxBg },
+              ]}>
               <ScrollView
                 nestedScrollEnabled
                 showsVerticalScrollIndicator={true}
                 contentContainerStyle={styles.modalOutputScroll}>
-                <Text selectable style={[styles.modalOutputText, { fontFamily: monoFont }]}>
+                <Text
+                  selectable
+                  style={[
+                    styles.modalOutputText,
+                    { color: modalText, fontFamily: monoFont },
+                  ]}>
                   {selectedTool?.output}
                 </Text>
               </ScrollView>
@@ -716,21 +839,27 @@ export function RemoteSessionScreen() {
           <TouchableOpacity
             activeOpacity={1}
             onPress={e => e.stopPropagation()}
-            style={[styles.menuSheet, { paddingBottom: Math.max(insets.bottom + 12, 24) }]}>
-            <View style={styles.menuDragHandle} />
-            <Text style={styles.menuSheetTitle}>Session Controls</Text>
+            style={[
+              styles.menuSheet,
+              {
+                backgroundColor: cardBg,
+                paddingBottom: Math.max(insets.bottom + 12, 24),
+              },
+            ]}>
+            <View style={[styles.menuDragHandle, { backgroundColor: borderColor }]} />
+            <Text style={[styles.menuSheetTitle, { color: textPrimary }]}>Session Controls</Text>
 
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => handleCopyText(remoteSession.sessionId || '')}
-              style={styles.menuOptionRow}>
+              style={[styles.menuOptionRow, { borderBottomColor: borderColor }]}>
               <View style={styles.menuOptionInfo}>
-                <Text style={styles.menuOptionLabel}>Session ID</Text>
+                <Text style={[styles.menuOptionLabel, { color: textMuted }]}>Session ID</Text>
                 <Text numberOfLines={1} style={styles.menuOptionValue}>
                   {remoteSession.sessionId || 'active'}
                 </Text>
               </View>
-              <CopyIcon size={16} color="#6B7280" />
+              <CopyIcon size={16} color={textSecondary} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -739,8 +868,8 @@ export function RemoteSessionScreen() {
                 setShowSessionMenu(false);
                 sendRemoteInterrupt();
               }}
-              style={styles.menuActionRow}>
-              <Text style={styles.menuActionText}>Send Interrupt (^C)</Text>
+              style={[styles.menuActionRow, { borderBottomColor: borderColor }]}>
+              <Text style={[styles.menuActionText, { color: textPrimary }]}>Send Interrupt (^C)</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -749,9 +878,9 @@ export function RemoteSessionScreen() {
                 setShowSessionMenu(false);
                 clearRemoteLogs();
               }}
-              style={styles.menuActionRow}>
-              <TrashIcon size={16} color="#6B7280" />
-              <Text style={styles.menuActionText}>Clear Session Logs</Text>
+              style={[styles.menuActionRow, { borderBottomColor: borderColor }]}>
+              <TrashIcon size={16} color={textSecondary} />
+              <Text style={[styles.menuActionText, { color: textPrimary }]}>Clear Session Logs</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -776,7 +905,6 @@ export function RemoteSessionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAF9F6',
   },
   floatingHeaderContainer: {
     flexDirection: 'row',
@@ -789,7 +917,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -798,11 +925,9 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#EFEFEF',
   },
   headerCenterCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 7,
@@ -815,17 +940,14 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#EFEFEF',
   },
   headerTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#18181B',
     textAlign: 'center',
   },
   headerSubtitle: {
     fontSize: 11.5,
-    color: '#6B7280',
     marginTop: 1,
     textAlign: 'center',
   },
@@ -833,10 +955,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   pairingCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     padding: 18,
     gap: 14,
     shadowColor: '#000',
@@ -854,12 +974,9 @@ const styles = StyleSheet.create({
   pairingTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#18181B',
   },
   detectedCard: {
-    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#22C55E',
     borderRadius: 12,
     padding: 14,
     gap: 8,
@@ -879,17 +996,13 @@ const styles = StyleSheet.create({
   detectedTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#18181B',
   },
   detectedName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#4B5563',
   },
   detectedSessionBox: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -898,7 +1011,6 @@ const styles = StyleSheet.create({
   detectedLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#6B7280',
   },
   detectedSessionValue: {
     fontSize: 11.5,
@@ -906,7 +1018,6 @@ const styles = StyleSheet.create({
     color: '#16A34A',
   },
   quickConnectBtn: {
-    backgroundColor: '#7C3AED',
     borderRadius: 10,
     paddingVertical: 11,
     alignItems: 'center',
@@ -921,33 +1032,26 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 12.5,
     fontWeight: '600',
-    color: '#4B5563',
   },
   terminalInput: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 13.5,
-    color: '#18181B',
-    backgroundColor: '#F9FAFB',
   },
   tokenInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingRight: 10,
-    backgroundColor: '#F9FAFB',
   },
   tokenInputInner: {
     flex: 1,
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 13.5,
-    color: '#18181B',
   },
   eyeBtn: {
     padding: 6,
@@ -955,7 +1059,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryConnectBtn: {
-    backgroundColor: '#18181B',
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
@@ -963,7 +1066,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   primaryConnectBtnText: {
-    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
   },
@@ -971,9 +1073,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   toolPromptBanner: {
-    backgroundColor: '#FFFBEB',
     borderBottomWidth: 1,
-    borderBottomColor: '#FDE68A',
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 6,
@@ -995,13 +1095,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   toolPromptName: {
-    color: '#92400E',
     fontSize: 13,
     fontWeight: '700',
     flex: 1,
   },
   toolPromptDesc: {
-    color: '#78350F',
     fontSize: 12,
     lineHeight: 17,
   },
@@ -1018,7 +1116,6 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#FEE2E2',
   },
   toolRejectText: {
     color: '#EF4444',
@@ -1064,12 +1161,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   emptyTitle: {
-    color: '#18181B',
     fontSize: 15,
     fontWeight: '700',
   },
   emptySubtitle: {
-    color: '#6B7280',
     fontSize: 12.5,
     textAlign: 'center',
     paddingHorizontal: 28,
@@ -1083,7 +1178,6 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     maxWidth: '82%',
-    backgroundColor: '#ECEEFB',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -1092,7 +1186,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '400',
-    color: '#18181B',
   },
   toolRow: {
     flexDirection: 'row',
@@ -1105,7 +1198,6 @@ const styles = StyleSheet.create({
   toolRowText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6B7280',
     flex: 1,
     marginRight: 8,
   },
@@ -1128,41 +1220,13 @@ const styles = StyleSheet.create({
     marginVertical: 6,
   },
   systemPill: {
-    backgroundColor: '#E5E7EB',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 3,
   },
   systemPillText: {
-    color: '#4B5563',
     fontSize: 11,
     fontWeight: '500',
-  },
-  warningCard: {
-    backgroundColor: '#FFFBEB',
-    borderLeftWidth: 3,
-    borderLeftColor: '#F59E0B',
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 4,
-  },
-  warningText: {
-    color: '#B45309',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  errorCard: {
-    backgroundColor: '#FEF2F2',
-    borderLeftWidth: 3,
-    borderLeftColor: '#EF4444',
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 4,
-  },
-  errorText: {
-    color: '#B91C1C',
-    fontSize: 13,
-    lineHeight: 18,
   },
   quickChipsRow: {
     paddingHorizontal: 16,
@@ -1173,14 +1237,11 @@ const styles = StyleSheet.create({
   },
   quickChipPill: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
   quickChipPillText: {
-    color: '#4B5563',
     fontSize: 12,
     fontWeight: '500',
   },
@@ -1195,7 +1256,6 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1204,16 +1264,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#EFEFEF',
   },
   bottomBarCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 10,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -1222,7 +1279,6 @@ const styles = StyleSheet.create({
   },
   bottomBarInput: {
     fontSize: 15,
-    color: '#18181B',
     lineHeight: 20,
     maxHeight: 90,
     minHeight: 34,
@@ -1243,12 +1299,10 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   chipPill: {
-    backgroundColor: '#ECEEFB',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 14,
@@ -1256,7 +1310,6 @@ const styles = StyleSheet.create({
   chipPillText: {
     fontSize: 12.5,
     fontWeight: '500',
-    color: '#4F46E5',
   },
   bottomSendBtn: {
     width: 32,
@@ -1271,7 +1324,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#ECECEE',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -1287,7 +1339,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#18181B',
   },
   modalCloseBtn: {
     position: 'absolute',
@@ -1295,7 +1346,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#DCDCE0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1308,7 +1358,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1321,7 +1370,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '500',
-    color: '#18181B',
     marginHorizontal: 12,
   },
   modalCheckBadge: {
@@ -1333,7 +1381,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalExecBox: {
-    backgroundColor: '#E2E2E6',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1342,13 +1389,11 @@ const styles = StyleSheet.create({
   modalDollarSign: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#7C3AED',
     lineHeight: 20,
   },
   modalExecText: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#18181B',
   },
   modalOutputHeader: {
     flexDirection: 'row',
@@ -1360,7 +1405,6 @@ const styles = StyleSheet.create({
   modalOutputLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#8E8E93',
     letterSpacing: 1.5,
   },
   modalSuccessBadge: {
@@ -1374,7 +1418,6 @@ const styles = StyleSheet.create({
     color: '#16A34A',
   },
   modalOutputBox: {
-    backgroundColor: '#E2E2E6',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1387,10 +1430,8 @@ const styles = StyleSheet.create({
   modalOutputText: {
     fontSize: 13,
     lineHeight: 19,
-    color: '#18181B',
   },
   menuSheet: {
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -1400,14 +1441,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E5E7EB',
     alignSelf: 'center',
     marginBottom: 14,
   },
   menuSheetTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#18181B',
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -1417,7 +1456,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   menuOptionInfo: {
     flex: 1,
@@ -1426,7 +1464,6 @@ const styles = StyleSheet.create({
   menuOptionLabel: {
     fontSize: 11.5,
     fontWeight: '600',
-    color: '#6B7280',
   },
   menuOptionValue: {
     fontSize: 13,
@@ -1440,11 +1477,9 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   menuActionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#18181B',
   },
 });
