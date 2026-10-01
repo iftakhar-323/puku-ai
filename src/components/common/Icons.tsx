@@ -820,6 +820,42 @@ export function TerminalPromptIcon({ size = 20, color = '#FFFFFF' }: IconProps) 
   );
 }
 
+export function TerminalWindowIcon({ size = 20, color = '#7C3AED' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="2" y="4" width="20" height="16" rx="4" stroke={color} strokeWidth="1.8" />
+      <Path
+        d="M6 9L9.5 12L6 15M12 15H17"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function ConnectedLinkIcon({ size = 20, color = '#22C55E' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function ArrowUpRightIcon({ size = 16, color = '#8E9297' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">

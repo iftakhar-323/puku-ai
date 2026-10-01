@@ -1532,51 +1532,70 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               }
             } else if (data.type === 'user') {
               const msg = data.message?.content;
-              const text =
-                typeof msg === 'string'
-                  ? msg
-                  : Array.isArray(msg)
-                  ? msg.map((m: any) => m.text || '').join('\n')
-                  : '';
+              let text = '';
+              const toolResults: string[] = [];
+
+              if (typeof msg === 'string') {
+                text = msg;
+              } else if (Array.isArray(msg)) {
+                for (const m of msg) {
+                  if (m.type === 'text') {
+                    text += (text ? '\n' : '') + (m.text || '');
+                  } else if (m.type === 'tool_result') {
+                    const rawContent =
+                      typeof m.content === 'string'
+                        ? m.content
+                        : Array.isArray(m.content)
+                        ? m.content.map((c: any) => c.text || '').join('\n')
+                        : JSON.stringify(m.content || '');
+                    if (rawContent) {
+                      toolResults.push(rawContent);
+                    }
+                  }
+                }
+              }
+
               const cleanText = text.trim();
-              if (cleanText) {
+              if (cleanText || toolResults.length > 0) {
                 setRemoteSession(prev => {
-                  const lastUserCmd = [...prev.logs]
-                    .reverse()
-                    .find(l => typeof l === 'string' && l.startsWith('> '));
-                  if (lastUserCmd === `> ${cleanText}`) {
-                    return {
-                      ...prev,
-                      progressStatus: 'thinking',
-                    };
+                  const newLogs = [...prev.logs];
+                  if (cleanText) {
+                    const lastUserCmd = [...newLogs]
+                      .reverse()
+                      .find(l => typeof l === 'string' && l.startsWith('> '));
+                    if (lastUserCmd !== `> ${cleanText}`) {
+                      newLogs.push(`> ${cleanText}`);
+                    }
+                  }
+                  for (const tr of toolResults) {
+                    newLogs.push(`[ToolResult] ${tr}`);
                   }
                   return {
                     ...prev,
-                    progressStatus: 'thinking',
-                    logs: [...prev.logs, `> ${cleanText}`],
+                    progressStatus: cleanText ? 'thinking' : prev.progressStatus,
+                    logs: newLogs,
                   };
                 });
               }
             } else if (data.type === 'assistant') {
               const msg = data.message?.content;
-              let text = '';
-              if (typeof msg === 'string') text = msg;
-              else if (Array.isArray(msg)) {
-                text = msg
-                  .map((m: any) => {
-                    if (m.type === 'text') return m.text || '';
-                    if (m.type === 'tool_use')
-                      return `[Tool] ${m.name || 'exec'}(${JSON.stringify(m.input || {})})`;
-                    return '';
-                  })
-                  .filter(Boolean)
-                  .join('\n');
+              const items: string[] = [];
+              if (typeof msg === 'string') {
+                if (msg) items.push(msg);
+              } else if (Array.isArray(msg)) {
+                for (const m of msg) {
+                  if (m.type === 'text' && m.text) {
+                    items.push(m.text);
+                  } else if (m.type === 'tool_use') {
+                    items.push(`[Tool] ${m.name || 'exec'}(${JSON.stringify(m.input || {})})`);
+                  }
+                }
               }
-              if (text) {
+              if (items.length > 0) {
                 setRemoteSession(prev => ({
                   ...prev,
                   progressStatus: 'idle',
-                  logs: [...prev.logs, text],
+                  logs: [...prev.logs, ...items],
                 }));
               }
             } else if (data.type === 'stream_event' || data.type === 'content_block_delta') {
