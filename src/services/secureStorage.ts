@@ -9,7 +9,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { devWarn } from '../utils/devLog';
+import { devWarn, ignore } from '../utils/devLog';
 
 // SecureStore keys may only contain [A-Za-z0-9._-].
 function toSecureKey(key: string): string {
@@ -41,7 +41,13 @@ export const secureStorage = {
 
     try {
       const value = await SecureStore.getItemAsync(toSecureKey(key));
-      if (value !== null) return value;
+      if (value !== null) {
+        // A write that was interrupted between the SecureStore write and the
+        // AsyncStorage cleanup (e.g. app killed mid-refresh) can leave a
+        // plaintext copy behind; sweep it on every read, not just migration.
+        AsyncStorage.removeItem(key).catch(ignore('secureStorage.sweep'));
+        return value;
+      }
     } catch (err) {
       devWarn('secureStorage.getItem', err);
     }

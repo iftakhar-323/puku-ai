@@ -17,6 +17,7 @@ import React, {
   useState,
 } from 'react';
 import { AppState, Vibration } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActiveRelaySession } from '../types';
 import { ENV } from '../config/env';
 import { pukuApi } from '../services/api';
@@ -74,6 +75,40 @@ const RemoteSessionContext = createContext<RemoteSessionContextValue | null>(
 const reconnectTokenKey = (sessionId: string) =>
   `@puku_remote_reconnect_${sessionId}`;
 
+// SecureStore has no way to list its keys, so we keep a small AsyncStorage
+// registry of session ids that have a reconnect token, purely so logout can
+// find and sweep them (they're otherwise never cleared by tokenManager,
+// which only owns the account access/refresh tokens).
+const reconnectRegistryKey = '@puku_remote_reconnect_keys';
+
+async function registerReconnectSession(sessionId: string): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(reconnectRegistryKey);
+    const ids: string[] = raw ? JSON.parse(raw) : [];
+    if (!ids.includes(sessionId)) {
+      await AsyncStorage.setItem(
+        reconnectRegistryKey,
+        JSON.stringify([...ids, sessionId]),
+      );
+    }
+  } catch (err) {
+    devWarn('remote.registerReconnectSession', err);
+  }
+}
+
+async function sweepReconnectTokens(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(reconnectRegistryKey);
+    const ids: string[] = raw ? JSON.parse(raw) : [];
+    await Promise.all(
+      ids.map(id => secureStorage.removeItem(reconnectTokenKey(id))),
+    );
+    await AsyncStorage.removeItem(reconnectRegistryKey);
+  } catch (err) {
+    devWarn('remote.sweepReconnectTokens', err);
+  }
+}
+
 async function resolveAccountToken(): Promise<string> {
   return (
     (await tokenManager.ensureValidToken().catch(() => null)) ||
@@ -108,6 +143,9 @@ export function RemoteSessionProvider({
     accountToken: string;
   } | null>(null);
   const attemptRef = useRef(0);
+  // Bumped by disconnect() to invalidate any connect() call still awaiting
+  // its token/auth fetches, so a disconnect tapped mid-connect sticks.
+  const connectGeneration = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // After a reconnect the CLI replays what we missed; skip frames already applied.
   const seenFrameIds = useRef<Set<string>>(new Set());
@@ -183,6 +221,9 @@ export function RemoteSessionProvider({
               secureStorage
                 .setItem(reconnectTokenKey(sid), effect.token)
                 .catch(ignore('remote.saveReconnectToken'));
+              registerReconnectSession(sid).catch(
+                ignore('remote.registerReconnectSession'),
+              );
             }
             break;
           }
@@ -358,6 +399,7 @@ export function RemoteSessionProvider({
     async (sessionId: string, token?: string) => {
       closeSocket();
       attemptRef.current = 0;
+      const generation = ++connectGeneration.current;
 
       const sameSession = stateRef.current.sessionId === sessionId;
       if (!sameSession) seenFrameIds.current = new Set();
@@ -390,6 +432,10 @@ export function RemoteSessionProvider({
         }
       }
 
+      // A disconnect() (or a newer connect()) ran while we were awaiting
+      // the token/auth fetches above: don't resurrect this attempt.
+      if (connectGeneration.current !== generation) return;
+
       connRef.current = { sessionId, mobileToken, accountToken };
       update(s => ({ ...s, token: mobileToken }));
       await openSocket();
@@ -398,6 +444,7 @@ export function RemoteSessionProvider({
   );
 
   const disconnect = useCallback(() => {
+    connectGeneration.current++;
     connRef.current = null;
     closeSocket();
     update(s =>
@@ -494,12 +541,47 @@ export function RemoteSessionProvider({
     return () => sub.remove();
   }, []);
 
-  // Signing out ends any remote session.
+  // Signing out ends any remote session and sweeps reconnect tokens left
+  // over from it. Gated on a true logged-in -> logged-out transition (not
+  // just "email is falsy") so a cold boot, where profile.email is briefly
+  // empty while restoreSession() runs, doesn't wipe a still-valid session's
+  // reconnect tokens out from under it.
+  const wasLoggedIn = useRef(!!profile.email);
   useEffect(() => {
-    if (!profile.email && connRef.current) disconnect();
+    if (!profile.email) {
+      if (connRef.current) disconnect();
+      if (wasLoggedIn.current) {
+        sweepReconnectTokens().catch(ignore('remote.sweepReconnectTokens'));
+      }
+    }
+    wasLoggedIn.current = !!profile.email;
   }, [profile.email, disconnect]);
 
   useEffect(() => closeSocket, [closeSocket]);
+
+  // Baseline poll so liveRelaySessions/isActive (read by ChatScreen's header
+  // and AppDrawer on every screen) stay accurate even when the user never
+  // visits Code or Remote Session, which run their own faster 5s poll via
+  // useRelaySessionPolling while mounted.
+  useEffect(() => {
+    if (!profile.email) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const tick = async () => {
+      if (cancelled) return;
+      if (AppState.currentState === 'active') {
+        await fetchSessionsWithStatus().catch(ignore('remote.backgroundPoll'));
+      }
+      if (!cancelled) timer = setTimeout(tick, 20000);
+    };
+    tick();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [profile.email, fetchSessionsWithStatus]);
 
   const isActive = ['connecting', 'open', 'attached', 'reconnecting'].includes(
     session.phase,

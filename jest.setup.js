@@ -49,3 +49,16 @@ jest.mock('expo-secure-store', () => {
     },
   };
 });
+
+jest.mock('expo-crypto', () => ({
+  getRandomBytes: jest.fn(byteCount => {
+    const bytes = new Uint8Array(byteCount);
+    for (let i = 0; i < byteCount; i++) bytes[i] = Math.floor(Math.random() * 256);
+    return bytes;
+  }),
+  getRandomBytesAsync: jest.fn(byteCount => {
+    const bytes = new Uint8Array(byteCount);
+    for (let i = 0; i < byteCount; i++) bytes[i] = Math.floor(Math.random() * 256);
+    return Promise.resolve(bytes);
+  }),
+}));

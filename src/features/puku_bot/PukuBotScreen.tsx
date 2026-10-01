@@ -1395,13 +1395,15 @@ export function PukuBotScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => setCustomApiUrl(ENV.PUKU_BOT_LOCAL_BASE_URL)}
-                  style={[styles.quickEnvPill, { borderColor: theme.border }]}>
-                  <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                    Local (3001)
-                  </Text>
-                </TouchableOpacity>
+                {__DEV__ && (
+                  <TouchableOpacity
+                    onPress={() => setCustomApiUrl(ENV.PUKU_BOT_LOCAL_BASE_URL)}
+                    style={[styles.quickEnvPill, { borderColor: theme.border }]}>
+                    <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
+                      Local (3001)
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Account Status */}

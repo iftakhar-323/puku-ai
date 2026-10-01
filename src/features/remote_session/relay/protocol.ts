@@ -237,15 +237,19 @@ function applyAssistant(
   const appended: NewEntry[] = [];
 
   for (const block of blocks) {
-    if (block?.type === 'text' && block.text) {
+    if (block?.type === 'text') {
       const idx = streamed[streamCursor++];
       if (idx !== undefined) {
+        // An empty final block (e.g. a truncated/aborted turn) should still
+        // finalize the entry, keeping whatever was already streamed rather
+        // than being treated as a "leftover" and dropped below.
+        const prev = entries[idx] as Extract<RemoteEntry, { kind: 'assistant' }>;
         entries[idx] = {
-          ...(entries[idx] as Extract<RemoteEntry, { kind: 'assistant' }>),
-          text: block.text,
+          ...prev,
+          text: block.text || prev.text,
           streaming: false,
         };
-      } else {
+      } else if (block.text) {
         appended.push({ kind: 'assistant', text: block.text });
       }
     } else if (block?.type === 'tool_use') {

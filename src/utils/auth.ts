@@ -3,6 +3,8 @@
  * Handles PKCE generation, JWT payload extraction, and user profile verification.
  */
 
+import * as Crypto from 'expo-crypto';
+
 const B64_MAP: Record<string, number> = {};
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 for (let i = 0; i < B64_CHARS.length; i++) {
@@ -118,13 +120,18 @@ export function toBase64Url(bytes: Uint8Array): string {
 }
 
 /**
- * Generates a random alphanumeric string for PKCE verifiers & state
+ * Generates a random alphanumeric string for PKCE verifiers & state.
+ *
+ * Uses expo-crypto's CSPRNG rather than Math.random(): the PKCE verifier and
+ * OAuth state must be unpredictable, and Math.random() is not a
+ * cryptographically secure source of randomness.
  */
 export function generateRandomString(length: number): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const bytes = Crypto.getRandomBytes(length);
   let res = '';
   for (let i = 0; i < length; i++) {
-    res += chars.charAt(Math.floor(Math.random() * chars.length));
+    res += chars.charAt(bytes[i] % chars.length);
   }
   return res;
 }

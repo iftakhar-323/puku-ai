@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -39,9 +39,13 @@ export function PairingView({
 
   const detected = liveSessions[0];
 
-  // Prefill the first detected session once.
+  // Prefill the first detected session once. `detected` gets a new object
+  // identity on every relay poll tick, so a ref (not just `!sessionId`)
+  // guards this against re-firing and clobbering a field the user cleared.
+  const didPrefill = useRef(false);
   useEffect(() => {
-    if (!sessionId && detected) {
+    if (!didPrefill.current && !sessionId && detected) {
+      didPrefill.current = true;
       setSessionId(detected.sessionId);
       if (detected.mobileToken) setToken(detected.mobileToken);
     }
