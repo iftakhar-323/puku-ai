@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,18 +12,34 @@ import { ThemeColors } from '../../../theme/theme';
 import { CheckmarkIcon, CopyIcon } from '../../../components/common/Icons';
 import { NativeClipboard } from '../../../services/nativeModules';
 
+/**
+ * Claude Code-style accents: colored inline code, tappable links and
+ * header-less code blocks. Omit for the default chat rendering.
+ */
+export interface CliColors {
+  inlineCode: string;
+  inlineCodeBackground: string;
+  link: string;
+}
+
 interface MarkdownRendererProps {
   content: string;
   theme: ThemeColors;
+  cliColors?: CliColors;
 }
+
+const monoFamily = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 export function renderFormattedText(
   text: string,
   baseStyle: any,
-  theme: ThemeColors
+  theme: ThemeColors,
+  cliColors?: CliColors
 ) {
   const parts: React.ReactNode[] = [];
-  const regex = /(\*\*.*?\*\*|\*.*?\*|`.*?`)/g;
+  const regex = cliColors
+    ? /(\[[^\]]+\]\([^)\s]+\)|\*\*.*?\*\*|\*.*?\*|`.*?`)/g
+    : /(\*\*.*?\*\*|\*.*?\*|`.*?`)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -36,7 +53,19 @@ export function renderFormattedText(
     }
 
     const chunk = match[0];
-    if (chunk.startsWith('**') && chunk.endsWith('**')) {
+    const linkMatch = cliColors ? chunk.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/) : null;
+    if (linkMatch) {
+      const url = linkMatch[2];
+      const isWebUrl = /^https?:\/\//.test(url);
+      parts.push(
+        <Text
+          key={match.index}
+          onPress={isWebUrl ? () => Linking.openURL(url).catch(() => {}) : undefined}
+          style={[baseStyle, { color: cliColors!.link, textDecorationLine: 'underline' }]}>
+          {linkMatch[1]}
+        </Text>
+      );
+    } else if (chunk.startsWith('**') && chunk.endsWith('**')) {
       parts.push(
         <Text
           key={match.index}
@@ -57,11 +86,12 @@ export function renderFormattedText(
           style={[
             baseStyle,
             {
-              fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-              backgroundColor: theme.codeBackground,
+              fontFamily: monoFamily,
+              backgroundColor: cliColors?.inlineCodeBackground ?? theme.codeBackground,
               paddingHorizontal: 4,
               borderRadius: 4,
             },
+            cliColors && { color: cliColors.inlineCode, fontSize: 13.5 },
           ]}>
           {chunk.slice(1, -1)}
         </Text>
@@ -86,19 +116,51 @@ function CodeBlockItem({
   code,
   language,
   theme,
+  compact,
 }: {
   code: string;
   language: string;
   theme: ThemeColors;
+  compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
+    NativeClipboard.setString(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const displayLang = language ? language.toUpperCase() : 'CODE';
+
+  if (compact) {
+    return (
+      <View
+        style={[
+          styles.codeBlock,
+          styles.codeBlockCompact,
+          { backgroundColor: theme.codeBackground, borderColor: theme.outline },
+        ]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.codeScrollContent, styles.codeScrollCompact]}>
+          <Text style={[styles.codeText, { color: theme.textPrimary }]}>{code}</Text>
+        </ScrollView>
+        <TouchableOpacity
+          onPress={handleCopy}
+          style={styles.codeCopyFloating}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          {copied ? (
+            <CheckmarkIcon size={15} color={theme.primary} />
+          ) : (
+            <CopyIcon size={15} color={theme.textSecondary} />
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -153,7 +215,9 @@ function CodeBlockItem({
   );
 }
 
-export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, theme, cliColors }: MarkdownRendererProps) {
+  const fmt = (text: string, style: any) => renderFormattedText(text, style, theme, cliColors);
+
   if (!content) return null;
 
   const lines = content.split('\n');
@@ -180,6 +244,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
           code={codeLines.join('\n')}
           language={language}
           theme={theme}
+          compact={!!cliColors}
         />
       );
       continue;
@@ -239,7 +304,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
                         styles.tableHeaderCellText,
                         { color: theme.textPrimary },
                       ]}>
-                      {renderFormattedText(cell, styles.tableHeaderCellText, theme)}
+                      {fmt(cell, styles.tableHeaderCellText)}
                     </Text>
                   </View>
                 ))}
@@ -271,7 +336,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
                             styles.tableCellText,
                             { color: theme.textPrimary },
                           ]}>
-                          {renderFormattedText(cell, styles.tableCellText, theme)}
+                          {fmt(cell, styles.tableCellText)}
                         </Text>
                       </View>
                     ))}
@@ -290,7 +355,9 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
       const levelMatch = trimmed.match(/^#+/);
       const level = levelMatch ? levelMatch[0].length : 1;
       const headingText = trimmed.replace(/^#+\s*/, '');
-      const fontSize = level === 1 ? 20 : level === 2 ? 18 : 16;
+      const fontSize = cliColors
+        ? level === 1 ? 22 : level === 2 ? 18 : 16
+        : level === 1 ? 20 : level === 2 ? 18 : 16;
       elements.push(
         <Text
           key={`h_${i}`}
@@ -303,11 +370,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
               marginBottom: 4,
             },
           ]}>
-          {renderFormattedText(
-            headingText,
-            [styles.heading, { fontSize, color: theme.textPrimary }],
-            theme
-          )}
+          {fmt(headingText, [styles.heading, { fontSize, color: theme.textPrimary }])}
         </Text>
       );
       i++;
@@ -324,11 +387,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
             •{' '}
           </Text>
           <Text style={[styles.bulletContent, { color: theme.textPrimary }]}>
-            {renderFormattedText(
-              itemContent,
-              [styles.bulletContent, { color: theme.textPrimary }],
-              theme
-            )}
+            {fmt(itemContent, [styles.bulletContent, { color: theme.textPrimary }])}
           </Text>
         </View>
       );
@@ -351,11 +410,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
             {prefix}
           </Text>
           <Text style={[styles.bulletContent, { color: theme.textPrimary }]}>
-            {renderFormattedText(
-              itemContent,
-              [styles.bulletContent, { color: theme.textPrimary }],
-              theme
-            )}
+            {fmt(itemContent, [styles.bulletContent, { color: theme.textPrimary }])}
           </Text>
         </View>
       );
@@ -375,11 +430,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
       <Text
         key={`p_${i}`}
         style={[styles.paragraph, { color: theme.textPrimary }]}>
-        {renderFormattedText(
-          rawLine,
-          [styles.paragraph, { color: theme.textPrimary }],
-          theme
-        )}
+        {fmt(rawLine, [styles.paragraph, { color: theme.textPrimary }])}
       </Text>
     );
     i++;
@@ -435,6 +486,18 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     overflow: 'hidden',
   },
+  codeBlockCompact: {
+    borderRadius: 10,
+    position: 'relative',
+  },
+  codeScrollCompact: {
+    paddingRight: 40,
+  },
+  codeCopyFloating: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
   codeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -468,7 +531,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   codeText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: monoFamily,
     fontSize: 13,
     lineHeight: 20,
   },

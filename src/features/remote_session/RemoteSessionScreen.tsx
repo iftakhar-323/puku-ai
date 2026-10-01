@@ -25,9 +25,8 @@ import {
   EyeOffIcon,
   LogoutIcon,
   PlusIcon,
+  RefreshIcon,
   RemoteIcon,
-  SendIcon,
-  SoundWaveIcon,
   TerminalWindowIcon,
   TrashIcon,
 } from '../../components/common/Icons';
@@ -35,7 +34,7 @@ import { useApp } from '../../store/AppContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 import { NativeClipboard } from '../../services/nativeModules';
 import { useToast } from '../../components/ui/Toast';
-import { MarkdownRenderer } from '../chat/components/MarkdownRenderer';
+import { MarkdownRenderer, type CliColors } from '../chat/components/MarkdownRenderer';
 import { TypingIndicator } from '../chat/components/TypingIndicator';
 
 interface ParsedToolExecution {
@@ -45,6 +44,32 @@ interface ParsedToolExecution {
   description: string;
   output: string;
   isSuccess: boolean;
+}
+
+type FeedItem =
+  | { kind: 'user'; key: string; text: string }
+  | { kind: 'tools'; key: string; tools: ParsedToolExecution[] }
+  | { kind: 'system'; key: string; text: string }
+  | { kind: 'assistant'; key: string; text: string };
+
+// Claude Code-style summary for a run of consecutive tool calls ("Ran 2 commands").
+function summarizeTools(tools: ParsedToolExecution[]): string {
+  const kindOf = (name: string) => {
+    const n = name.toLowerCase();
+    if (['bash', 'terminal', 'exec', 'run_command'].includes(n)) return 'command';
+    if (['read', 'readfile', 'view_file'].includes(n)) return 'read';
+    if (['edit', 'write', 'writefile', 'write_to_file', 'replace_file_content'].includes(n)) return 'edit';
+    if (['grep', 'glob', 'search', 'find'].includes(n)) return 'search';
+    return 'other';
+  };
+  const count = tools.length;
+  const kinds = new Set(tools.map(t => kindOf(t.name)));
+  const only = kinds.size === 1 ? [...kinds][0] : null;
+  if (only === 'command') return count === 1 ? 'Ran a command' : `Ran ${count} commands`;
+  if (only === 'read') return count === 1 ? 'Read a file' : `Read ${count} files`;
+  if (only === 'edit') return count === 1 ? 'Edited a file' : `Edited ${count} files`;
+  if (only === 'search') return count === 1 ? 'Searched the code' : `Ran ${count} searches`;
+  return count === 1 ? tools[0].description : `Used ${count} tools`;
 }
 
 export function RemoteSessionScreen() {
@@ -73,6 +98,7 @@ export function RemoteSessionScreen() {
   const [selectedTool, setSelectedTool] = useState<ParsedToolExecution | null>(null);
   const [showSessionMenu, setShowSessionMenu] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
 
   const scrollViewRef = useRef<any>(null);
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
@@ -88,7 +114,7 @@ export function RemoteSessionScreen() {
   const textSecondary = isDark ? theme.textSecondary : '#6B7280';
   const textMuted = isDark ? theme.textMuted : '#9CA3AF';
   const borderColor = isDark ? theme.outline : '#E5E7EB';
-  const userBubbleBg = isDark ? '#282A3A' : '#ECEEFB';
+  const userBubbleBg = isDark ? '#2B2B29' : '#EFEDE6';
   const userBubbleText = isDark ? '#FFFFFF' : '#18181B';
   const modalBg = isDark ? '#1C1D1A' : '#ECECEE';
   const modalBoxBg = isDark ? '#242621' : '#E2E2E6';
@@ -97,10 +123,9 @@ export function RemoteSessionScreen() {
   const bottomBarBg = isDark ? theme.cardBackground : '#FFFFFF';
   const bottomInputText = isDark ? theme.textPrimary : '#18181B';
   const bottomPlaceholder = isDark ? theme.placeholderText : '#8E8E93';
-  const chipBg = isDark ? '#282A3A' : '#ECEEFB';
-  const chipText = isDark ? '#A78BFA' : '#4F46E5';
-  const secondaryChipBg = isDark ? '#242621' : '#F3F4F6';
-  const secondaryChipText = isDark ? theme.textSecondary : '#6B7280';
+  const cliColors: CliColors = isDark
+    ? { inlineCode: '#F28B82', inlineCodeBackground: 'rgba(255, 255, 255, 0.06)', link: '#5AA9FF' }
+    : { inlineCode: '#C0392B', inlineCodeBackground: '#F1EFE8', link: '#2563EB' };
 
   useEffect(() => {
     fetchActiveRelaySessions().catch(() => {});
@@ -255,8 +280,8 @@ export function RemoteSessionScreen() {
     };
   };
 
-  // Helper to format each log item into clean, modern UI components
-  const renderLogItem = (rawLog: any, index: number) => {
+  // Turn one raw log into a feed item, or null when it never shows in the chat.
+  const classifyLog = (rawLog: any, index: number): FeedItem | ParsedToolExecution | null => {
     const log =
       typeof rawLog === 'string'
         ? rawLog
@@ -266,7 +291,7 @@ export function RemoteSessionScreen() {
 
     const trimmed = log.trim();
 
-    // 1. Filter out internal JSON protocol strings that should never be shown in chat
+    // Internal JSON protocol strings are never shown in chat
     if (
       (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
       (trimmed.startsWith('[') && trimmed.endsWith(']'))
@@ -279,42 +304,15 @@ export function RemoteSessionScreen() {
       } catch {}
     }
 
-    // 2. User message bubble (right-aligned pill)
     if (log.startsWith('> ')) {
-      const cmd = log.slice(2).trim();
-      return (
-        <View key={index} style={styles.userRow}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            delayLongPress={200}
-            onLongPress={() => handleCopyText(cmd)}
-            style={[styles.userBubble, { backgroundColor: userBubbleBg }]}>
-            <Text style={[styles.userText, { color: userBubbleText }]}>{cmd}</Text>
-          </TouchableOpacity>
-        </View>
-      );
+      return { kind: 'user', key: `u_${index}`, text: log.slice(2).trim() };
     }
 
-    // 3. Tool invocation -> clean minimal row: `<Description>  >` which opens Terminal Modal!
     if (log.startsWith('[Tool]')) {
-      const parsedTool = parseToolLog(log, index);
-      return (
-        <TouchableOpacity
-          key={index}
-          activeOpacity={0.7}
-          onPress={() => setSelectedTool(parsedTool)}
-          style={styles.toolRow}>
-          <Text
-            numberOfLines={1}
-            style={[styles.toolRowText, { color: isDark ? theme.textSecondary : '#6B7280' }]}>
-            {parsedTool.description}
-          </Text>
-          <ChevronRightIcon size={16} color={isDark ? theme.textMuted : '#9CA3AF'} />
-        </TouchableOpacity>
-      );
+      return parseToolLog(log, index);
     }
 
-    // 4. Skip raw tool results, done badges, running states, or permission logs from feed
+    // Raw tool results, done badges, running states and permission logs stay out of the feed
     if (
       log.startsWith('[ToolResult]') ||
       log.startsWith('✓ Done') ||
@@ -324,38 +322,133 @@ export function RemoteSessionScreen() {
       return null;
     }
 
-    // 5. Status / System info
     if (log.startsWith('[Status]')) {
       const statusText = log.replace('[Status]', '').trim();
       if (!statusText || statusText === 'idle' || statusText === 'ready') return null;
-      return (
-        <View key={index} style={styles.systemPillRow}>
-          <View style={[styles.systemPill, { backgroundColor: secondaryBg }]}>
-            <Text style={[styles.systemPillText, { color: textSecondary }]}>{statusText}</Text>
-          </View>
-        </View>
-      );
+      return { kind: 'system', key: `s_${index}`, text: statusText };
     }
 
     if (log.startsWith('[Connection]')) {
-      const connText = log.replace('[Connection]', '').trim();
-      return (
-        <View key={index} style={styles.systemPillRow}>
-          <View style={[styles.systemPill, { backgroundColor: secondaryBg }]}>
-            <Text style={[styles.systemPillText, { color: textSecondary }]}>{connText}</Text>
-          </View>
-        </View>
-      );
+      return { kind: 'system', key: `s_${index}`, text: log.replace('[Connection]', '').trim() };
     }
 
-    // 6. Assistant output -> rendered with MarkdownRenderer adapting to the active theme!
-    return (
-      <View key={index} style={styles.assistantRow}>
-        <View style={styles.assistantCard}>
-          <MarkdownRenderer content={log} theme={theme} />
-        </View>
-      </View>
-    );
+    return { kind: 'assistant', key: `a_${index}`, text: log };
+  };
+
+  // Consecutive tool calls (hidden logs in between don't break the run) collapse
+  // into one "Ran N commands" group, like Claude Code.
+  const buildFeed = (): FeedItem[] => {
+    const feed: FeedItem[] = [];
+    remoteSession.logs.forEach((rawLog, index) => {
+      const item = classifyLog(rawLog, index);
+      if (!item) return;
+      if (!('kind' in item)) {
+        const last = feed[feed.length - 1];
+        if (last?.kind === 'tools') {
+          last.tools.push(item);
+        } else {
+          feed.push({ kind: 'tools', key: `t_${index}`, tools: [item] });
+        }
+        return;
+      }
+      feed.push(item);
+    });
+    return feed;
+  };
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const renderFeedItem = (item: FeedItem) => {
+    switch (item.kind) {
+      case 'user':
+        return (
+          <View key={item.key} style={styles.userRow}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              delayLongPress={200}
+              onLongPress={() => handleCopyText(item.text)}
+              style={[styles.userBubble, { backgroundColor: userBubbleBg }]}>
+              <Text style={[styles.userText, { color: userBubbleText }]}>{item.text}</Text>
+            </TouchableOpacity>
+            <View style={styles.userActions}>
+              <TouchableOpacity
+                activeOpacity={0.6}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => handleCopyText(item.text)}>
+                <CopyIcon size={14} color={textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.6}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => handleSendCommand(item.text)}>
+                <RefreshIcon size={14} color={textMuted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+
+      case 'tools': {
+        const expanded = expandedGroups.has(item.key);
+        return (
+          <View key={item.key} style={styles.toolGroup}>
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={() => toggleGroup(item.key)}
+              style={styles.toolGroupHeader}>
+              <Text numberOfLines={1} style={[styles.toolGroupText, { color: textSecondary }]}>
+                {summarizeTools(item.tools)}
+              </Text>
+              {expanded ? (
+                <ChevronDownIcon size={13} color={textSecondary} />
+              ) : (
+                <ChevronRightIcon size={14} color={textSecondary} />
+              )}
+            </TouchableOpacity>
+            {expanded && (
+              <View style={[styles.toolGroupList, { borderLeftColor: borderColor }]}>
+                {item.tools.map(tool => (
+                  <TouchableOpacity
+                    key={tool.id}
+                    activeOpacity={0.6}
+                    onPress={() => setSelectedTool(tool)}
+                    style={styles.toolRow}>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.toolRowText, { color: textSecondary, fontFamily: monoFont }]}>
+                      {tool.description}
+                    </Text>
+                    <ChevronRightIcon size={14} color={textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      }
+
+      case 'system':
+        return (
+          <View key={item.key} style={styles.systemPillRow}>
+            <View style={[styles.systemPill, { backgroundColor: secondaryBg }]}>
+              <Text style={[styles.systemPillText, { color: textSecondary }]}>{item.text}</Text>
+            </View>
+          </View>
+        );
+
+      case 'assistant':
+        return (
+          <View key={item.key} style={styles.assistantRow}>
+            <MarkdownRenderer content={item.text} theme={theme} cliColors={cliColors} />
+          </View>
+        );
+    }
   };
 
   return (
@@ -602,7 +695,7 @@ export function RemoteSessionScreen() {
               </View>
             )}
 
-            {remoteSession.logs.map((log, index) => renderLogItem(log, index))}
+            {buildFeed().map(renderFeedItem)}
 
             {remoteSession.progressStatus === 'thinking' && (
               <View style={styles.thinkingWrapper}>
@@ -611,30 +704,7 @@ export function RemoteSessionScreen() {
             )}
           </ScrollView>
 
-          {/* Quick Command Chips */}
-          <View style={styles.quickChipsRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.quickChipsScroll}>
-              {['git status', 'git diff', 'ls -la', 'npm test'].map(cmd => (
-                <TouchableOpacity
-                  key={cmd}
-                  activeOpacity={0.7}
-                  onPress={() => handleSendCommand(cmd)}
-                  style={[
-                    styles.quickChipPill,
-                    { backgroundColor: cardBg, borderColor },
-                  ]}>
-                  <Text style={[styles.quickChipPillText, { color: textSecondary, fontFamily: monoFont }]}>
-                    {cmd}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Floating Bottom Capsule Bar */}
+          {/* Bottom Composer (Claude Code style) */}
           <View style={styles.bottomBarContainer}>
             {showScrollBottom && (
               <TouchableOpacity
@@ -655,7 +725,7 @@ export function RemoteSessionScreen() {
               ]}>
               <TextInput
                 style={[styles.bottomBarInput, { color: bottomInputText }]}
-                placeholder="Reply to Puku"
+                placeholder="Type / for commands"
                 placeholderTextColor={bottomPlaceholder}
                 value={commandText}
                 onChangeText={setCommandText}
@@ -664,54 +734,40 @@ export function RemoteSessionScreen() {
                 autoCorrect={false}
                 onSubmitEditing={() => handleSendCommand()}
               />
+              <TouchableOpacity
+                activeOpacity={0.6}
+                disabled={isSending || !commandText.trim()}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                onPress={() => handleSendCommand()}
+                style={styles.bottomSendBtn}>
+                {isSending ? (
+                  <ActivityIndicator size="small" color={textMuted} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.bottomSendGlyph,
+                      { color: commandText.trim() ? textPrimary : textMuted },
+                    ]}>
+                    ↵
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.bottomBarControls}>
-                <View style={styles.bottomBarLeftGroup}>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => {}}
-                    style={[styles.plusBtn, { backgroundColor: secondaryBg }]}>
-                    <PlusIcon size={16} color={textPrimary} />
-                  </TouchableOpacity>
-
-                  <View style={[styles.chipPill, { backgroundColor: chipBg }]}>
-                    <Text style={[styles.chipPillText, { color: chipText }]}>puku...</Text>
-                  </View>
-
-                  <View style={[styles.chipPill, { backgroundColor: secondaryChipBg }]}>
-                    <Text style={[styles.chipPillText, { color: secondaryChipText }]}>default</Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  disabled={isSending}
-                  onPress={() => {
-                    if (commandText.trim()) {
-                      handleSendCommand();
-                    }
-                  }}
-                  style={[
-                    styles.bottomSendBtn,
-                    {
-                      backgroundColor: commandText.trim()
-                        ? isDark
-                          ? '#FFFFFF'
-                          : '#18181B'
-                        : isDark
-                        ? '#2A2C26'
-                        : '#E5E7EB',
-                    },
-                  ]}>
-                  {isSending ? (
-                    <ActivityIndicator size="small" color={isDark ? '#18181B' : '#FFFFFF'} />
-                  ) : commandText.trim() ? (
-                    <SendIcon size={15} color={isDark ? '#18181B' : '#FFFFFF'} />
-                  ) : (
-                    <SoundWaveIcon size={16} color={textMuted} />
-                  )}
-                </TouchableOpacity>
-              </View>
+            <View style={styles.bottomBarControls}>
+              <TouchableOpacity
+                activeOpacity={0.6}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => {}}>
+                <PlusIcon size={18} color={textSecondary} />
+              </TouchableOpacity>
+              <Text style={[styles.bottomBarLabel, { color: textSecondary }]}>Auto</Text>
+              <View style={styles.bottomBarSpacer} />
+              <Text style={[styles.bottomBarLabel, { color: textSecondary }]}>Puku</Text>
+              <Text style={[styles.bottomBarLabel, { color: textSecondary }]}>Default</Text>
+              {remoteSession.progressStatus === 'thinking' && (
+                <ActivityIndicator size="small" color={textMuted} />
+              )}
             </View>
           </View>
         </View>
@@ -1171,45 +1227,65 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   userRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginVertical: 4,
+    alignItems: 'flex-end',
+    marginTop: 8,
+    marginBottom: 4,
     paddingHorizontal: 4,
   },
   userBubble: {
-    maxWidth: '82%',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    maxWidth: '85%',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
   userText: {
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '400',
   },
+  userActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 8,
+    paddingRight: 4,
+  },
+  toolGroup: {
+    paddingHorizontal: 4,
+    marginVertical: 2,
+  },
+  toolGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingVertical: 6,
+  },
+  toolGroupText: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  toolGroupList: {
+    borderLeftWidth: 1,
+    marginLeft: 4,
+    paddingLeft: 10,
+    marginBottom: 4,
+  },
   toolRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    marginVertical: 2,
+    paddingVertical: 7,
   },
   toolRowText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 12.5,
     flex: 1,
     marginRight: 8,
   },
   assistantRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
+    width: '100%',
     marginVertical: 4,
-    width: '100%',
     paddingHorizontal: 4,
-  },
-  assistantCard: {
-    width: '100%',
   },
   thinkingWrapper: {
     marginVertical: 4,
@@ -1226,23 +1302,6 @@ const styles = StyleSheet.create({
   },
   systemPillText: {
     fontSize: 11,
-    fontWeight: '500',
-  },
-  quickChipsRow: {
-    paddingHorizontal: 16,
-    marginBottom: 6,
-  },
-  quickChipsScroll: {
-    gap: 8,
-  },
-  quickChipPill: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  quickChipPillText: {
-    fontSize: 12,
     fontWeight: '500',
   },
   bottomBarContainer: {
@@ -1266,57 +1325,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   bottomBarCard: {
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    borderRadius: 18,
+    paddingLeft: 16,
+    paddingRight: 12,
+    paddingVertical: 10,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
   },
   bottomBarInput: {
+    flex: 1,
     fontSize: 15,
     lineHeight: 20,
-    maxHeight: 90,
-    minHeight: 34,
+    maxHeight: 110,
+    minHeight: 24,
     paddingVertical: 2,
+  },
+  bottomSendBtn: {
+    width: 28,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  bottomSendGlyph: {
+    fontSize: 18,
+    lineHeight: 22,
   },
   bottomBarControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
+    gap: 16,
+    paddingHorizontal: 10,
+    paddingTop: 10,
   },
-  bottomBarLeftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  bottomBarSpacer: {
+    flex: 1,
   },
-  plusBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  chipPillText: {
-    fontSize: 12.5,
+  bottomBarLabel: {
+    fontSize: 13,
     fontWeight: '500',
-  },
-  bottomSendBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   modalBackdrop: {
     flex: 1,
