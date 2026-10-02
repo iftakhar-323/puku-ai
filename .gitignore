@@ -94,3 +94,6 @@ dist/
 # MCP server config: holds a bearer token, never commit it
 .mcp.json
 
+# Jest coverage output
+coverage/
+

@@ -34,6 +34,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Puku AI needs camera access to scan the pairing QR code from Puku CLI and to attach photos.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Puku AI needs access to the microphone for voice conversations and speech-to-text.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

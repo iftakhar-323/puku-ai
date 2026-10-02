@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import {
+  CameraIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   EyeIcon,
@@ -19,6 +20,7 @@ import {
 import { ThemeColors } from '../../../theme/theme';
 import { ActiveRelaySession } from '../../../types';
 import { formatActivityDate } from '../../../utils/date';
+import { QrScannerView } from './QrScannerView';
 
 const monoFont = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -50,6 +52,7 @@ export function PairingView({
   const [token, setToken] = useState(initialToken);
   const [showToken, setShowToken] = useState(false);
   const [showManual, setShowManual] = useState(!!initialSessionId);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Prefill from the first detected session once a user picks "connect manually"
   // after sessions arrive, so the field isn't empty when they open it.
@@ -89,7 +92,30 @@ export function PairingView({
           in Puku CLI on your laptop. Sessions on your account show up below
           automatically.
         </Text>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Scan QR code to pair"
+          onPress={() => setShowScanner(true)}
+          style={[styles.scanBtn, { borderColor: theme.outline }]}
+        >
+          <CameraIcon size={16} color={theme.textPrimary} />
+          <Text style={[styles.scanBtnText, { color: theme.textPrimary }]}>
+            Scan QR code
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      <QrScannerView
+        theme={theme}
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanned={(sessionId, token) => {
+          setShowScanner(false);
+          onConnect(sessionId, token);
+        }}
+      />
 
       {liveSessions.length > 0 ? (
         <View style={styles.sessionList}>
@@ -299,6 +325,20 @@ const styles = StyleSheet.create({
   hintCode: {
     fontFamily: monoFont,
     fontSize: 12.5,
+    fontWeight: '700',
+  },
+  scanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  scanBtnText: {
+    fontSize: 13,
     fontWeight: '700',
   },
   sessionList: {

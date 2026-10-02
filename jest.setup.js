@@ -50,6 +50,14 @@ jest.mock('expo-secure-store', () => {
   };
 });
 
+jest.mock('expo-camera', () => ({
+  CameraView: 'CameraView',
+  useCameraPermissions: jest.fn(() => [
+    { granted: true, canAskAgain: true },
+    jest.fn().mockResolvedValue({ granted: true }),
+  ]),
+}));
+
 jest.mock('expo-crypto', () => ({
   getRandomBytes: jest.fn(byteCount => {
     const bytes = new Uint8Array(byteCount);
