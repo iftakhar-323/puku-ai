@@ -19,6 +19,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # The runner's default Xcode (16.4) ships Swift tools 6.1, but
+      # ExpoModulesJSI's SwiftPM package requires 6.2+. macos-15 also
+      # has Xcode 26.x pre-installed (just not as the default) — select
+      # the newest stable one instead of the default.
+      - name: Select Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
