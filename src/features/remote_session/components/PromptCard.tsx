@@ -151,6 +151,10 @@ function PermissionBody({
   const isEdit = kind === 'edit';
   const isRead = kind === 'read';
   const isCommand = kind === 'command';
+  const isFetch =
+    kind === 'fetch' ||
+    toolName.toLowerCase().includes('fetch') ||
+    Boolean(prompt.input?.url);
 
   let summary = '';
   try {
@@ -171,6 +175,13 @@ function PermissionBody({
       : '');
   const descriptionText = safeRenderString(descriptionRaw).trim();
 
+  const fetchUrl = safeRenderString(
+    prompt.input?.url ||
+      prompt.input?.uri ||
+      prompt.input?.href ||
+      '',
+  );
+
   const filePath = safeRenderString(
     prompt.input?.file_path ||
       prompt.input?.path ||
@@ -187,10 +198,16 @@ function PermissionBody({
 
   const eyebrowText = isExitPlanMode
     ? 'PLAN READY FOR APPROVAL'
+    : isFetch
+    ? 'NETWORK ACCESS REQUIRED'
     : 'PERMISSION REQUIRED';
 
   const titleText = isExitPlanMode
     ? 'Ready to start coding?'
+    : isFetch
+    ? fetchUrl
+      ? `Allow fetching ${fetchUrl}?`
+      : 'Allow network request?'
     : isEdit
     ? fileBasename
       ? `Allow Puku to ${isWrite ? 'write' : 'edit'} ${fileBasename}?`
@@ -213,6 +230,10 @@ function PermissionBody({
           prompt.input?.commandLine ||
           summary,
       )
+    : isFetch
+    ? fetchUrl
+      ? `Fetch(${fetchUrl})`
+      : safeRenderString(summary)
     : isEdit || isRead
     ? filePath
       ? `${filePath}${

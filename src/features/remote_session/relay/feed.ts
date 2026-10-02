@@ -35,7 +35,7 @@ export function buildFeed(entries: RemoteEntry[]): FeedItem[] {
   return feed;
 }
 
-type ToolKind = 'command' | 'read' | 'edit' | 'search' | 'other';
+type ToolKind = 'command' | 'read' | 'edit' | 'search' | 'fetch' | 'other';
 
 export function toolKind(name?: string | null): ToolKind {
   const n = (name || '').toLowerCase();
@@ -95,6 +95,19 @@ export function toolKind(name?: string | null): ToolKind {
   ) {
     return 'search';
   }
+  if (
+    [
+      'fetch',
+      'webfetch',
+      'web_fetch',
+      'curl',
+      'http',
+      'read_url_content',
+    ].includes(n) ||
+    n.includes('fetch')
+  ) {
+    return 'fetch';
+  }
   return 'other';
 }
 
@@ -147,6 +160,10 @@ export function describeTool(tool: ToolCall): string {
       case 'search':
         return `${name} ${String(
           input.pattern || input.query || input.path || '',
+        )}`.trim();
+      case 'fetch':
+        return `Fetch ${String(
+          input.url || input.uri || input.href || '',
         )}`.trim();
       default: {
         const firstString = Object.values(input).find(
