@@ -11,12 +11,10 @@ import {
   View,
 } from 'react-native';
 import {
-  ArrowUpRightIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CopyIcon,
   RefreshIcon,
-  RemoteIcon,
 } from '../../../components/common/Icons';
 import { useApp } from '../../../store/AppContext';
 import { ThemeColors } from '../../../theme/theme';
@@ -178,7 +176,7 @@ export function RemoteFeed({
         onContentSizeChange={onContentSizeChange}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            {/* Hero Header with Dynamic Greeting & Retro Computer Illustration (matching Puku AI) */}
+            {/* Hero Header with Dynamic Greeting & Retro Computer Illustration (matching Puku AI 1:1) */}
             <View style={styles.heroRow}>
               <View style={styles.headlineWrapper}>
                 <Text style={[styles.headlineLead, { color: theme.textSecondary }]}>
@@ -203,114 +201,6 @@ export function RemoteFeed({
                   resizeMode="contain"
                 />
               </View>
-            </View>
-
-            {/* Connected to Laptop Card */}
-            <View
-              style={[
-                styles.connectedCard,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.outline || theme.border,
-                },
-              ]}
-            >
-              <View style={styles.connectedBadgeRow}>
-                <View
-                  style={[
-                    styles.connectedPill,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(176, 179, 252, 0.16)'
-                        : 'rgba(72, 77, 208, 0.12)',
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.liveDot,
-                      { backgroundColor: theme.primaryLight },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.connectedBadgeText,
-                      { color: theme.primaryLight, fontFamily: monoFont },
-                    ]}
-                  >
-                    CONNECTED TO YOUR LAPTOP
-                  </Text>
-                </View>
-              </View>
-
-              <Text
-                style={[styles.connectedHeading, { color: theme.textPrimary }]}
-              >
-                Control your laptop terminal
-              </Text>
-              <Text
-                style={[
-                  styles.connectedSub,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                Ask Puku to inspect files, run git commands, execute tests, or control tasks in real time.
-              </Text>
-            </View>
-
-            {/* Quick Commands / Suggestions */}
-            <View style={styles.suggestionsSection}>
-              <Text
-                style={[
-                  styles.suggestionsLabel,
-                  { color: theme.textMuted, fontFamily: monoFont },
-                ]}
-              >
-                QUICK COMMANDS
-              </Text>
-
-              {[
-                {
-                  label: 'Check git status & modified files',
-                  prompt: 'git status',
-                },
-                {
-                  label: 'List workspace files & directories',
-                  prompt: 'ls -la',
-                },
-                {
-                  label: 'Run test suite & show output',
-                  prompt: 'npm test',
-                },
-                {
-                  label: 'Show current system resource usage',
-                  prompt: 'Show system resource usage: CPU, RAM, and disk space',
-                },
-              ].map((cmd, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  activeOpacity={0.7}
-                  onPress={() => onResend(cmd.prompt)}
-                  style={[
-                    styles.suggestionChip,
-                    {
-                      backgroundColor: theme.cardBackground,
-                      borderColor: theme.outline || theme.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.suggestionChipText,
-                      { color: theme.textPrimary, fontFamily: monoFont },
-                    ]}
-                  >
-                    {cmd.label}
-                  </Text>
-                  <ArrowUpRightIcon size={14} color={theme.textSecondary} />
-                </TouchableOpacity>
-              ))}
             </View>
           </View>
         }
@@ -660,75 +550,13 @@ const styles = StyleSheet.create({
   computerWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
   },
   computerImage: {
-    width: 110,
-    height: 102,
-  },
-  connectedCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  connectedBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  connectedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 6,
-  },
-  liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  connectedBadgeText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-  },
-  connectedHeading: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  connectedSub: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  suggestionsSection: {
-    marginTop: 4,
-  },
-  suggestionsLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-  },
-  suggestionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginVertical: 4,
-  },
-  suggestionChipText: {
-    fontSize: 13,
-    flex: 1,
-    marginRight: 10,
+    width: 120,
+    height: 112,
   },
   typing: {
     marginVertical: 4,

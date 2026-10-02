@@ -150,6 +150,18 @@ export function ChatScreen() {
     }
   };
 
+  const handleTakePhoto = async () => {
+    setShowAttachmentSheet(false);
+    try {
+      const file = await NativePicker.takePhoto();
+      if (file) {
+        setPendingAttachment(file);
+      }
+    } catch (err: any) {
+      Alert.alert('Camera Error', err?.message || 'Could not take photo');
+    }
+  };
+
   const handleSend = () => {
     if ((!inputVal.trim() && !pendingAttachment) || isGenerating) return;
     sendMessage(inputVal.trim(), undefined, pendingAttachment || undefined);
@@ -297,7 +309,7 @@ export function ChatScreen() {
         visible={showAttachmentSheet}
         theme={theme}
         onClose={() => setShowAttachmentSheet(false)}
-        onCameraTap={handlePickMedia}
+        onCameraTap={handleTakePhoto}
         onPhotosTap={handlePickMedia}
         onAddToProjectTap={() => {
           setShowAttachmentSheet(false);

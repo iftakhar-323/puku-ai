@@ -19,6 +19,7 @@ import {
   MoonIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
+  PukuRemoteGradientIcon,
   RemoteIcon,
   SunIcon,
   TrashIcon,
@@ -225,8 +226,14 @@ function RemoteSessionScreenContent() {
             <BackIcon size={20} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <View style={styles.titleContainer}>
-            <RemoteIcon size={20} color={theme.primaryLight} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="View all remote sessions"
+            onPress={() => navigate('code')}
+            style={styles.titleContainer}
+          >
+            <PukuRemoteGradientIcon size={20} />
             <Text
               style={[
                 styles.headerTitle,
@@ -235,39 +242,7 @@ function RemoteSessionScreenContent() {
             >
               puku remote
             </Text>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowMenu(true)}
-              style={[
-                styles.badge,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(176, 179, 252, 0.16)'
-                    : 'rgba(72, 77, 208, 0.12)',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                },
-              ]}
-            >
-              <View
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: linkColor,
-                }}
-              />
-              <Text
-                style={[
-                  styles.badgeText,
-                  { color: theme.primaryLight, fontFamily: monoFont },
-                ]}
-              >
-                {isAttached ? 'LIVE' : phase.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.trailingGroup}>

@@ -41,7 +41,12 @@ import {
 } from '../../components/common/Icons';
 import { ENV } from '../../config/env';
 import { MarkdownRenderer } from '../chat/components/MarkdownRenderer';
-import { NativeClipboard, NativePicker, PickedMedia } from '../../services/nativeModules';
+import {
+  NativeClipboard,
+  NativePicker,
+  PickedMedia,
+  promptMediaAttachment,
+} from '../../services/nativeModules';
 import { formatActivityDate } from '../../utils/date';
 import { pukuBotApi } from '../../services/pukuBotApi';
 import { useApp } from '../../store/AppContext';
@@ -308,15 +313,13 @@ export function PukuBotScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handlePickMedia = async () => {
-    try {
-      const file = await NativePicker.pickMedia();
-      if (file) {
+  const handlePickMedia = () => {
+    promptMediaAttachment(
+      (file: PickedMedia) => {
         setPendingAttachment(file);
-      }
-    } catch (err: any) {
-      Alert.alert('Upload Error', err?.message || 'Could not pick file');
-    }
+      },
+      'Attach Photo or File'
+    );
   };
 
   const handleSelectRecentConv = async (convId: string) => {

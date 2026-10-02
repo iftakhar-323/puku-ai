@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -19,6 +20,7 @@ import {
   MoonIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
+  PukuRemoteGradientIcon,
   RefreshIcon,
   RemoteIcon,
   SidebarToggleIcon,
@@ -37,9 +39,30 @@ interface DetailRow {
   value: string;
 }
 
+function getGreeting(userName?: string): { lead: string; name: string } {
+  const h = new Date().getHours();
+  let lead = 'Good morning,';
+  if (h >= 12 && h < 17) {
+    lead = 'Good afternoon,';
+  } else if (h >= 17 && h < 22) {
+    lead = 'Good evening,';
+  } else if (h >= 22 || h < 5) {
+    lead = 'Back at it,';
+  }
+
+  let name = 'there';
+  if (userName?.trim()) {
+    name = userName.trim().split(/\s+/)[0];
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  return { lead, name };
+}
+
 export function CodeScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, isDark, updateSettings, setDrawerOpen, navigate } = useApp();
+  const { theme, isDark, profile, updateSettings, setDrawerOpen, navigate } = useApp();
+  const greeting = getGreeting(profile?.name);
   const {
     session,
     isActive: isCurrentSessionActive,
@@ -163,7 +186,7 @@ export function CodeScreen() {
           </TouchableOpacity>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <RemoteIcon size={20} color={theme.primaryLight} />
+            <PukuRemoteGradientIcon size={20} />
             <Text
               style={[
                 styles.headerTitle,
@@ -236,6 +259,33 @@ export function CodeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Hero Header with Dynamic Greeting & Retro Computer Illustration (matching Puku AI 1:1) */}
+        <View style={styles.heroRow}>
+          <View style={styles.headlineWrapper}>
+            <Text style={[styles.headlineLead, { color: theme.textSecondary }]}>
+              {greeting.lead}
+            </Text>
+            <Text style={[styles.headlineName, { color: theme.textPrimary }]}>
+              {greeting.name}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.computerWrapper,
+              {
+                backgroundColor: theme.cardBackground,
+                borderColor: theme.outline || theme.border,
+              },
+            ]}
+          >
+            <Image
+              source={require('../../../assets/images/retro_puku_computer.png')}
+              style={styles.computerImage}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
+
         {/* CURRENTLY ATTACHED SESSION (If active) */}
         {isAttachedOrActive && (
           <View style={styles.section}>
@@ -848,6 +898,40 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 20,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  headlineWrapper: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  headlineLead: {
+    fontSize: 27,
+    fontWeight: '700',
+    lineHeight: 35,
+    letterSpacing: -0.4,
+  },
+  headlineName: {
+    fontSize: 27,
+    fontWeight: '700',
+    lineHeight: 35,
+    letterSpacing: -0.4,
+  },
+  computerWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  computerImage: {
+    width: 120,
+    height: 112,
   },
   section: {
     gap: 10,

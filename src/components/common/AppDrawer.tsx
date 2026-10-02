@@ -30,6 +30,7 @@ import {
   PlusIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
+  PukuRemoteGradientIcon,
   RemoteIcon,
   SearchIcon,
   SettingsIcon,
@@ -256,10 +257,7 @@ export function AppDrawer() {
           },
         ]}>
         <View style={styles.switchHubLeft}>
-          <RemoteIcon
-            size={20}
-            color={isLive ? theme.primaryLight : theme.primary}
-          />
+          <PukuRemoteGradientIcon size={20} />
           <View style={styles.switchHubTextWrap}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
@@ -563,7 +561,7 @@ export function AppDrawer() {
             <View style={styles.brandRow}>
               {isRemoteMode ? (
                 <>
-                  <RemoteIcon size={22} color={theme.primaryLight} />
+                  <PukuRemoteGradientIcon size={22} />
                   <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku Remote</Text>
                 </>
               ) : (

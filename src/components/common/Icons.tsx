@@ -1105,6 +1105,32 @@ export function PukuBotGradientIcon({ size = 20 }: { size?: number }) {
 }
 
 /**
+ * Official Puku Remote Logo with brand purple/indigo gradient
+ */
+export function PukuRemoteGradientIcon({ size = 20 }: { size?: number }) {
+  const gradId = 'remoteGrad_' + size;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Defs>
+        <LinearGradient id={gradId} x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#0718D2" />
+          <Stop offset="0.48" stopColor="#D08BFF" />
+          <Stop offset="1" stopColor="#A4ABFF" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="2" y="4" width="20" height="16" rx="4" stroke={`url(#${gradId})`} strokeWidth="1.8" />
+      <Path
+        d="M6 9L9.5 12L6 15M12 15H17"
+        stroke={`url(#${gradId})`}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/**
  * Attachment / Paperclip Icon for Add Sheet
  */
 export function PaperclipIcon({ size = 20, color = '#ECEEEC' }: IconProps) {

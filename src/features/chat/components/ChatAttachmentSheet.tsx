@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  CameraIcon,
   ChevronRightIcon,
   ConnectorsBranchIcon,
   FolderOutlinedIcon,
@@ -33,6 +34,7 @@ export function ChatAttachmentSheet({
   visible,
   theme,
   onClose,
+  onCameraTap,
   onPhotosTap,
   onAddToProjectTap,
   onToolAccessTap,
@@ -40,6 +42,11 @@ export function ChatAttachmentSheet({
 }: ChatAttachmentSheetProps) {
   const insets = useSafeAreaInsets();
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+
+  const handleCameraPress = () => {
+    onClose();
+    onCameraTap();
+  };
 
   const handleFilesPress = () => {
     onClose();
@@ -91,7 +98,20 @@ export function ChatAttachmentSheet({
 
         {/* Action Rows */}
         <View style={styles.rowsList}>
-          {/* 1. Add files or photos */}
+          {/* 1. Take photo */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleCameraPress}
+            style={styles.actionRow}>
+            <View style={styles.leftInfo}>
+              <CameraIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.actionLabel, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                Take photo
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* 2. Add files or photos */}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleFilesPress}
