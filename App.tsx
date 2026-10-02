@@ -7,7 +7,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Linking, Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initSentry } from './src/config/sentryConfig';
 import { AppDrawer } from './src/components/common/AppDrawer';
 import { ArtifactsScreen } from './src/features/artifacts/ArtifactsScreen';
 import { ChatScreen } from './src/features/chat/ChatScreen';
@@ -28,6 +30,8 @@ import { ToastProvider } from './src/components/ui/Toast';
 import { UpdateService } from './src/services/updateService';
 import { pukuBotApi } from './src/services/pukuBotApi';
 import { ignore } from './src/utils/devLog';
+
+initSentry();
 
 function MainNavigator(): React.JSX.Element {
   const { activeRoute, isDark, isRestoringSession, navigate } = useApp();
@@ -174,6 +178,7 @@ class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('App ErrorBoundary caught error:', error, errorInfo);
+    Sentry.captureException(error, { extra: errorInfo });
   }
 
   render() {
@@ -251,4 +256,4 @@ function App(): React.JSX.Element {
   );
 }
 
-export default App;
+export default Sentry.wrap(App);

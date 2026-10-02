@@ -5,6 +5,6 @@ module.exports = {
     '\\.(css|less|scss|sass)$': '<rootDir>/__mocks__/styleMock.js',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@react-native|react-native|@react-native-async-storage|react-native-inappbrowser-reborn|react-native-safe-area-context|react-native-svg)/)',
+    'node_modules/(?!(@react-native|react-native|@react-native-async-storage|react-native-inappbrowser-reborn|react-native-safe-area-context|react-native-svg|@sentry)/)',
   ],
 };

@@ -8,4 +8,8 @@ export const ENV = {
   PUKU_BOT_LOCAL_BASE_URL: 'http://192.168.0.108:3001/api/v1',
   PUKU_BOT_EMULATOR_BASE_URL: 'http://10.0.2.2:3001/api/v1',
   PUKU_BOT_REDIRECT_URI: 'pukubot://auth/callback',
+  // A Sentry DSN is a public write-only ingest key, safe to ship in the
+  // client. Leave empty to keep crash reporting disabled (e.g. local dev).
+  SENTRY_DSN: '',
+  SENTRY_ENVIRONMENT: __DEV__ ? 'development' : 'production',
 };

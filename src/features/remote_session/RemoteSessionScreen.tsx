@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import * as Sentry from '@sentry/react-native';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -67,6 +68,7 @@ class RemoteSessionErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, info: any) {
     console.error('RemoteSessionScreen caught error:', error, info);
+    Sentry.captureException(error, { extra: info });
   }
 
   render() {
