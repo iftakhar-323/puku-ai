@@ -11,6 +11,7 @@ class PukuNativePackage : ReactPackage {
         return listOf(
             ClipboardModule(reactContext),
             SpeechModule(reactContext),
+            TtsModule(reactContext),
             PickerModule(reactContext)
         )
     }

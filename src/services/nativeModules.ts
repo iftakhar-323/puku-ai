@@ -1,6 +1,6 @@
 import { Alert, NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
 
-const { PukuClipboard, PukuSpeech, PukuPicker } = NativeModules;
+const { PukuClipboard, PukuSpeech, PukuTts, PukuPicker } = NativeModules;
 
 export interface PickedMedia {
   uri: string;
@@ -153,6 +153,8 @@ const speechEventEmitter = PukuSpeech
   ? new NativeEventEmitter(PukuSpeech)
   : null;
 
+const ttsEventEmitter = PukuTts ? new NativeEventEmitter(PukuTts) : null;
+
 export interface SpeechResultsEvent {
   text: string;
 }
@@ -228,6 +230,42 @@ export const NativeSpeech = {
     const sub = speechEventEmitter.addListener('onSpeechError', (err: any) => {
       callback({ code: err?.code || -1, message: err?.message || 'Unknown error' });
     });
+    return () => sub.remove();
+  },
+};
+
+export const NativeTts = {
+  speak: async (text: string): Promise<boolean> => {
+    try {
+      if (PukuTts && PukuTts.speak) {
+        return await PukuTts.speak(text);
+      }
+    } catch (e) {
+      console.warn('Failed to speak', e);
+    }
+    return false;
+  },
+  stop: async (): Promise<boolean> => {
+    try {
+      if (PukuTts && PukuTts.stop) {
+        return await PukuTts.stop();
+      }
+    } catch {}
+    return false;
+  },
+  onStart: (callback: () => void) => {
+    if (!ttsEventEmitter) return () => {};
+    const sub = ttsEventEmitter.addListener('onTtsStart', () => callback());
+    return () => sub.remove();
+  },
+  onDone: (callback: () => void) => {
+    if (!ttsEventEmitter) return () => {};
+    const sub = ttsEventEmitter.addListener('onTtsDone', () => callback());
+    return () => sub.remove();
+  },
+  onError: (callback: () => void) => {
+    if (!ttsEventEmitter) return () => {};
+    const sub = ttsEventEmitter.addListener('onTtsError', () => callback());
     return () => sub.remove();
   },
 };
