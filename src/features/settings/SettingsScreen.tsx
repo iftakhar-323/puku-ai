@@ -52,7 +52,9 @@ export function SettingsScreen() {
   } = useApp();
 
   const [infoModalVisible, setInfoModalVisible] = useState(false);
-  const [tokenInput, setTokenInput] = useState(pukuApi.getAuthToken() || '');
+  const [tokenInput, setTokenInput] = useState(
+    __DEV__ ? pukuApi.getAuthToken() || '' : '',
+  );
 
   const displayEmail =
     profile.email || 'Tap to sign in';
@@ -448,37 +450,40 @@ export function SettingsScreen() {
               </Text>
             </View>
 
-            <View style={styles.modalSection}>
-              <Text style={[styles.modalLabel, { color: theme.textMuted }]}>
-                AUTH TOKEN
-              </Text>
-              <TextInput
-                value={tokenInput}
-                onChangeText={setTokenInput}
-                placeholder="Paste JWT / Bearer token"
-                placeholderTextColor={theme.placeholderText}
-                style={[
-                  styles.tokenInput,
-                  {
-                    backgroundColor: theme.codeBackground,
-                    color: theme.textPrimary,
-                    borderColor: theme.outline,
-                  },
-                ]}
-              />
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => {
-                  if (tokenInput.trim()) {
-                    pukuApi.setAuthToken(tokenInput.trim());
-                    Alert.alert('Success', 'Auth token updated.');
-                    setInfoModalVisible(false);
-                  }
-                }}
-                style={[styles.saveTokenBtn, { backgroundColor: theme.primary }]}>
-                <Text style={styles.saveTokenBtnText}>Save Token</Text>
-              </TouchableOpacity>
-            </View>
+            {__DEV__ && (
+              <View style={styles.modalSection}>
+                <Text style={[styles.modalLabel, { color: theme.textMuted }]}>
+                  AUTH TOKEN (DEV ONLY)
+                </Text>
+                <TextInput
+                  value={tokenInput}
+                  onChangeText={setTokenInput}
+                  placeholder="Paste JWT / Bearer token"
+                  placeholderTextColor={theme.placeholderText}
+                  secureTextEntry
+                  style={[
+                    styles.tokenInput,
+                    {
+                      backgroundColor: theme.codeBackground,
+                      color: theme.textPrimary,
+                      borderColor: theme.outline,
+                    },
+                  ]}
+                />
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (tokenInput.trim()) {
+                      pukuApi.setAuthToken(tokenInput.trim());
+                      Alert.alert('Success', 'Auth token updated.');
+                      setInfoModalVisible(false);
+                    }
+                  }}
+                  style={[styles.saveTokenBtn, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.saveTokenBtnText}>Save Token</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>

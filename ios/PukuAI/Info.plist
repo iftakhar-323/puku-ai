@@ -34,8 +34,6 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Puku AI needs access to the microphone for voice conversations and speech-to-text.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

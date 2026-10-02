@@ -26,6 +26,7 @@ import {
 } from '../types';
 import { generatePkcePair, generateRandomString } from '../utils/auth';
 import { NativePicker } from './nativeModules';
+import { secureStorage } from './secureStorage';
 import { ignore } from '../utils/devLog';
 
 const STORAGE_KEYS = {
@@ -65,11 +66,15 @@ export class PukuBotApiClient {
     try {
       const [savedUrl, savedToken, savedUser] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.BASE_URL),
-        AsyncStorage.getItem(STORAGE_KEYS.TOKEN),
+        secureStorage.getItem(STORAGE_KEYS.TOKEN),
         AsyncStorage.getItem(STORAGE_KEYS.USER),
       ]);
 
-      if (savedUrl) {
+      // Custom/self-hosted base URLs are a dev convenience only: letting a
+      // production user point the PKCE token exchange at an arbitrary host
+      // is a phishing vector (see security audit). Ignore any saved
+      // override outside __DEV__.
+      if (savedUrl && __DEV__) {
         this.baseUrl = savedUrl.replace(/\/+$/, '');
       }
       if (savedToken) {
@@ -98,6 +103,7 @@ export class PukuBotApiClient {
   }
 
   public async setBaseUrl(url: string): Promise<void> {
+    if (!__DEV__) return;
     const cleaned = url.trim().replace(/\/+$/, '');
     this.baseUrl = cleaned;
     await AsyncStorage.setItem(STORAGE_KEYS.BASE_URL, cleaned);
@@ -229,7 +235,7 @@ export class PukuBotApiClient {
     this.token = data.token;
     this.user = data.user || null;
 
-    await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, this.token as string);
+    await secureStorage.setItem(STORAGE_KEYS.TOKEN, this.token as string);
     if (this.user) {
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.user));
     } else {
@@ -263,7 +269,7 @@ export class PukuBotApiClient {
     this.token = null;
     this.user = null;
 
-    await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+    await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
     await AsyncStorage.removeItem(STORAGE_KEYS.USER);
 
     this.notifyAuthChange();
@@ -295,7 +301,7 @@ export class PukuBotApiClient {
           if (isSingle) {
             // Local Pukubot server in PUKUBOT_SINGLE_USER=true mode
             this.token = 'single-user-dev-session';
-            await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+            await secureStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
           }
           this.notifyAuthChange();
           return { reachable: true, authenticated: true, isSingleUser: isSingle, user: userData };

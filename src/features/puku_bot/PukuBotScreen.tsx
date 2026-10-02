@@ -1434,28 +1434,33 @@ export function PukuBotScreen() {
               </Text>
 
               <TextInput
-                value={customApiUrl}
-                onChangeText={setCustomApiUrl}
+                value={__DEV__ ? customApiUrl : ENV.PUKU_BOT_API_BASE_URL}
+                onChangeText={__DEV__ ? setCustomApiUrl : undefined}
+                editable={__DEV__}
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="https://app.bot.puku.sh/api/v1"
                 placeholderTextColor={theme.placeholderText}
                 style={[
                   styles.settingsInput,
-                  { color: theme.textPrimary, borderColor: theme.border, fontFamily: monoFont },
+                  {
+                    color: __DEV__ ? theme.textPrimary : theme.textMuted,
+                    borderColor: theme.border,
+                    fontFamily: monoFont,
+                  },
                 ]}
               />
 
-              <View style={styles.quickEnvRow}>
-                <TouchableOpacity
-                  onPress={() => setCustomApiUrl(ENV.PUKU_BOT_API_BASE_URL)}
-                  style={[styles.quickEnvPill, { borderColor: theme.border }]}>
-                  <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                    Cloud (Prod)
-                  </Text>
-                </TouchableOpacity>
+              {__DEV__ && (
+                <View style={styles.quickEnvRow}>
+                  <TouchableOpacity
+                    onPress={() => setCustomApiUrl(ENV.PUKU_BOT_API_BASE_URL)}
+                    style={[styles.quickEnvPill, { borderColor: theme.border }]}>
+                    <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
+                      Cloud (Prod)
+                    </Text>
+                  </TouchableOpacity>
 
-                {__DEV__ && (
                   <TouchableOpacity
                     onPress={() => setCustomApiUrl(ENV.PUKU_BOT_LOCAL_BASE_URL)}
                     style={[styles.quickEnvPill, { borderColor: theme.border }]}>
@@ -1463,8 +1468,8 @@ export function PukuBotScreen() {
                       Local (3001)
                     </Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                </View>
+              )}
 
               {/* Account Status */}
               <View style={[styles.accountBox, { borderColor: theme.border }]}>
