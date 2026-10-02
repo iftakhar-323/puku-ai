@@ -162,14 +162,17 @@ export function CodeScreen() {
             <SidebarToggleIcon size={20} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <Text
-            style={[
-              styles.headerTitle,
-              { color: theme.textPrimary, fontFamily: monoFont },
-            ]}
-          >
-            Puku Remote
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <RemoteIcon size={20} color={theme.primaryLight} />
+            <Text
+              style={[
+                styles.headerTitle,
+                { color: theme.textPrimary, fontFamily: monoFont },
+              ]}
+            >
+              puku remote
+            </Text>
+          </View>
         </View>
 
         <View style={styles.trailingGroup}>

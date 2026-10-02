@@ -32,6 +32,7 @@ import {
   PukuBotGradientIcon,
   PukuLogoIcon,
   RefreshIcon,
+  RemoteIcon,
   SettingsIcon,
   SidebarToggleIcon,
   SunIcon,
@@ -44,6 +45,7 @@ import { NativeClipboard, NativePicker, PickedMedia } from '../../services/nativ
 import { formatActivityDate } from '../../utils/date';
 import { pukuBotApi } from '../../services/pukuBotApi';
 import { useApp } from '../../store/AppContext';
+import { useRemoteSession } from '../../store/RemoteSessionContext';
 import {
   PukuBotComputerInfo,
   PukuBotConversation,
@@ -131,6 +133,8 @@ export function PukuBotScreen() {
     addBotMessage,
     profile,
   } = useApp();
+  const { isActive: isRemoteActive, liveRelaySessions } = useRemoteSession();
+  const isTerminalLive = isRemoteActive || liveRelaySessions.length > 0;
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   // Dynamic greeting matching Puku AI
@@ -781,8 +785,16 @@ export function PukuBotScreen() {
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Computer control"
               activeOpacity={0.7}
               onPress={handleOpenComputerModal}
-              style={[styles.actionBtn, styles.computerBtn, { backgroundColor: isDark ? '#1C271E' : '#E0F3E5' }]}>
-              <ComputerMonitorIcon size={18} color={isDark ? '#94C7A0' : '#2D7543'} />
+              style={[
+                styles.actionBtn,
+                styles.computerBtn,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(176, 179, 252, 0.16)'
+                    : 'rgba(72, 77, 208, 0.12)',
+                },
+              ]}>
+              <ComputerMonitorIcon size={18} color={theme.primaryLight} />
             </TouchableOpacity>
           )}
 
@@ -797,7 +809,23 @@ export function PukuBotScreen() {
             activeOpacity={0.7}
             onPress={() => navigate('code')}
             style={styles.actionBtn}>
-            <TerminalPromptIcon size={20} color={theme.textSecondary} />
+            <RemoteIcon
+              size={19}
+              color={isTerminalLive ? theme.primaryLight : theme.textSecondary}
+            />
+            {isTerminalLive && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 6,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: theme.primaryLight,
+                }}
+              />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Settings"

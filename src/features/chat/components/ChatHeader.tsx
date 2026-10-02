@@ -67,17 +67,9 @@ export function ChatHeader({
 
           <View style={styles.brandTitleWrap}>
             <PukuLogoIcon size={20} />
-            {title ? (
-              <Text
-                numberOfLines={1}
-                style={[styles.topBarTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                {title}
-              </Text>
-            ) : (
-              <Text style={[styles.brandTitleText, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                puku ai
-              </Text>
-            )}
+            <Text style={[styles.brandTitleText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+              puku ai
+            </Text>
           </View>
         </View>
       )}

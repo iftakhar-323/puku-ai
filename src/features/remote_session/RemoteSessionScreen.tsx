@@ -16,6 +16,11 @@ import {
   ConnectedLinkIcon,
   CopyIcon,
   LogoutIcon,
+  MoonIcon,
+  PukuBotGradientIcon,
+  PukuLogoIcon,
+  RemoteIcon,
+  SunIcon,
   TrashIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
@@ -132,7 +137,8 @@ class RemoteSessionErrorBoundary extends React.Component<
 function RemoteSessionScreenContent() {
   const insets = useSafeAreaInsets();
   const { keyboardHeight } = useKeyboardHeight();
-  const { theme, goBack, navigate } = useApp();
+  const { theme, isDark, updateSettings, goBack, navigate } = useApp();
+  const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
   const {
     session,
     liveRelaySessions,
@@ -201,65 +207,118 @@ function RemoteSessionScreenContent() {
         },
       ]}
     >
-      <View style={styles.header}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          onPress={() => navigate('code')}
-          style={[
-            styles.circleBtn,
-            {
-              backgroundColor: theme.cardBackground,
-              borderColor: theme.outline,
-            },
-          ]}
-        >
-          <BackIcon size={20} color={theme.textPrimary} />
-        </TouchableOpacity>
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: theme.outline || 'rgba(255, 255, 255, 0.08)' },
+        ]}
+      >
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Back to remote sessions"
+            hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
+            onPress={() => navigate('code')}
+            style={styles.leadingBtn}
+          >
+            <BackIcon size={20} color={theme.textPrimary} />
+          </TouchableOpacity>
 
-        <View
-          style={[
-            styles.headerCard,
-            {
-              backgroundColor: theme.cardBackground,
-              borderColor: theme.outline,
-            },
-          ]}
-        >
-          <Text
-            numberOfLines={1}
-            style={[styles.headerTitle, { color: theme.textPrimary }]}
-          >
-            {session.title || 'Laptop CLI'}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[styles.headerSubtitle, { color: theme.textSecondary }]}
-          >
-            {isAttached && session.cwd ? session.cwd : PHASE_SUBTITLE[phase]}
-          </Text>
+          <View style={styles.titleContainer}>
+            <RemoteIcon size={20} color={theme.primaryLight} />
+            <Text
+              style={[
+                styles.headerTitle,
+                { color: theme.textPrimary, fontFamily: monoFont },
+              ]}
+            >
+              puku remote
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowMenu(true)}
+              style={[
+                styles.badge,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(176, 179, 252, 0.16)'
+                    : 'rgba(72, 77, 208, 0.12)',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                },
+              ]}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: linkColor,
+                }}
+              />
+              <Text
+                style={[
+                  styles.badgeText,
+                  { color: theme.primaryLight, fontFamily: monoFont },
+                ]}
+              >
+                {isAttached ? 'LIVE' : phase.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Session controls"
-          disabled={showPairing}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          onPress={() => setShowMenu(true)}
-          style={[
-            styles.circleBtn,
-            {
-              backgroundColor: theme.cardBackground,
-              borderColor: theme.outline,
-            },
-            showPairing && styles.dimmed,
-          ]}
-        >
-          <ConnectedLinkIcon size={20} color={linkColor} />
-        </TouchableOpacity>
+        <View style={styles.trailingGroup}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Session controls"
+            disabled={showPairing}
+            onPress={() => setShowMenu(true)}
+            style={styles.actionBtn}
+          >
+            <ConnectedLinkIcon size={18} color={linkColor} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Puku AI"
+            activeOpacity={0.7}
+            onPress={() => navigate('chat')}
+            style={styles.actionBtn}
+          >
+            <PukuLogoIcon size={19} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Puku Bot"
+            activeOpacity={0.7}
+            onPress={() => navigate('pukuBot')}
+            style={styles.actionBtn}
+          >
+            <PukuBotGradientIcon size={20} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Toggle theme"
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
+            onPress={() =>
+              updateSettings({ themeMode: isDark ? 'light' : 'dark' })
+            }
+            style={styles.actionBtn}
+          >
+            {isDark ? (
+              <SunIcon size={19} color={theme.textPrimary} />
+            ) : (
+              <MoonIcon size={19} color={theme.textPrimary} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {showPairing ? (
@@ -594,11 +653,54 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  leadingBtn: {
+    width: 28,
+    height: 36,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  badge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  trailingGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   circleBtn: {
     width: 38,
@@ -616,10 +718,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     alignItems: 'center',
     borderWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
   },
   headerSubtitle: {
     fontSize: 11.5,

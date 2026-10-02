@@ -11,12 +11,14 @@ import {
   View,
 } from 'react-native';
 import {
+  ArrowUpRightIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CopyIcon,
   RefreshIcon,
   RemoteIcon,
 } from '../../../components/common/Icons';
+import { useApp } from '../../../store/AppContext';
 import { ThemeColors } from '../../../theme/theme';
 import {
   CliColors,
@@ -34,6 +36,26 @@ import {
 
 const monoFont = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 const NEAR_BOTTOM_PX = 160;
+
+function getGreeting(userName?: string): { lead: string; name: string } {
+  const h = new Date().getHours();
+  let lead = 'Good morning,';
+  if (h >= 12 && h < 17) {
+    lead = 'Good afternoon,';
+  } else if (h >= 17 && h < 22) {
+    lead = 'Good evening,';
+  } else if (h >= 22 || h < 5) {
+    lead = 'Back at it,';
+  }
+
+  let name = 'there';
+  if (userName?.trim()) {
+    name = userName.trim().split(/\s+/)[0];
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  return { lead, name };
+}
 
 interface Props {
   entries: RemoteEntry[];
@@ -138,6 +160,9 @@ export function RemoteFeed({
     ],
   );
 
+  const { profile, isDark } = useApp();
+  const greeting = getGreeting(profile?.name);
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -152,23 +177,141 @@ export function RemoteFeed({
         scrollEventThrottle={100}
         onContentSizeChange={onContentSizeChange}
         ListEmptyComponent={
-          <View style={styles.empty}>
+          <View style={styles.emptyContainer}>
+            {/* Hero Header with Dynamic Greeting & Retro Computer Illustration (matching Puku AI) */}
+            <View style={styles.heroRow}>
+              <View style={styles.headlineWrapper}>
+                <Text style={[styles.headlineLead, { color: theme.textSecondary }]}>
+                  {greeting.lead}
+                </Text>
+                <Text style={[styles.headlineName, { color: theme.textPrimary }]}>
+                  {greeting.name}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.computerWrapper,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderColor: theme.outline || theme.border,
+                  },
+                ]}
+              >
+                <Image
+                  source={require('../../../../assets/images/retro_puku_computer.png')}
+                  style={styles.computerImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+
+            {/* Connected to Laptop Card */}
             <View
               style={[
-                styles.emptyIcon,
-                { backgroundColor: theme.pillBackground },
+                styles.connectedCard,
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderColor: theme.outline || theme.border,
+                },
               ]}
             >
-              <RemoteIcon size={24} color={theme.success} />
+              <View style={styles.connectedBadgeRow}>
+                <View
+                  style={[
+                    styles.connectedPill,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(176, 179, 252, 0.16)'
+                        : 'rgba(72, 77, 208, 0.12)',
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.liveDot,
+                      { backgroundColor: theme.primaryLight },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.connectedBadgeText,
+                      { color: theme.primaryLight, fontFamily: monoFont },
+                    ]}
+                  >
+                    CONNECTED TO YOUR LAPTOP
+                  </Text>
+                </View>
+              </View>
+
+              <Text
+                style={[styles.connectedHeading, { color: theme.textPrimary }]}
+              >
+                Control your laptop terminal
+              </Text>
+              <Text
+                style={[
+                  styles.connectedSub,
+                  { color: theme.textSecondary },
+                ]}
+              >
+                Ask Puku to inspect files, run git commands, execute tests, or control tasks in real time.
+              </Text>
             </View>
-            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              Laptop connected
-            </Text>
-            <Text
-              style={[styles.emptySubtitle, { color: theme.textSecondary }]}
-            >
-              Ask Puku to do something on your laptop.
-            </Text>
+
+            {/* Quick Commands / Suggestions */}
+            <View style={styles.suggestionsSection}>
+              <Text
+                style={[
+                  styles.suggestionsLabel,
+                  { color: theme.textMuted, fontFamily: monoFont },
+                ]}
+              >
+                QUICK COMMANDS
+              </Text>
+
+              {[
+                {
+                  label: 'Check git status & modified files',
+                  prompt: 'git status',
+                },
+                {
+                  label: 'List workspace files & directories',
+                  prompt: 'ls -la',
+                },
+                {
+                  label: 'Run test suite & show output',
+                  prompt: 'npm test',
+                },
+                {
+                  label: 'Show current system resource usage',
+                  prompt: 'Show system resource usage: CPU, RAM, and disk space',
+                },
+              ].map((cmd, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  activeOpacity={0.7}
+                  onPress={() => onResend(cmd.prompt)}
+                  style={[
+                    styles.suggestionChip,
+                    {
+                      backgroundColor: theme.cardBackground,
+                      borderColor: theme.outline || theme.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.suggestionChipText,
+                      { color: theme.textPrimary, fontFamily: monoFont },
+                    ]}
+                  >
+                    {cmd.label}
+                  </Text>
+                  <ArrowUpRightIcon size={14} color={theme.textSecondary} />
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         }
         ListFooterComponent={
@@ -485,30 +628,107 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     flexGrow: 1,
   },
-  empty: {
+  emptyContainer: {
+    paddingHorizontal: 4,
+    paddingTop: 8,
+    paddingBottom: 24,
+    width: '100%',
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  headlineWrapper: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 8,
+    paddingRight: 12,
   },
-  emptyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontSize: 15,
+  headlineLead: {
+    fontSize: 27,
     fontWeight: '700',
+    lineHeight: 35,
+    letterSpacing: -0.4,
   },
-  emptySubtitle: {
-    fontSize: 12.5,
-    textAlign: 'center',
-    paddingHorizontal: 28,
+  headlineName: {
+    fontSize: 27,
+    fontWeight: '700',
+    lineHeight: 35,
+    letterSpacing: -0.4,
+  },
+  computerWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  computerImage: {
+    width: 110,
+    height: 102,
+  },
+  connectedCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  connectedBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  connectedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 6,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  connectedBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  connectedHeading: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  connectedSub: {
+    fontSize: 13,
     lineHeight: 18,
+  },
+  suggestionsSection: {
+    marginTop: 4,
+  },
+  suggestionsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  suggestionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginVertical: 4,
+  },
+  suggestionChipText: {
+    fontSize: 13,
+    flex: 1,
+    marginRight: 10,
   },
   typing: {
     marginVertical: 4,
