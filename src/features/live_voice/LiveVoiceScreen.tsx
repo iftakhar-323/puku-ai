@@ -12,6 +12,7 @@ import {
   LiveVoiceIcon,
   MicIcon,
 } from '../../components/common/Icons';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../store/AppContext';
 import { NativeSpeech, NativeTts } from '../../services/nativeModules';
 
@@ -19,6 +20,7 @@ type VoiceStatus = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
 
 export function LiveVoiceScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { goBack, sendMessage, isGenerating, activeConversation } = useApp();
 
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -104,7 +106,7 @@ export function LiveVoiceScreen() {
       setErrorText('');
       const started = await NativeSpeech.startListening();
       setVoiceStatus(started ? 'listening' : 'error');
-      if (!started) setErrorText('Speech recognition is unavailable on this device.');
+      if (!started) setErrorText(t('liveVoice.recognitionUnavailable'));
     } else if (voiceStatus === 'listening') {
       await NativeSpeech.stopListening();
     } else if (voiceStatus === 'speaking') {
@@ -116,15 +118,15 @@ export function LiveVoiceScreen() {
   const getStatusText = () => {
     switch (voiceStatus) {
       case 'idle':
-        return 'Tap the mic to talk';
+        return t('liveVoice.tapToTalk');
       case 'listening':
-        return 'Listening...';
+        return t('liveVoice.listening');
       case 'thinking':
-        return 'Puku is thinking...';
+        return t('liveVoice.thinking');
       case 'speaking':
-        return 'Puku is responding...';
+        return t('liveVoice.speaking');
       case 'error':
-        return 'Something went wrong';
+        return t('liveVoice.error');
     }
   };
 
@@ -142,7 +144,7 @@ export function LiveVoiceScreen() {
       <View style={styles.topBar}>
         <View style={styles.badge}>
           <LiveVoiceIcon size={18} color="#A5A5FF" />
-          <Text style={styles.badgeText}>LIVE CONVERSATION</Text>
+          <Text style={styles.badgeText}>{t('liveVoice.badge')}</Text>
         </View>
 
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={goBack} style={styles.closeBtn}>
@@ -191,10 +193,10 @@ export function LiveVoiceScreen() {
         <Text style={styles.statusTitle}>{getStatusText()}</Text>
         <Text style={styles.subtext}>
           {voiceStatus === 'error'
-            ? errorText || 'Please try again.'
+            ? errorText || t('liveVoice.subtextErrorFallback')
             : voiceStatus === 'speaking' && lastReply
             ? lastReply
-            : 'Natural real-time low latency audio'}
+            : t('liveVoice.subtextIdle')}
         </Text>
       </View>
 
@@ -207,7 +209,7 @@ export function LiveVoiceScreen() {
             { backgroundColor: isSpeakerOn ? '#201C59' : '#151125' },
           ]}>
           <Text style={styles.controlBtnText}>
-            {isSpeakerOn ? '🔊 Speaker' : '🔈 Ear'}
+            {isSpeakerOn ? t('liveVoice.speakerOn') : t('liveVoice.speakerOff')}
           </Text>
         </TouchableOpacity>
 
@@ -229,7 +231,7 @@ export function LiveVoiceScreen() {
           onPress={goBack}
           style={[styles.controlBtn, { backgroundColor: '#FF4D4F' }]}>
           <Text style={[styles.controlBtnText, { color: '#FFFFFF' }]}>
-            End
+            {t('liveVoice.end')}
           </Text>
         </TouchableOpacity>
       </View>

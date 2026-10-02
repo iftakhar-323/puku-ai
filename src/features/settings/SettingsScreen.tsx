@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Badge, Switch } from '../../components/ui';
 import {
   BackIcon,
@@ -40,6 +41,7 @@ import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 export function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { keyboardHeight } = useKeyboardHeight();
   const {
     theme,
@@ -57,19 +59,21 @@ export function SettingsScreen() {
   );
 
   const displayEmail =
-    profile.email || 'Tap to sign in';
+    profile.email || t('settings.signInPrompt');
   const displayName =
-    profile.name || (profile.email ? profile.email.split('@')[0] : 'Guest');
-  const displayPlan = profile.email ? (profile.plan || 'Power') : 'Sign In';
+    profile.name || (profile.email ? profile.email.split('@')[0] : t('settings.guest'));
+  const displayPlan = profile.email
+    ? profile.plan || t('settings.planDefault')
+    : t('settings.planSignedOut');
 
   const handleLogout = () => {
     Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out of your Puku account?',
+      t('settings.logoutDialogTitle'),
+      t('settings.logoutDialogMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('settings.cancel'), style: 'cancel' },
         {
-          text: 'Log out',
+          text: t('settings.logout'),
           style: 'destructive',
           onPress: () => logout(),
         },
@@ -88,7 +92,7 @@ export function SettingsScreen() {
             backgroundColor: theme.background,
           },
         ]}>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back"
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('settings.back')}
           activeOpacity={0.7}
           onPress={goBack}
           style={styles.headerBtn}>
@@ -96,10 +100,10 @@ export function SettingsScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
-          Settings
+          {t('settings.title')}
         </Text>
 
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="About"
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('settings.about')}
           activeOpacity={0.7}
           onPress={() => setInfoModalVisible(true)}
           style={styles.headerBtn}>
@@ -163,7 +167,7 @@ export function SettingsScreen() {
               <ProfileIcon size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-              Profile
+              {t('settings.profile')}
             </Text>
             <ChevronRightIcon size={18} color={theme.textSecondary} />
           </TouchableOpacity>
@@ -173,7 +177,12 @@ export function SettingsScreen() {
           {/* Billing */}
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Billing', 'Active plan: ' + displayPlan)}
+            onPress={() =>
+              Alert.alert(
+                t('settings.billingAlertTitle'),
+                t('settings.billingAlertMessage', { plan: displayPlan })
+              )
+            }
             style={styles.sectionRow}>
             <View
               style={[
@@ -183,7 +192,7 @@ export function SettingsScreen() {
               <CreditCardIcon size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-              Billing
+              {t('settings.billing')}
             </Text>
             <ChevronRightIcon size={18} color={theme.textSecondary} />
           </TouchableOpacity>
@@ -203,7 +212,7 @@ export function SettingsScreen() {
               <BarChartIcon size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-              Usage
+              {t('settings.usage')}
             </Text>
             <ChevronRightIcon size={18} color={theme.textSecondary} />
           </TouchableOpacity>
@@ -219,7 +228,10 @@ export function SettingsScreen() {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() =>
-              Alert.alert('Capabilities', 'Web Search & Code Execution enabled')
+              Alert.alert(
+                t('settings.capabilities'),
+                t('settings.capabilitiesAlertMessage')
+              )
             }
             style={styles.sectionRow}>
             <View
@@ -231,10 +243,10 @@ export function SettingsScreen() {
             </View>
             <View style={styles.labelCol}>
               <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-                Capabilities
+                {t('settings.capabilities')}
               </Text>
               <Text style={[styles.rowSubLabel, { color: theme.textSecondary }]}>
-                2 enabled
+                {t('settings.capabilitiesSubLabel')}
               </Text>
             </View>
             <ChevronRightIcon size={18} color={theme.textSecondary} />
@@ -246,7 +258,10 @@ export function SettingsScreen() {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() =>
-              Alert.alert('Permissions', 'Microphone and network permissions active')
+              Alert.alert(
+                t('settings.permissions'),
+                t('settings.permissionsAlertMessage')
+              )
             }
             style={styles.sectionRow}>
             <View
@@ -257,7 +272,7 @@ export function SettingsScreen() {
               <LockIcon size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-              Permissions
+              {t('settings.permissions')}
             </Text>
             <ChevronRightIcon size={18} color={theme.textSecondary} />
           </TouchableOpacity>
@@ -277,7 +292,7 @@ export function SettingsScreen() {
               <VoiceIcon size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-              Voice
+              {t('settings.voice')}
             </Text>
             <ChevronRightIcon size={18} color={theme.textSecondary} />
           </TouchableOpacity>
@@ -304,10 +319,12 @@ export function SettingsScreen() {
             </View>
             <View style={styles.labelCol}>
               <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-                Dark Theme
+                {t('settings.darkTheme')}
               </Text>
               <Text style={[styles.rowSubLabel, { color: theme.textSecondary }]}>
-                {settings.themeMode === 'dark' ? 'Dark theme active' : 'Light theme active'}
+                {settings.themeMode === 'dark'
+                  ? t('settings.darkThemeActive')
+                  : t('settings.lightThemeActive')}
               </Text>
             </View>
             <Switch
@@ -335,7 +352,7 @@ export function SettingsScreen() {
               <VibrateIcon size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-              Haptic feedback
+              {t('settings.hapticFeedback')}
             </Text>
             <Switch
               value={settings.hapticFeedback}
@@ -353,7 +370,12 @@ export function SettingsScreen() {
           {/* Notifications */}
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Notifications', 'Push notifications enabled')}
+            onPress={() =>
+              Alert.alert(
+                t('settings.notifications'),
+                t('settings.notificationsAlertMessage')
+              )
+            }
             style={styles.sectionRow}>
             <View
               style={[
@@ -363,7 +385,7 @@ export function SettingsScreen() {
               <BellIcon size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-              Notifications
+              {t('settings.notifications')}
             </Text>
             <ChevronRightIcon size={18} color={theme.textSecondary} />
           </TouchableOpacity>
@@ -373,7 +395,12 @@ export function SettingsScreen() {
           {/* Shared links */}
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Shared Links', 'No active shared links')}
+            onPress={() =>
+              Alert.alert(
+                t('settings.sharedLinksAlertTitle'),
+                t('settings.sharedLinksAlertMessage')
+              )
+            }
             style={styles.sectionRow}>
             <View
               style={[
@@ -383,7 +410,7 @@ export function SettingsScreen() {
               <ExternalLinkIcon size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>
-              Shared links
+              {t('settings.sharedLinks')}
             </Text>
             <ChevronRightIcon size={18} color={theme.textSecondary} />
           </TouchableOpacity>
@@ -399,7 +426,7 @@ export function SettingsScreen() {
           ]}>
           <LogoutIcon size={22} color={AppColors.pumpkin} />
           <Text style={[styles.logoutText, { color: AppColors.pumpkin }]}>
-            Log out
+            {t('settings.logout')}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -425,9 +452,9 @@ export function SettingsScreen() {
             ]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                Puku AI Information
+                {t('settings.aboutTitle')}
               </Text>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.close')}
                 onPress={() => setInfoModalVisible(false)}
                 style={styles.closeBtn}>
                 <CloseIcon size={20} color={theme.textPrimary} />
@@ -435,30 +462,30 @@ export function SettingsScreen() {
             </View>
 
             <Text style={[styles.modalSub, { color: theme.textSecondary }]}>
-              Version 1.0.0 (Production Release)
+              {t('settings.versionLabel', { version: '1.0.0' })}
             </Text>
 
             <View style={styles.modalSection}>
               <Text style={[styles.modalLabel, { color: theme.textMuted }]}>
-                ACTIVE ACCOUNT
+                {t('settings.activeAccount')}
               </Text>
               <Text style={[styles.modalValue, { color: theme.textPrimary }]}>
                 {displayEmail}
               </Text>
               <Text style={[styles.modalValue, { color: theme.textSecondary }]}>
-                Plan: {displayPlan} • Status: Active
+                {t('settings.planStatus', { plan: displayPlan })}
               </Text>
             </View>
 
             {__DEV__ && (
               <View style={styles.modalSection}>
                 <Text style={[styles.modalLabel, { color: theme.textMuted }]}>
-                  AUTH TOKEN (DEV ONLY)
+                  {t('settings.authTokenDevOnly')}
                 </Text>
                 <TextInput
                   value={tokenInput}
                   onChangeText={setTokenInput}
-                  placeholder="Paste JWT / Bearer token"
+                  placeholder={t('settings.pasteTokenPlaceholder')}
                   placeholderTextColor={theme.placeholderText}
                   secureTextEntry
                   style={[
@@ -475,12 +502,15 @@ export function SettingsScreen() {
                   onPress={() => {
                     if (tokenInput.trim()) {
                       pukuApi.setAuthToken(tokenInput.trim());
-                      Alert.alert('Success', 'Auth token updated.');
+                      Alert.alert(
+                        t('settings.tokenUpdateSuccessTitle'),
+                        t('settings.tokenUpdated')
+                      );
                       setInfoModalVisible(false);
                     }
                   }}
                   style={[styles.saveTokenBtn, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.saveTokenBtnText}>Save Token</Text>
+                  <Text style={styles.saveTokenBtnText}>{t('settings.saveToken')}</Text>
                 </TouchableOpacity>
               </View>
             )}

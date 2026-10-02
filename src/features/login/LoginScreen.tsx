@@ -18,6 +18,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from '../../services/secureStorage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   CloseIcon,
   EmailIcon,
@@ -46,6 +47,7 @@ import { ignore } from '../../utils/devLog';
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { navigate, updateProfile, refreshConversations } = useApp();
   const { keyboardHeight } = useKeyboardHeight();
 
@@ -64,7 +66,7 @@ export function LoginScreen() {
 
   // OAuth State
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  const [authStatusMessage, setAuthStatusMessage] = useState('Ready to connect with Google');
+  const [authStatusMessage, setAuthStatusMessage] = useState(t('login.readyToConnectGoogle'));
   const [manualCodeInput, setManualCodeInput] = useState('');
   const [authVerifier, setAuthVerifier] = useState<string>('');
   const [authState, setAuthState] = useState<string>('');
@@ -130,7 +132,7 @@ export function LoginScreen() {
     if (!urlStr) return;
 
     try {
-      setAuthStatusMessage('Signing in with Google credentials...');
+      setAuthStatusMessage(t('login.signingInWithGoogle'));
       let code = '';
       let returnedState = '';
 
@@ -144,7 +146,7 @@ export function LoginScreen() {
       }
 
       if (!code) {
-        showSnackBar('Authentication canceled or missing authorization code');
+        showSnackBar(t('login.authCanceledOrMissingCode'));
         setIsGoogleModalOpen(false);
         setIsOAuthWaiting(false);
         return;
@@ -157,7 +159,7 @@ export function LoginScreen() {
       const redirectUri = overrideRedirectUri || getOAuthRedirectUri();
 
       if (storedState && returnedState && storedState !== returnedState) {
-        showSnackBar('State validation failed. Please try again.');
+        showSnackBar(t('login.stateValidationFailed'));
         setIsGoogleModalOpen(false);
         setIsOAuthWaiting(false);
         return;
@@ -249,7 +251,7 @@ export function LoginScreen() {
             if (accessData?.sub && !authenticId) authenticId = accessData.sub;
           }
 
-          const resolvedName = authenticName || (authenticEmail ? authenticEmail.split('@')[0] : 'Google User');
+          const resolvedName = authenticName || (authenticEmail ? authenticEmail.split('@')[0] : t('login.googleUserFallbackName'));
 
           updateProfile({
             name: resolvedName,
@@ -269,7 +271,11 @@ export function LoginScreen() {
           setIsOAuthWaiting(false);
           setIsOpeningWorkspace(true);
 
-          showSnackBar(authenticEmail ? `Signed in as ${authenticEmail}` : 'Google Sign-In successful!');
+          showSnackBar(
+            authenticEmail
+              ? t('login.signedInAs', { email: authenticEmail })
+              : t('login.googleSignInSuccess')
+          );
           refreshConversations().catch(ignore('LoginScreen'));
           setTimeout(() => {
             setIsOpeningWorkspace(false);
@@ -284,12 +290,17 @@ export function LoginScreen() {
       setIsGoogleModalOpen(false);
       setIsOAuthWaiting(false);
       showSnackBar(
-        `Google Sign-In failed: ${errBody?.error_description || errBody?.error || 'Invalid authorization code'}`
+        t('login.googleSignInFailed', {
+          reason:
+            errBody?.error_description ||
+            errBody?.error ||
+            t('login.invalidAuthorizationCode'),
+        })
       );
     } catch (err: any) {
       setIsGoogleModalOpen(false);
       setIsOAuthWaiting(false);
-      showSnackBar(`Sign-In error: ${err.message || 'Network error'}`);
+      showSnackBar(t('login.signInError', { reason: err.message || t('login.networkError') }));
     }
   };
 
@@ -353,15 +364,15 @@ export function LoginScreen() {
         if (authResponse.type === 'success' && authResponse.url) {
           await handleOAuthCallbackUrl(authResponse.url, verifier, stateVal, redirectUri);
         } else if (authResponse.type === 'cancel') {
-          showSnackBar('Google Sign-In canceled');
+          showSnackBar(t('login.googleSignInCanceled'));
         }
       } else {
         // Fallback to external browser
         setIsGoogleModalOpen(true);
         setIsOAuthWaiting(true);
-        setAuthStatusMessage('Launching browser for Google Sign-In...');
+        setAuthStatusMessage(t('login.launchingBrowser'));
         await Linking.openURL(authUrl);
-        setAuthStatusMessage('Complete Google login in your browser. Puku AI will return automatically.');
+        setAuthStatusMessage(t('login.completeLoginInBrowser'));
       }
     } catch (err: any) {
       // In case InAppBrowser fails, open system browser
@@ -381,10 +392,12 @@ export function LoginScreen() {
 
         setIsGoogleModalOpen(true);
         setIsOAuthWaiting(true);
-        setAuthStatusMessage('Complete Google login in your browser. Puku AI will return automatically.');
+        setAuthStatusMessage(t('login.completeLoginInBrowser'));
         await Linking.openURL(fallbackUrl);
       } catch (linkErr: any) {
-        showSnackBar(`Failed to open Google Sign-In: ${err.message || linkErr.message}`);
+        showSnackBar(
+          t('login.failedToOpenGoogleSignIn', { reason: err.message || linkErr.message })
+        );
       }
     }
   };
@@ -395,11 +408,11 @@ export function LoginScreen() {
     const trimmedCredential = passwordInput.trim();
 
     if (!trimmedEmail) {
-      setEmailErrorMessage('Please enter your exact email address');
+      setEmailErrorMessage(t('login.enterExactEmail'));
       return;
     }
     if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
-      setEmailErrorMessage('Please enter a valid email address');
+      setEmailErrorMessage(t('login.enterValidEmail'));
       return;
     }
 
@@ -426,7 +439,7 @@ export function LoginScreen() {
         }
       } else if (!trimmedCredential) {
         // If password/token is completely empty
-        setEmailErrorMessage('Please enter your password or authentic Puku Bearer token');
+        setEmailErrorMessage(t('login.enterPasswordOrToken'));
         setIsEmailSubmitting(false);
         return;
       }
@@ -456,7 +469,7 @@ export function LoginScreen() {
       }, 1200);
     } catch (e: any) {
       setIsEmailSubmitting(false);
-      setEmailErrorMessage(e.message || 'Login failed. Please verify credentials.');
+      setEmailErrorMessage(e.message || t('login.loginFailed'));
     }
   };
 
@@ -465,7 +478,7 @@ export function LoginScreen() {
       <View style={styles.workspaceLoadingContainer}>
         <StatusBar barStyle="light-content" />
         <Text style={[styles.workspaceLoadingText, { fontFamily: monoFont }]}>
-          Opening workspace...
+          {t('login.openingWorkspace')}
         </Text>
       </View>
     );
@@ -496,11 +509,11 @@ export function LoginScreen() {
         {/* 3. Hero Typography matching screenshot */}
         <View style={styles.heroSection}>
           <Text style={[styles.heroHeadline, { fontFamily: monoFont }]}>
-            A little{'\n'}curiosity.{'\n'}A lot of{'\n'}possibility.
+            {t('login.heroHeadline')}
           </Text>
 
           <Text style={[styles.heroSubtitle, { fontFamily: monoFont }]}>
-            A place to think, make and figure things out.
+            {t('login.heroSubtitle')}
           </Text>
         </View>
 
@@ -509,7 +522,7 @@ export function LoginScreen() {
           activeOpacity={0.85}
           disabled={isGoogleLoading}
           accessibilityRole="button"
-          accessibilityLabel="Sign in to Puku with Google"
+          accessibilityLabel={t('login.signInWithGoogleLabel')}
           onPress={handleGoogleSignIn}
           style={styles.primarySignInBtn}>
           {isGoogleLoading ? (
@@ -518,7 +531,7 @@ export function LoginScreen() {
             <>
               <GoogleIcon size={18} color="#FFFFFF" />
               <Text style={[styles.primarySignInText, { fontFamily: monoFont }]}>
-                Sign in with Google
+                {t('login.signInWithGoogle')}
               </Text>
             </>
           )}
@@ -528,7 +541,7 @@ export function LoginScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Sign in with email or access token"
+          accessibilityLabel={t('login.signInWithEmailOrToken')}
           onPress={() => {
             setEmailErrorMessage(null);
             setIsEmailModalOpen(true);
@@ -536,7 +549,7 @@ export function LoginScreen() {
           style={styles.secondarySignInBtn}>
           <EmailIcon size={15} color="#A0A0A8" />
           <Text style={[styles.secondarySignInText, { fontFamily: monoFont }]}>
-            Sign in with email or access token
+            {t('login.signInWithEmailOrToken')}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -578,9 +591,9 @@ export function LoginScreen() {
               <View style={styles.modalHeaderRow}>
                 <View style={styles.modalTitleBadge}>
                   <EmailIcon size={18} color={AppColors.blueLite} />
-                  <Text style={styles.modalTitleText}>Sign in with Email</Text>
+                  <Text style={styles.modalTitleText}>{t('login.signInWithEmailTitle')}</Text>
                 </View>
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.close')}
                   onPress={() => setIsEmailModalOpen(false)}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   <CloseIcon size={20} color={AppColors.coolGrey} />
@@ -588,7 +601,7 @@ export function LoginScreen() {
               </View>
 
               <Text style={styles.modalSubtitleText}>
-                Enter your account email to access your Puku workspace and AI models.
+                {t('login.emailModalSubtitle')}
               </Text>
 
               {/* Error Message */}
@@ -600,17 +613,17 @@ export function LoginScreen() {
 
               {/* Email Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                <Text style={styles.inputLabel}>{t('login.emailAddressLabel')}</Text>
                 <View style={styles.inputWrapper}>
                   <EmailIcon size={18} color={AppColors.coolGrey} />
                   <TextInput
                     style={styles.textInputField}
                     value={emailInput}
-                    onChangeText={t => {
-                      setEmailInput(t);
+                    onChangeText={text => {
+                      setEmailInput(text);
                       if (emailErrorMessage) setEmailErrorMessage(null);
                     }}
-                    placeholder="you@domain.com"
+                    placeholder={t('login.emailPlaceholder')}
                     placeholderTextColor={AppColors.coolGrey}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -621,19 +634,19 @@ export function LoginScreen() {
 
               {/* Password / Access Token Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PASSWORD OR ACCESS TOKEN</Text>
+                <Text style={styles.inputLabel}>{t('login.passwordOrTokenLabel')}</Text>
                 <View style={styles.inputWrapper}>
                   <LockIcon size={18} color={AppColors.coolGrey} />
                   <TextInput
                     style={[styles.textInputField, { flex: 1 }]}
                     value={passwordInput}
                     onChangeText={setPasswordInput}
-                    placeholder="Enter password or token"
+                    placeholder={t('login.passwordPlaceholder')}
                     placeholderTextColor={AppColors.coolGrey}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                   />
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Show or hide password"
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('login.showHidePassword')}
                     onPress={() => setShowPassword(p => !p)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     {showPassword ? (
@@ -654,7 +667,7 @@ export function LoginScreen() {
                 {isEmailSubmitting ? (
                   <ActivityIndicator size="small" color={AppColors.white} />
                 ) : (
-                  <Text style={styles.primaryModalBtnText}>Sign In with Email</Text>
+                  <Text style={styles.primaryModalBtnText}>{t('login.signInWithEmailButton')}</Text>
                 )}
               </TouchableOpacity>
 
@@ -666,7 +679,7 @@ export function LoginScreen() {
                 }}
                 style={styles.webEmailLinkBtn}>
                 <Text style={styles.webEmailLinkText}>
-                  Need one-time magic link? Open Puku Web Email →
+                  {t('login.magicLinkPrompt')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -700,7 +713,7 @@ export function LoginScreen() {
                 <GoogleIcon size={32} color={AppColors.black} />
               </View>
 
-              <Text style={styles.browserDialogTitle}>Google Sign-In</Text>
+              <Text style={styles.browserDialogTitle}>{t('login.googleSignInTitle')}</Text>
 
               <Text style={styles.browserDialogDesc}>
                 {authStatusMessage}
@@ -716,13 +729,13 @@ export function LoginScreen() {
 
               {/* Direct manual paste fallback in case browser does not auto-redirect */}
               <View style={{ width: '100%', marginTop: 6, marginBottom: 12 }}>
-                <Text style={styles.inputLabel}>OR PASTE REDIRECT URL / AUTH CODE</Text>
+                <Text style={styles.inputLabel}>{t('login.redirectUrlLabel')}</Text>
                 <View style={styles.inputWrapper}>
                   <TextInput
                     style={styles.textInputField}
                     value={manualCodeInput}
                     onChangeText={setManualCodeInput}
-                    placeholder="Paste callback URL or code here"
+                    placeholder={t('login.redirectUrlPlaceholder')}
                     placeholderTextColor={AppColors.coolGrey}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -737,7 +750,7 @@ export function LoginScreen() {
                       handleOAuthCallbackUrl(inputVal);
                     }}
                     style={[styles.primaryModalBtn, { marginTop: 8, height: 42 }]}>
-                    <Text style={styles.primaryModalBtnText}>Verify & Sign In</Text>
+                    <Text style={styles.primaryModalBtnText}>{t('login.verifyAndSignIn')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -747,7 +760,7 @@ export function LoginScreen() {
                 onPress={handleGoogleSignIn}
                 style={styles.openBrowserBtn}>
                 <Text style={styles.openBrowserBtnText}>
-                  🌐 Re-open Google OAuth
+                  {t('login.reopenGoogleOAuth')}
                 </Text>
               </TouchableOpacity>
 
@@ -760,7 +773,7 @@ export function LoginScreen() {
                 }}
                 style={styles.switchModalBtn}>
                 <Text style={styles.switchModalText}>
-                  Prefer Token or Email? Sign in manually instead
+                  {t('login.preferTokenOrEmail')}
                 </Text>
               </TouchableOpacity>
 
@@ -771,7 +784,7 @@ export function LoginScreen() {
                   setIsOAuthWaiting(false);
                 }}
                 style={styles.cancelAuthBtn}>
-                <Text style={styles.cancelAuthText}>Cancel</Text>
+                <Text style={styles.cancelAuthText}>{t('login.cancel')}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

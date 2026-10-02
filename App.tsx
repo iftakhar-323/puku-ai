@@ -10,6 +10,7 @@ import { Linking, Platform, StatusBar, Text, TouchableOpacity, View } from 'reac
 import * as Sentry from '@sentry/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { initSentry } from './src/config/sentryConfig';
+import './src/i18n';
 import { AppDrawer } from './src/components/common/AppDrawer';
 import { ArtifactsScreen } from './src/features/artifacts/ArtifactsScreen';
 import { ChatScreen } from './src/features/chat/ChatScreen';

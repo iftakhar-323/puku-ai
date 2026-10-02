@@ -50,6 +50,10 @@ jest.mock('expo-secure-store', () => {
   };
 });
 
+jest.mock('expo-localization', () => ({
+  getLocales: jest.fn(() => [{ languageCode: 'en', languageTag: 'en-US' }]),
+}));
+
 jest.mock('expo-camera', () => ({
   CameraView: 'CameraView',
   useCameraPermissions: jest.fn(() => [
