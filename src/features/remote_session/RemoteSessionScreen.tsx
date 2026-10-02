@@ -20,7 +20,6 @@ import {
   PukuBotGradientIcon,
   PukuLogoIcon,
   PukuRemoteGradientIcon,
-  RemoteIcon,
   SunIcon,
   TrashIcon,
 } from '../../components/common/Icons';

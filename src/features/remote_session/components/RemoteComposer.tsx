@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { ChevronDownIcon, CloseIcon, PaperclipIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
-import { NativePicker, PickedMedia, promptMediaAttachment } from '../../../services/nativeModules';
+import { NativePicker, PickedMedia } from '../../../services/nativeModules';
+import { MediaPickerModal } from '../../../components/common/MediaPickerModal';
 import { OptionSheet } from './OptionSheet';
 import {
   isValidAttachment,
@@ -50,6 +51,7 @@ export function RemoteComposer({
   const [text, setText] = useState('');
   const [sheet, setSheet] = useState<'mode' | 'model' | null>(null);
   const [attachment, setAttachment] = useState<PickedMedia | null>(null);
+  const [showPickerSheet, setShowPickerSheet] = useState(false);
 
   const hasText = text.trim().length > 0;
   const hasAttachment = !!attachment;
@@ -63,19 +65,41 @@ export function RemoteComposer({
       : REMOTE_MODELS;
 
   const handleAttach = () => {
-    promptMediaAttachment(
-      (media: PickedMedia) => {
-        if (!isValidAttachment(media)) {
-          Alert.alert(
-            'Unsupported attachment',
-            'Attach a PNG, JPEG, GIF, or WEBP image under 700KB.',
-          );
-          return;
-        }
-        setAttachment(media);
-      },
-      'Attach Image'
-    );
+    setShowPickerSheet(true);
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const media = await NativePicker.takePhoto();
+      if (!media) return;
+      if (!isValidAttachment(media)) {
+        Alert.alert(
+          'Unsupported attachment',
+          'Attach a PNG, JPEG, GIF, or WEBP image under 700KB.',
+        );
+        return;
+      }
+      setAttachment(media);
+    } catch (err: any) {
+      Alert.alert('Camera Error', err?.message || 'Could not take photo');
+    }
+  };
+
+  const handlePickMedia = async () => {
+    try {
+      const media = await NativePicker.pickMedia();
+      if (!media) return;
+      if (!isValidAttachment(media)) {
+        Alert.alert(
+          'Unsupported attachment',
+          'Attach a PNG, JPEG, GIF, or WEBP image under 700KB.',
+        );
+        return;
+      }
+      setAttachment(media);
+    } catch (err: any) {
+      Alert.alert('File Error', err?.message || 'Could not pick file');
+    }
   };
 
   const submit = () => {
@@ -258,6 +282,14 @@ export function RemoteComposer({
           if (key !== model) onSetModel(key);
         }}
         onClose={() => setSheet(null)}
+      />
+      <MediaPickerModal
+        visible={showPickerSheet}
+        theme={theme}
+        title="Attach Image"
+        onClose={() => setShowPickerSheet(false)}
+        onTakePhoto={handleTakePhoto}
+        onPickMedia={handlePickMedia}
       />
     </View>
   );

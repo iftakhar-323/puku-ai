@@ -27,6 +27,7 @@ import {
   LockIcon,
   PukuLogoIcon,
 } from '../../components/common/Icons';
+import { RetroComputerIllustration } from '../../components/common/RetroComputerIllustration';
 import { pukuApi } from '../../services/api';
 import { tokenManager } from '../../services/tokenManager';
 import { useApp } from '../../store/AppContext';
@@ -486,8 +487,7 @@ export function LoginScreen() {
         showsVerticalScrollIndicator={false}>
         {/* 2. Retro Computer Illustration */}
         <View style={styles.retroComputerWrap}>
-          <Image
-            source={require('../../assets/images/retro_puku_computer.png')}
+          <RetroComputerIllustration
             style={styles.retroComputerImage}
             resizeMode="contain"
           />

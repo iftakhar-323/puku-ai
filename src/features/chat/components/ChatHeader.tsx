@@ -7,9 +7,9 @@ import {
   MoonIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
+  PukuRemoteGradientIcon,
   SidebarToggleIcon,
   SunIcon,
-  TerminalPromptIcon,
 } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 
@@ -89,10 +89,7 @@ export function ChatHeader({
               activeOpacity={0.7}
               onPress={onTerminalTap}
               style={styles.actionBtn}>
-              <TerminalPromptIcon
-                size={19}
-                color={isTerminalLive ? theme.primaryLight : theme.textSecondary}
-              />
+              <PukuRemoteGradientIcon size={20} />
               {isTerminalLive && (
                 <View style={[styles.liveDot, { backgroundColor: theme.primaryLight }]} />
               )}

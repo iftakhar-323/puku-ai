@@ -31,6 +31,7 @@ import {
   PlusIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
+  PukuRemoteGradientIcon,
   RefreshIcon,
   RemoteIcon,
   SettingsIcon,
@@ -39,6 +40,8 @@ import {
   TerminalPromptIcon,
   UpArrowIcon,
 } from '../../components/common/Icons';
+import { RetroComputerIllustration } from '../../components/common/RetroComputerIllustration';
+import { MediaPickerModal } from '../../components/common/MediaPickerModal';
 import { ENV } from '../../config/env';
 import { MarkdownRenderer } from '../chat/components/MarkdownRenderer';
 import {
@@ -313,13 +316,28 @@ export function PukuBotScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handlePickMedia = () => {
-    promptMediaAttachment(
-      (file: PickedMedia) => {
-        setPendingAttachment(file);
-      },
-      'Attach Photo or File'
-    );
+  const [showBotPickerSheet, setShowBotPickerSheet] = useState(false);
+
+  const handleOpenPicker = () => {
+    setShowBotPickerSheet(true);
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const file = await NativePicker.takePhoto();
+      if (file) setPendingAttachment(file);
+    } catch (err: any) {
+      Alert.alert('Camera Error', err?.message || 'Could not take photo');
+    }
+  };
+
+  const handlePickFile = async () => {
+    try {
+      const file = await NativePicker.pickMedia();
+      if (file) setPendingAttachment(file);
+    } catch (err: any) {
+      Alert.alert('Upload Error', err?.message || 'Could not pick file');
+    }
   };
 
   const handleSelectRecentConv = async (convId: string) => {
@@ -812,10 +830,7 @@ export function PukuBotScreen() {
             activeOpacity={0.7}
             onPress={() => navigate('code')}
             style={styles.actionBtn}>
-            <RemoteIcon
-              size={19}
-              color={isTerminalLive ? theme.primaryLight : theme.textSecondary}
-            />
+            <PukuRemoteGradientIcon size={20} />
             {isTerminalLive && (
               <View
                 style={{
@@ -955,8 +970,7 @@ export function PukuBotScreen() {
                 { backgroundColor: theme.cardBackground, borderColor: theme.outline },
               ]}
             >
-              <Image
-                source={require('../../assets/images/retro_puku_computer.png')}
+              <RetroComputerIllustration
                 style={styles.botComputerImage}
                 resizeMode="contain"
               />
@@ -1250,7 +1264,7 @@ export function PukuBotScreen() {
           <View style={styles.composerLeftMeta}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Attach file"
               activeOpacity={0.7}
-              onPress={handlePickMedia}
+              onPress={handleOpenPicker}
               style={[styles.composerIconBtn, { borderColor: theme.border }]}>
               <PaperclipIcon size={17} color={theme.textSecondary} />
             </TouchableOpacity>
@@ -1556,6 +1570,16 @@ export function PukuBotScreen() {
           </View>
         </View>
       </Modal>
+
+      <MediaPickerModal
+        visible={showBotPickerSheet}
+        theme={theme}
+        isDark={isDark}
+        title="Attach Photo or File"
+        onClose={() => setShowBotPickerSheet(false)}
+        onTakePhoto={handleTakePhoto}
+        onPickMedia={handlePickFile}
+      />
     </KeyboardAvoidingView>
   );
 }

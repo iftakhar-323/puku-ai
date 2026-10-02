@@ -22,10 +22,10 @@ import {
   PukuLogoIcon,
   PukuRemoteGradientIcon,
   RefreshIcon,
-  RemoteIcon,
   SidebarToggleIcon,
   SunIcon,
 } from '../../components/common/Icons';
+import { RetroComputerIllustration } from '../../components/common/RetroComputerIllustration';
 import { useApp } from '../../store/AppContext';
 import {
   useRelaySessionPolling,
@@ -278,8 +278,7 @@ export function CodeScreen() {
               },
             ]}
           >
-            <Image
-              source={require('../../../assets/images/retro_puku_computer.png')}
+            <RetroComputerIllustration
               style={styles.computerImage}
               resizeMode="contain"
             />
@@ -372,7 +371,7 @@ export function CodeScreen() {
                   <Text
                     style={[styles.openActiveBtnText, { color: theme.background }]}
                   >
-                    Open Active Chat
+                    Open Active Terminal
                   </Text>
                 </TouchableOpacity>
 
@@ -392,194 +391,174 @@ export function CodeScreen() {
         )}
 
         {/* SECTION 1: ACTIVE / OPEN TERMINALS */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: theme.textPrimary, fontFamily: monoFont },
-              ]}
-            >
-              Active Terminals (Open Now)
-            </Text>
-            <View
-              style={[
-                styles.countBadge,
-                {
-                  backgroundColor:
-                    openSessions.length > 0
-                      ? accentSoftBg
-                      : theme.pillBackground || 'rgba(255, 255, 255, 0.06)',
-                },
-              ]}
-            >
+        {(!isAttachedOrActive || openSessions.length > 0) && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
               <Text
                 style={[
-                  styles.countBadgeText,
-                  {
-                    color: openSessions.length > 0 ? accent : theme.textMuted,
-                    fontFamily: monoFont,
-                  },
-                ]}
-              >
-                {openSessions.length} ONLINE
-              </Text>
-            </View>
-          </View>
-
-          {openSessions.length > 0 ? (
-            <View style={styles.sessionsList}>
-              {openSessions.map((s: ActiveRelaySession) => (
-                <View
-                  key={s.sessionId}
-                  style={[
-                    styles.sessionCard,
-                    {
-                      backgroundColor: theme.cardBackground,
-                      borderColor:
-                        session.sessionId === s.sessionId
-                          ? accent
-                          : theme.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.sessionHeaderRow}>
-                    <View style={styles.sessionTitleGroup}>
-                      <View style={[styles.liveDot, { backgroundColor: accent }]} />
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.sessionTitle,
-                          { color: theme.textPrimary, fontFamily: monoFont },
-                        ]}
-                      >
-                        {s.title || 'puku-cli'}
-                      </Text>
-                    </View>
-                    <View style={[styles.liveBadge, { backgroundColor: accentSoftBg }]}>
-                      <Text
-                        style={[
-                          styles.liveBadgeText,
-                          { color: accent, fontFamily: monoFont },
-                        ]}
-                      >
-                        ONLINE
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.metaRow}>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.sessionMetaText,
-                        { color: theme.textSecondary, fontFamily: monoFont },
-                      ]}
-                    >
-                      Online · {formatActivityDate(s.titleUpdatedAt || s.createdAt)}
-                    </Text>
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityLabel="Session details"
-                      activeOpacity={0.6}
-                      onPress={() => openSessionDetails(s, false)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <InfoIcon size={14} color={theme.textMuted} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      connectRemoteSession(s.sessionId, s.mobileToken);
-                      navigate('remoteSession');
-                    }}
-                    style={[
-                      styles.connectBtn,
-                      {
-                        backgroundColor:
-                          session.sessionId === s.sessionId
-                            ? accent
-                            : theme.textPrimary,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.connectBtnText,
-                        {
-                          color:
-                            session.sessionId === s.sessionId
-                              ? accentInk
-                              : theme.background,
-                        },
-                      ]}
-                    >
-                      {session.sessionId === s.sessionId
-                        ? 'Open Active Terminal'
-                        : 'Connect & Open Terminal'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View
-              style={[
-                styles.emptyCard,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <RemoteIcon size={28} color={theme.textMuted} />
-              <Text
-                style={[
-                  styles.emptyTitle,
+                  styles.sectionTitle,
                   { color: theme.textPrimary, fontFamily: monoFont },
                 ]}
               >
-                No Active Terminals Open
+                {isAttachedOrActive ? 'Other Active Terminals' : 'Active Terminals'}
               </Text>
-              <Text
-                style={[
-                  styles.emptyDesc,
-                  { color: theme.textSecondary, fontFamily: monoFont },
-                ]}
-              >
-                Run Puku CLI on your laptop to mirror your terminal:
-              </Text>
+              {openSessions.length > 0 && (
+                <View
+                  style={[
+                    styles.countBadge,
+                    { backgroundColor: accentSoftBg },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.countBadgeText,
+                      { color: accent, fontFamily: monoFont },
+                    ]}
+                  >
+                    {openSessions.length} ONLINE
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {openSessions.length > 0 ? (
+              <View style={styles.sessionsList}>
+                {openSessions.map((s: ActiveRelaySession) => (
+                  <View
+                    key={s.sessionId}
+                    style={[
+                      styles.sessionCard,
+                      {
+                        backgroundColor: theme.cardBackground,
+                        borderColor:
+                          session.sessionId === s.sessionId
+                            ? accent
+                            : theme.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.sessionHeaderRow}>
+                      <View style={styles.sessionTitleGroup}>
+                        <View style={[styles.liveDot, { backgroundColor: accent }]} />
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.sessionTitle,
+                            { color: theme.textPrimary, fontFamily: monoFont },
+                          ]}
+                        >
+                          {s.title || 'puku-cli'}
+                        </Text>
+                      </View>
+                      <View style={[styles.liveBadge, { backgroundColor: accentSoftBg }]}>
+                        <Text
+                          style={[
+                            styles.liveBadgeText,
+                            { color: accent, fontFamily: monoFont },
+                          ]}
+                        >
+                          ONLINE
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.metaRow}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.sessionMetaText,
+                          { color: theme.textSecondary, fontFamily: monoFont },
+                        ]}
+                      >
+                        Online · {formatActivityDate(s.titleUpdatedAt || s.createdAt)}
+                      </Text>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Session details"
+                        activeOpacity={0.6}
+                        onPress={() => openSessionDetails(s, false)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <InfoIcon size={14} color={theme.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        connectRemoteSession(s.sessionId, s.mobileToken);
+                        navigate('remoteSession');
+                      }}
+                      style={[
+                        styles.connectBtn,
+                        {
+                          backgroundColor:
+                            session.sessionId === s.sessionId
+                              ? accent
+                              : theme.textPrimary,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.connectBtnText,
+                          {
+                            color:
+                              session.sessionId === s.sessionId
+                                ? accentInk
+                                : theme.background,
+                          },
+                        ]}
+                      >
+                        {session.sessionId === s.sessionId
+                          ? 'Open Active Terminal'
+                          : 'Connect & Open Terminal'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : !isAttachedOrActive ? (
               <View
                 style={[
-                  styles.codeSnippet,
+                  styles.emptyCard,
                   {
-                    backgroundColor: theme.background,
+                    backgroundColor: theme.cardBackground,
                     borderColor: theme.border,
                   },
                 ]}
               >
+                <PukuRemoteGradientIcon size={26} />
                 <Text
                   style={[
-                    styles.codeText,
-                    { color: accent, fontFamily: monoFont },
+                    styles.emptyTitle,
+                    { color: theme.textPrimary, fontFamily: monoFont },
                   ]}
                 >
-                  /remote-control
+                  Run Puku CLI on your laptop:
                 </Text>
+                <View
+                  style={[
+                    styles.codeSnippet,
+                    {
+                      backgroundColor: theme.background,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.codeText,
+                      { color: accent, fontFamily: monoFont },
+                    ]}
+                  >
+                    puku remote
+                  </Text>
+                </View>
               </View>
-              <Text
-                style={[
-                  styles.emptyHint,
-                  { color: theme.textMuted, fontFamily: monoFont },
-                ]}
-              >
-                Sessions on your account will appear here automatically.
-              </Text>
-            </View>
-          )}
-        </View>
+            ) : null}
+          </View>
+        )}
 
         {/* SECTION 2: PREVIOUS / ENDED TERMINALS */}
         {endedSessions.length > 0 && (
@@ -908,6 +887,7 @@ const styles = StyleSheet.create({
   },
   headlineWrapper: {
     flex: 1,
+    minWidth: 0,
     paddingRight: 12,
   },
   headlineLead: {
@@ -1014,12 +994,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minWidth: 0,
   },
   sessionTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     flex: 1,
+    minWidth: 0,
+    marginRight: 8,
   },
   liveDot: {
     width: 8,
@@ -1030,6 +1013,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     flex: 1,
+    minWidth: 0,
   },
   liveBadge: {
     paddingHorizontal: 7,
@@ -1045,9 +1029,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
+    minWidth: 0,
   },
   sessionMetaText: {
     fontSize: 11.5,
+    flex: 1,
+    minWidth: 0,
   },
   detailsLink: {
     flexDirection: 'row',
@@ -1109,6 +1096,7 @@ const styles = StyleSheet.create({
   },
   manualInput: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,

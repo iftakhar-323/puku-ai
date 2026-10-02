@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { ArrowUpRightIcon } from '../../../components/common/Icons';
+import { RetroComputerIllustration } from '../../../components/common/RetroComputerIllustration';
 import { ThemeColors } from '../../../theme/theme';
 import { Conversation } from '../../../types';
 import { formatActivityDate } from '../../../utils/date';
@@ -124,8 +125,7 @@ export function ChatEmptyState({
             { backgroundColor: theme.cardBackground, borderColor: theme.outline },
           ]}
         >
-          <Image
-            source={require('../../../../assets/images/retro_puku_computer.png')}
+          <RetroComputerIllustration
             style={styles.computerImage}
             resizeMode="contain"
           />

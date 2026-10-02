@@ -14,7 +14,7 @@ import {
   ChevronRightIcon,
   EyeIcon,
   EyeOffIcon,
-  RemoteIcon,
+  PukuRemoteGradientIcon,
 } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import { ActiveRelaySession } from '../../../types';
@@ -76,7 +76,7 @@ export function PairingView({
         <View
           style={[styles.headerIcon, { backgroundColor: theme.pillBackground }]}
         >
-          <RemoteIcon size={22} color={theme.success} />
+          <PukuRemoteGradientIcon size={24} />
         </View>
         <Text style={[styles.title, { color: theme.textPrimary }]}>
           Connect to Laptop CLI
