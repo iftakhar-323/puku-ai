@@ -207,17 +207,7 @@ export function ChatScreen() {
         onTrailingTap={() => setIncognito(!isIncognito)}
         isTerminalLive={isRemoteActive || liveRelaySessions.length > 0}
         onTerminalTap={() => {
-          if (isRemoteActive) {
-            navigate('remoteSession');
-          } else if (liveRelaySessions.length > 0) {
-            connectRemoteSession(
-              liveRelaySessions[0].sessionId,
-              liveRelaySessions[0].mobileToken
-            );
-            navigate('remoteSession');
-          } else {
-            navigate('code');
-          }
+          navigate('code');
         }}
         onBotTap={() => {
           selectBotConversation(null as any);

@@ -207,7 +207,7 @@ function RemoteSessionScreenContent() {
           accessibilityRole="button"
           accessibilityLabel="Back"
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          onPress={goBack}
+          onPress={() => navigate('code')}
           style={[
             styles.circleBtn,
             {
@@ -395,6 +395,14 @@ function RemoteSessionScreenContent() {
               <CopyIcon size={16} color={theme.textSecondary} />
             </TouchableOpacity>
 
+            <MenuAction
+              theme={theme}
+              label="Switch Terminal / View All Sessions"
+              onPress={() => {
+                setShowMenu(false);
+                navigate('code');
+              }}
+            />
             <MenuAction
               theme={theme}
               label="Send interrupt (^C)"

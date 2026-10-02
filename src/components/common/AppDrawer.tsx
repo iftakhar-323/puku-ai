@@ -717,17 +717,7 @@ export function AppDrawer() {
               activeOpacity={0.7}
               onPress={() => {
                 setDrawerOpen(false);
-                if (isRemoteActive) {
-                  navigate('remoteSession');
-                } else if (liveRelaySessions.length > 0) {
-                  connectRemoteSession(
-                    liveRelaySessions[0].sessionId,
-                    liveRelaySessions[0].mobileToken
-                  );
-                  navigate('remoteSession');
-                } else {
-                  navigate('code');
-                }
+                navigate('code');
               }}
               style={[
                 styles.switchHubCard,
