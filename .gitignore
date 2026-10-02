@@ -89,3 +89,6 @@ dist/
 *.apk
 *.aab
 
+# MCP server config: holds a bearer token, never commit it
+.mcp.json
+

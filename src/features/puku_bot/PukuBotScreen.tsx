@@ -746,12 +746,22 @@ export function PukuBotScreen() {
               activeOpacity={0.7}
               disabled={!isAuthenticated || availableBots.length <= 1}
               onPress={() => setShowBotModal(true)}
-              style={[styles.badge, { backgroundColor: isDark ? '#262925' : '#E4E5DB', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-              <Text style={[styles.badgeText, { color: isDark ? '#35D6B4' : '#1A1D18', fontFamily: monoFont }]}>
+              style={[
+                styles.badge,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(176, 179, 252, 0.16)'
+                    : 'rgba(72, 77, 208, 0.12)',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                },
+              ]}>
+              <Text style={[styles.badgeText, { color: theme.primaryLight, fontFamily: monoFont }]}>
                 {isAuthenticated ? (availableBots.find(b => b.id === selectedBotId)?.name || 'LIVE') : 'AI'}
               </Text>
               {isAuthenticated && availableBots.length > 1 && (
-                <ChevronDownIcon size={10} color={isDark ? '#35D6B4' : '#1A1D18'} />
+                <ChevronDownIcon size={10} color={theme.primaryLight} />
               )}
             </TouchableOpacity>
           </View>
@@ -776,11 +786,11 @@ export function PukuBotScreen() {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Settings"
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to Puku chat"
             activeOpacity={0.7}
-            onPress={() => setShowSettingsModal(true)}
+            onPress={() => navigate('chat')}
             style={styles.actionBtn}>
-            <SettingsIcon size={19} color={theme.textSecondary} />
+            <PukuLogoIcon size={19} />
           </TouchableOpacity>
 
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remote laptop sessions"
@@ -790,11 +800,11 @@ export function PukuBotScreen() {
             <TerminalPromptIcon size={20} color={theme.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to Puku chat"
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Settings"
             activeOpacity={0.7}
-            onPress={() => navigate('chat')}
+            onPress={() => setShowSettingsModal(true)}
             style={styles.actionBtn}>
-            <PukuLogoIcon size={19} />
+            <SettingsIcon size={19} color={theme.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Toggle theme"
@@ -908,7 +918,12 @@ export function PukuBotScreen() {
                 {greeting.name}
               </Text>
             </View>
-            <View style={styles.botComputerWrapper}>
+            <View
+              style={[
+                styles.botComputerWrapper,
+                { backgroundColor: theme.cardBackground, borderColor: theme.outline },
+              ]}
+            >
               <Image
                 source={require('../../assets/images/retro_puku_computer.png')}
                 style={styles.botComputerImage}
@@ -2000,10 +2015,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   botComputerWrapper: {
-    width: 120,
-    height: 112,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12, // official Puku "panelRadius" token
+    borderWidth: 1,
   },
   botComputerImage: {
     width: 120,

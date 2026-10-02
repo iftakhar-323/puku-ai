@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
@@ -20,6 +21,7 @@ import { ThemeColors } from '../../../theme/theme';
 import {
   CliColors,
   MarkdownRenderer,
+  StreamingText,
 } from '../../chat/components/MarkdownRenderer';
 import { TypingIndicator } from '../../chat/components/TypingIndicator';
 import type { RemoteEntry, ToolCall } from '../relay/protocol';
@@ -87,12 +89,13 @@ export function RemoteFeed({
     setShowJump(prev => (prev === !isNear ? prev : !isNear));
   }, []);
 
-  // Follow new output while near bottom or when Puku is actively working/streaming
+  // Follow new output while near the bottom; never yank the view back down
+  // if the user has deliberately scrolled up to read earlier output.
   const onContentSizeChange = useCallback(() => {
-    if (nearBottom.current || isWorking) {
+    if (nearBottom.current) {
       listRef.current?.scrollToEnd({ animated: true });
     }
-  }, [isWorking]);
+  }, []);
 
   // Scroll to bottom when keyboard opens so Puku's writing is never obscured
   React.useEffect(() => {
@@ -253,27 +256,37 @@ const FeedRow = memo(function FeedRowView({
           <TouchableOpacity
             activeOpacity={0.85}
             delayLongPress={200}
-            onLongPress={() => onCopy(userText)}
+            onLongPress={() => userText && onCopy(userText)}
             style={[styles.userBubble, { backgroundColor: theme.userBubble }]}
           >
-            <Text
-              selectable
-              style={[styles.userText, { color: theme.onUserBubble }]}
-            >
-              {userText}
-            </Text>
+            {item.attachmentUri ? (
+              <Image
+                source={{ uri: item.attachmentUri }}
+                style={styles.userAttachment}
+              />
+            ) : null}
+            {userText ? (
+              <Text
+                selectable
+                style={[styles.userText, { color: theme.onUserBubble }]}
+              >
+                {userText}
+              </Text>
+            ) : null}
           </TouchableOpacity>
           <View style={styles.userActions}>
-            <TouchableOpacity
-              activeOpacity={0.6}
-              accessibilityRole="button"
-              accessibilityLabel="Copy message"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => onCopy(userText)}
-            >
-              <CopyIcon size={14} color={theme.textMuted} />
-            </TouchableOpacity>
-            {canResend && (
+            {userText ? (
+              <TouchableOpacity
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel="Copy message"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => onCopy(userText)}
+              >
+                <CopyIcon size={14} color={theme.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+            {canResend && userText && (
               <TouchableOpacity
                 activeOpacity={0.6}
                 accessibilityRole="button"
@@ -390,11 +403,73 @@ const FeedRow = memo(function FeedRowView({
         typeof item.text === 'string' ? item.text : String(item.text || '');
       return (
         <View style={styles.assistantRow}>
-          <MarkdownRenderer
-            content={assistantText}
-            theme={theme}
-            cliColors={cliColors}
-          />
+          {item.streaming ? (
+            <StreamingText
+              content={assistantText}
+              theme={theme}
+              cliColors={cliColors}
+              cursor
+            />
+          ) : (
+            <MarkdownRenderer
+              content={assistantText}
+              theme={theme}
+              cliColors={cliColors}
+            />
+          )}
+          {assistantText.trim() ? (
+            <TouchableOpacity
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel="Copy response"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => onCopy(assistantText)}
+              style={styles.assistantCopyBtn}
+            >
+              <CopyIcon size={13} color={theme.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      );
+    }
+
+    case 'thinking': {
+      const thinkingText =
+        typeof item.text === 'string' ? item.text : String(item.text || '');
+      if (!thinkingText.trim()) return null;
+      return (
+        <View style={styles.thinkingGroup}>
+          <TouchableOpacity
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isExpanded }}
+            onPress={() => onToggleGroup(item.id)}
+            style={styles.thinkingHeader}
+          >
+            <Text style={[styles.thinkingHeaderText, { color: theme.textMuted }]}>
+              {item.streaming ? 'Thinking…' : 'Thought'}
+            </Text>
+            {isExpanded ? (
+              <ChevronDownIcon size={12} color={theme.textMuted} />
+            ) : (
+              <ChevronRightIcon size={13} color={theme.textMuted} />
+            )}
+          </TouchableOpacity>
+          {isExpanded && (
+            <View
+              style={[
+                styles.thinkingTextWrap,
+                { borderLeftColor: theme.outline },
+              ]}
+            >
+              <StreamingText
+                content={thinkingText}
+                theme={theme}
+                cursor={item.streaming}
+                style={[styles.thinkingText, { color: theme.textMuted }]}
+              />
+            </View>
+          )}
         </View>
       );
     }
@@ -471,6 +546,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
   },
+  userAttachment: {
+    width: 160,
+    height: 160,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
   userActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -529,5 +610,36 @@ const styles = StyleSheet.create({
     width: '100%',
     marginVertical: 4,
     paddingHorizontal: 4,
+  },
+  assistantCopyBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    padding: 2,
+  },
+  thinkingGroup: {
+    paddingHorizontal: 4,
+    marginVertical: 2,
+  },
+  thinkingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingVertical: 6,
+  },
+  thinkingHeaderText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
+  thinkingTextWrap: {
+    borderLeftWidth: 2,
+    marginLeft: 4,
+    paddingLeft: 10,
+    marginBottom: 4,
+  },
+  thinkingText: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontStyle: 'italic',
   },
 });

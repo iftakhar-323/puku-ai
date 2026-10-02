@@ -196,13 +196,6 @@ export function ChatScreen() {
         theme={theme}
         isDark={isDark}
         isIncognitoMode={isIncognito}
-        title={
-          isIncognito
-            ? null
-            : activeConversation?.title && activeConversation.title !== 'New chat'
-            ? activeConversation.title
-            : null
-        }
         onLeadingTap={() => setDrawerOpen(true)}
         onTrailingTap={() => setIncognito(!isIncognito)}
         isTerminalLive={isRemoteActive || liveRelaySessions.length > 0}

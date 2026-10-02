@@ -30,6 +30,7 @@ import {
   PendingControl,
   PermissionMode,
   RelayEffect,
+  RemoteAttachment,
   RemoteSessionState,
   WORKING_TIMEOUT_MS,
   addEntry,
@@ -61,7 +62,7 @@ interface RemoteSessionContextValue {
   fetchActiveRelaySessions: () => Promise<ActiveRelaySession[]>;
   connect: (sessionId: string, token?: string) => void;
   disconnect: () => void;
-  sendMessage: (text: string) => boolean;
+  sendMessage: (text: string, attachment?: RemoteAttachment) => boolean;
   interrupt: () => void;
   clearFeed: () => void;
   answerPrompt: (allow: boolean | 'always', message?: string) => void;
@@ -337,33 +338,51 @@ export function RemoteSessionProvider({
       update(s => ({ ...s, phase: 'open' }));
     };
 
+    // Everything in here runs outside React's render cycle, so a thrown
+    // error would skip every <ErrorBoundary> in the tree and can take the
+    // whole JS instance down (a blank/black screen in release builds,
+    // since there's no red-box to catch it). A single malformed or
+    // unexpected frame from the CLI must never be able to do that: catch
+    // per-frame so one bad frame can't drop the rest of the batch, and
+    // wrap the whole handler as a second net.
     ws.onmessage = (event: WebSocketMessageEvent) => {
-      if (wsRef.current !== ws) return;
-      const raw = typeof event.data === 'string' ? event.data : '';
-      const { frames, text } = parseMessage(raw);
-      const effects: RelayEffect[] = [];
-      let next = stateRef.current;
-      for (const line of text)
-        next = addEntry(next, { kind: 'assistant', text: line });
-      for (const frame of frames) {
-        const frameId: unknown = frame?.uuid;
-        if (typeof frameId === 'string' && frame?.type !== 'control_request') {
-          if (seenFrameIds.current.has(frameId)) continue;
-          seenFrameIds.current.add(frameId);
+      try {
+        if (wsRef.current !== ws) return;
+        const raw = typeof event.data === 'string' ? event.data : '';
+        const { frames, text } = parseMessage(raw);
+        const effects: RelayEffect[] = [];
+        let next = stateRef.current;
+        for (const line of text)
+          next = addEntry(next, { kind: 'assistant', text: line });
+        for (const frame of frames) {
+          try {
+            const frameId: unknown = frame?.uuid;
+            if (
+              typeof frameId === 'string' &&
+              frame?.type !== 'control_request'
+            ) {
+              if (seenFrameIds.current.has(frameId)) continue;
+              seenFrameIds.current.add(frameId);
+            }
+            if (__DEV__) {
+              console.log(
+                '[RemoteRelay] frame',
+                frame?.type,
+                frame?.event?.type || frame?.subtype || '',
+              );
+            }
+            const result = applyFrame(next, frame);
+            next = result.state;
+            effects.push(...result.effects);
+          } catch (err) {
+            devWarn('remote.applyFrame', err);
+          }
         }
-        if (__DEV__) {
-          console.log(
-            '[RemoteRelay] frame',
-            frame?.type,
-            frame?.event?.type || frame?.subtype || '',
-          );
-        }
-        const result = applyFrame(next, frame);
-        next = result.state;
-        effects.push(...result.effects);
+        update(() => next);
+        runEffects(effects);
+      } catch (err) {
+        devWarn('remote.onmessage', err);
       }
-      update(() => next);
-      runEffects(effects);
     };
 
     ws.onerror = (err: Event) => {
@@ -507,11 +526,15 @@ export function RemoteSessionProvider({
   }, [closeSocket, update]);
 
   const sendMessage = useCallback(
-    (text: string): boolean => {
+    (text: string, attachment?: RemoteAttachment): boolean => {
       const trimmed = text.trim();
-      if (!trimmed || stateRef.current.phase !== 'attached') return false;
-      if (!send(userFrame(trimmed, stateRef.current.sessionId))) return false;
-      update(s => addLocalUser(s, trimmed));
+      if ((!trimmed && !attachment) || stateRef.current.phase !== 'attached')
+        return false;
+      if (
+        !send(userFrame(trimmed, stateRef.current.sessionId, attachment))
+      )
+        return false;
+      update(s => addLocalUser(s, trimmed, attachment?.uri));
       return true;
     },
     [send, update],

@@ -76,26 +76,26 @@ export const darkTheme: ThemeColors = {
 };
 
 export const lightTheme: ThemeColors = {
-  background: '#faf9f5',
-  secondaryBackground: '#f3f1e8',
-  cardBackground: '#ffffff',
-  chatBarBackground: '#ffffff',
-  chatBarBorder: '#d0d4c6',
+  background: '#f1f0e9', // official Puku light "main"
+  secondaryBackground: '#e9e9e0', // official Puku light "sidebar"
+  cardBackground: '#fafaf5', // official Puku light "panel"
+  chatBarBackground: '#fafaf5', // official Puku light "panel"
+  chatBarBorder: '#c9cdc0', // official Puku light "border"
   primary: '#111310',
-  primaryLight: '#484dd0',
+  primaryLight: '#484dd0', // official Puku light "accent"
   accent: '#111310',
-  textPrimary: '#111310', // Deep black for high contrast & clear legibility
-  textSecondary: '#2b2f27', // Dark charcoal black-like text
-  textMuted: '#4a4f43', // Dark readable muted text
-  placeholderText: '#686e60', // Dark readable placeholder
-  border: '#d0d4c6',
-  outline: '#d0d4c6',
+  textPrimary: '#282c22', // official Puku light "text"
+  textSecondary: '#626759', // official Puku light "muted"
+  textMuted: '#626759', // official Puku light "muted"
+  placeholderText: '#626759', // official Puku light "muted"
+  border: '#c9cdc0', // official Puku light "border"
+  outline: '#c9cdc0', // official Puku light "border"
   buttonBackground: '#ffffff',
-  pillBackground: '#e5e7dc',
+  pillBackground: '#e4e5db', // official Puku light "hover"
   tagText: '#111310',
   menuIcon: '#111310',
   error: '#b5263e',
-  success: '#206b35',
+  success: '#326b40', // official Puku light "success"
   warning: '#8b4a18',
   codeBackground: '#edece4',
   inlineCode: '#C0392B',

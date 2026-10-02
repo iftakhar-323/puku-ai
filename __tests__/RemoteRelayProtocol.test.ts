@@ -6,11 +6,13 @@ import {
   createInitialState,
   giveUpOnTurn,
   hasRunningTool,
+  isValidAttachment,
   parseMessage,
   permissionReply,
   questionReply,
   reconnectDelay,
   shouldReconnect,
+  userFrame,
 } from '../src/features/remote_session/relay/protocol';
 import {
   buildFeed,
@@ -267,8 +269,15 @@ describe('streaming output', () => {
     ]);
   });
 
-  test('thinking and tool-input deltas are not rendered as text', () => {
+  test('thinking deltas stream into a collapsible thinking entry, not as assistant text', () => {
     const { state } = run([
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_start',
+          content_block: { type: 'thinking' },
+        },
+      },
       {
         type: 'stream_event',
         event: {
@@ -280,11 +289,75 @@ describe('streaming output', () => {
         type: 'stream_event',
         event: {
           type: 'content_block_delta',
+          delta: { type: 'thinking_delta', thinking: ', let me check' },
+        },
+      },
+    ]);
+    expect(state.entries).toEqual([
+      expect.objectContaining({
+        kind: 'thinking',
+        text: 'hmm, let me check',
+        streaming: true,
+      }),
+    ]);
+  });
+
+  test('tool-input deltas (partial_json) are not rendered as text', () => {
+    const { state } = run([
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
           delta: { type: 'input_json_delta', partial_json: '{' },
         },
       },
     ]);
     expect(state.entries).toEqual([]);
+  });
+
+  test('a final thinking block replaces the streamed one, then the assistant text follows separately', () => {
+    const live = run([
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_start',
+          content_block: { type: 'thinking' },
+        },
+      },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          delta: { type: 'thinking_delta', thinking: 'reasoning...' },
+        },
+      },
+    ]);
+
+    const done = run(
+      [
+        {
+          type: 'assistant',
+          message: {
+            content: [
+              { type: 'thinking', thinking: 'reasoning... done.' },
+              { type: 'text', text: 'Here is the answer.' },
+            ],
+          },
+        },
+      ],
+      live.state,
+    );
+    expect(done.state.entries).toEqual([
+      expect.objectContaining({
+        kind: 'thinking',
+        text: 'reasoning... done.',
+        streaming: false,
+      }),
+      expect.objectContaining({
+        kind: 'assistant',
+        text: 'Here is the answer.',
+      }),
+    ]);
   });
 
   test('without streaming, assistant frames append as before', () => {
@@ -721,6 +794,69 @@ describe('turn completion & working state', () => {
     expect(describeTool({} as any)).toBe('Tool');
     expect(() => summarizeTools([{} as any])).not.toThrow();
     expect(summarizeTools([{} as any])).toBe('Tool');
+  });
+});
+
+describe('image attachments', () => {
+  test('userFrame sends plain string content with no attachment', () => {
+    const frame = userFrame('hello', 'sess-1');
+    expect(frame.message.content).toBe('hello');
+  });
+
+  test('userFrame with an attachment sends text + image blocks', () => {
+    const frame = userFrame('what is this?', 'sess-1', {
+      uri: 'file:///tmp/photo.png',
+      base64: 'AAAA',
+      mediaType: 'image/png',
+    });
+    expect(frame.message.content).toEqual([
+      { type: 'text', text: 'what is this?' },
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/png', data: 'AAAA' },
+      },
+    ]);
+  });
+
+  test('userFrame with an attachment and no text omits the text block', () => {
+    const frame = userFrame('', 'sess-1', {
+      uri: 'file:///tmp/photo.png',
+      base64: 'AAAA',
+      mediaType: 'image/png',
+    });
+    expect(frame.message.content).toEqual([
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/png', data: 'AAAA' },
+      },
+    ]);
+  });
+
+  test('isValidAttachment accepts supported types under the size cap, rejects otherwise', () => {
+    expect(isValidAttachment({ type: 'image/png', size: 1024 })).toBe(true);
+    expect(isValidAttachment({ type: 'image/webp', size: 700 * 1024 })).toBe(
+      true,
+    );
+    expect(
+      isValidAttachment({ type: 'image/png', size: 700 * 1024 + 1 }),
+    ).toBe(false);
+    expect(isValidAttachment({ type: 'application/pdf', size: 10 })).toBe(
+      false,
+    );
+    expect(isValidAttachment({ type: 'image/png', size: 0 })).toBe(false);
+  });
+
+  test('addLocalUser records the attachment uri on the entry', () => {
+    const state = addLocalUser(
+      createInitialState(),
+      '',
+      'file:///tmp/photo.png',
+    );
+    expect(state.entries[0]).toMatchObject({
+      kind: 'user',
+      text: '',
+      attachmentUri: 'file:///tmp/photo.png',
+    });
   });
 });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Linking,
   Platform,
@@ -122,6 +122,44 @@ export function renderFormattedText(
   }
 
   return parts;
+}
+
+/** Blinking terminal-style cursor shown at the end of actively streaming text. */
+function BlinkingCursor({ color }: { color: string }) {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const id = setInterval(() => setVisible(v => !v), 500);
+    return () => clearInterval(id);
+  }, []);
+
+  return <Text style={{ color, opacity: visible ? 1 : 0 }}>{'▌'}</Text>;
+}
+
+/**
+ * Cheap, no-structure renderer used while a reply is still streaming in:
+ * one regex pass for inline formatting (bold/italic/code/links), no line-by-line
+ * table/heading/bullet parsing. Avoids re-running that heavier parser on every
+ * incoming token, and avoids a half-written table row flashing as plain text
+ * before "popping" into a table once its closing `|` arrives. The full
+ * `MarkdownRenderer` takes over once the entry finalizes.
+ */
+export function StreamingText({
+  content,
+  theme,
+  cliColors,
+  cursor,
+  style,
+}: MarkdownRendererProps & { cursor?: boolean; style?: any }) {
+  const textContent = typeof content === 'string' ? content : String(content || '');
+  if (!textContent && !cursor) return null;
+  const baseStyle = [styles.paragraph, { color: theme.textPrimary }, style];
+  return (
+    <Text style={baseStyle}>
+      {renderFormattedText(textContent, baseStyle, theme, cliColors)}
+      {cursor ? <BlinkingCursor color={theme.textPrimary} /> : null}
+    </Text>
+  );
 }
 
 function CodeBlockItem({

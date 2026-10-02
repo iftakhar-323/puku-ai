@@ -49,6 +49,35 @@ export const PERMISSION_MODES: {
 /** Offered in the model picker; the CLI's own allowlist has the final say. */
 export const REMOTE_MODELS = ['puku-ai-2.7', 'puku-ai-2.8', 'opus-4-8'];
 
+/** An image picked on this device, waiting to go out with the next prompt. */
+export interface RemoteAttachment {
+  uri: string;
+  base64: string;
+  mediaType: string;
+}
+
+/** Matches the relay's frame cap (1MB, base64 adds ~33%): see REMOTE_SESSION_GUIDE §6. */
+export const ATTACHMENT_MAX_BYTES = 700 * 1024;
+export const ATTACHMENT_ALLOWED_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+]);
+
+export function isValidAttachment(media: {
+  type?: string;
+  size?: number;
+}): boolean {
+  return (
+    !!media.type &&
+    ATTACHMENT_ALLOWED_TYPES.has(media.type) &&
+    typeof media.size === 'number' &&
+    media.size > 0 &&
+    media.size <= ATTACHMENT_MAX_BYTES
+  );
+}
+
 export interface ToolCall {
   name: string;
   input: Record<string, any>;
@@ -57,8 +86,9 @@ export interface ToolCall {
 }
 
 export type RemoteEntry =
-  | { kind: 'user'; id: string; text: string }
+  | { kind: 'user'; id: string; text: string; attachmentUri?: string }
   | { kind: 'assistant'; id: string; text: string; streaming?: boolean }
+  | { kind: 'thinking'; id: string; text: string; streaming?: boolean }
   | { kind: 'tool'; id: string; tool: ToolCall }
   | { kind: 'system'; id: string; text: string; tone: 'info' | 'error' };
 
@@ -180,8 +210,12 @@ export function addSystem(
 export function addLocalUser(
   state: RemoteSessionState,
   text: string,
+  attachmentUri?: string,
 ): RemoteSessionState {
-  return { ...addEntry(state, { kind: 'user', text }), isWorking: true };
+  return {
+    ...addEntry(state, { kind: 'user', text, attachmentUri }),
+    isWorking: true,
+  };
 }
 
 function contentToText(content: any): string {
@@ -210,11 +244,14 @@ function controlError(requestId: string, error: string): RelayEffect {
   };
 }
 
-/** Index of the assistant entries currently being streamed, oldest first. */
-function streamingIndices(entries: RemoteEntry[]): number[] {
+/** Index of the assistant/thinking entries currently being streamed, oldest first. */
+function streamingIndices(
+  entries: RemoteEntry[],
+  kind: 'assistant' | 'thinking' = 'assistant',
+): number[] {
   const out: number[] = [];
   entries.forEach((e, i) => {
-    if (e.kind === 'assistant' && e.streaming) out.push(i);
+    if (e.kind === kind && e.streaming) out.push(i);
   });
   return out;
 }
@@ -225,7 +262,9 @@ function finalizeStreaming(state: RemoteSessionState): RemoteSessionState {
   return {
     ...state,
     entries: state.entries.map(e =>
-      e.kind === 'assistant' && e.streaming ? { ...e, streaming: false } : e,
+      (e.kind === 'assistant' || e.kind === 'thinking') && e.streaming
+        ? { ...e, streaming: false }
+        : e,
     ),
   };
 }
@@ -271,9 +310,11 @@ function applyAssistant(
     : state;
 
   // Final text replaces what was streamed for it, in place.
-  const streamed = streamingIndices(next.entries);
+  const streamed = streamingIndices(next.entries, 'assistant');
+  const thinkingStreamed = streamingIndices(next.entries, 'thinking');
   const entries = [...next.entries];
   let streamCursor = 0;
+  let thinkingCursor = 0;
   const appended: NewEntry[] = [];
 
   for (const block of blocks) {
@@ -296,6 +337,22 @@ function applyAssistant(
       } else if (blockText) {
         appended.push({ kind: 'assistant', text: blockText });
       }
+    } else if (block?.type === 'thinking') {
+      const blockText =
+        typeof block.thinking === 'string'
+          ? block.thinking
+          : sanitizePromptString(block.thinking ?? block.text);
+      const idx = thinkingStreamed[thinkingCursor++];
+      if (idx !== undefined) {
+        const prev = entries[idx] as Extract<RemoteEntry, { kind: 'thinking' }>;
+        entries[idx] = {
+          ...prev,
+          text: blockText || prev.text,
+          streaming: false,
+        };
+      } else if (blockText) {
+        appended.push({ kind: 'thinking', text: blockText });
+      }
     } else if (block?.type === 'tool_use') {
       appended.push({
         kind: 'tool',
@@ -311,7 +368,10 @@ function applyAssistant(
   }
 
   // Leftover streamed entries had no final counterpart: drop them.
-  const leftovers = new Set(streamed.slice(streamCursor));
+  const leftovers = new Set([
+    ...streamed.slice(streamCursor),
+    ...thinkingStreamed.slice(thinkingCursor),
+  ]);
   next = { ...next, entries: entries.filter((_, i) => !leftovers.has(i)) };
   for (const entry of appended) next = addEntry(next, entry);
 
@@ -383,22 +443,32 @@ function applyStreamEvent(
 
   const startsText =
     ev.type === 'content_block_start' && ev.content_block?.type === 'text';
+  const startsThinking =
+    ev.type === 'content_block_start' && ev.content_block?.type === 'thinking';
+  const isThinkingDelta =
+    ev.type === 'content_block_delta' && ev.delta?.type === 'thinking_delta';
+  const kind: 'assistant' | 'thinking' =
+    startsThinking || isThinkingDelta ? 'thinking' : 'assistant';
+
   const rawDelta =
-    ev.type === 'content_block_delta' ? ev.delta?.text || '' : data.text || '';
+    ev.type === 'content_block_delta'
+      ? (isThinkingDelta ? ev.delta?.thinking : ev.delta?.text) || ''
+      : data.text || '';
   const delta =
     typeof rawDelta === 'string' ? rawDelta : sanitizePromptString(rawDelta);
-  if (!startsText && !delta) return state;
+  const starts = startsText || startsThinking;
+  if (!starts && !delta) return state;
 
-  const streamed = streamingIndices(state.entries);
+  const streamed = streamingIndices(state.entries, kind);
   const last = streamed[streamed.length - 1];
-  if (startsText || last === undefined) {
+  if (starts || last === undefined) {
     return {
-      ...addEntry(state, { kind: 'assistant', text: delta, streaming: true }),
+      ...addEntry(state, { kind, text: delta, streaming: true }),
       isWorking: true,
     };
   }
   const entries = [...state.entries];
-  const entry = entries[last] as Extract<RemoteEntry, { kind: 'assistant' }>;
+  const entry = entries[last] as Extract<RemoteEntry, { kind: 'assistant' | 'thinking' }>;
   entries[last] = { ...entry, text: entry.text + delta };
   return { ...state, entries, isWorking: true };
 }
@@ -727,10 +797,27 @@ export function parseMessage(raw: string): { frames: any[]; text: string[] } {
 
 // ---- Outgoing frames -------------------------------------------------------
 
-export function userFrame(text: string, sessionId: string) {
+export function userFrame(
+  text: string,
+  sessionId: string,
+  attachment?: RemoteAttachment,
+) {
+  const content = attachment
+    ? [
+        ...(text ? [{ type: 'text', text }] : []),
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: attachment.mediaType,
+            data: attachment.base64,
+          },
+        },
+      ]
+    : text;
   return {
     type: 'user',
-    message: { role: 'user', content: text },
+    message: { role: 'user', content },
     parent_tool_use_id: null,
     session_id: sessionId,
   };

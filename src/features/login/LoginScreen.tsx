@@ -827,10 +827,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 20,
     marginBottom: 24,
+    alignSelf: 'center',
+    padding: 16,
+    borderRadius: 12, // official Puku "panelRadius" token
+    borderWidth: 1,
+    borderColor: '#34362e', // official Puku dark "border"
+    backgroundColor: '#1c1d1a', // official Puku dark "panel"
   },
   retroComputerImage: {
     width: 220,
-    height: 190,
+    height: 210, // matches the asset's native 520:496 aspect ratio
   },
   heroSection: {
     marginBottom: 28,

@@ -92,15 +92,6 @@ export function ChatHeader({
         </TouchableOpacity>
       ) : (
         <View style={styles.trailingGroup}>
-          {onTrailingTap && (
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Incognito chat"
-              activeOpacity={0.7}
-              onPress={onTrailingTap}
-              style={styles.actionBtn}>
-              <GhostIcon size={19} color={theme.textSecondary} eyeColor={theme.background} />
-            </TouchableOpacity>
-          )}
-
           {onTerminalTap && (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remote laptop sessions"
               activeOpacity={0.7}
@@ -108,9 +99,11 @@ export function ChatHeader({
               style={styles.actionBtn}>
               <TerminalPromptIcon
                 size={19}
-                color={isTerminalLive ? (isDark ? '#52C41A' : '#389E0D') : theme.textSecondary}
+                color={isTerminalLive ? theme.primaryLight : theme.textSecondary}
               />
-              {isTerminalLive && <View style={styles.liveDot} />}
+              {isTerminalLive && (
+                <View style={[styles.liveDot, { backgroundColor: theme.primaryLight }]} />
+              )}
             </TouchableOpacity>
           )}
 
@@ -120,6 +113,15 @@ export function ChatHeader({
               onPress={onBotTap}
               style={styles.actionBtn}>
               <PukuBotGradientIcon size={20} />
+            </TouchableOpacity>
+          )}
+
+          {onTrailingTap && (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Incognito chat"
+              activeOpacity={0.7}
+              onPress={onTrailingTap}
+              style={styles.actionBtn}>
+              <GhostIcon size={19} color={theme.textSecondary} eyeColor={theme.background} />
             </TouchableOpacity>
           )}
 
@@ -205,7 +207,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#52C41A',
   },
   trailingBtn: {
     width: 22,

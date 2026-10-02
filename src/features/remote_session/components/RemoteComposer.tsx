@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Image,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ChevronDownIcon } from '../../../components/common/Icons';
+import { ChevronDownIcon, CloseIcon, PaperclipIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
+import { NativePicker, PickedMedia } from '../../../services/nativeModules';
 import { OptionSheet } from './OptionSheet';
 import {
+  isValidAttachment,
   PERMISSION_MODES,
   PermissionMode,
   REMOTE_MODELS,
+  RemoteAttachment,
 } from '../relay/protocol';
 
 interface Props {
@@ -23,7 +28,7 @@ interface Props {
   isWorking: boolean;
   permissionMode: PermissionMode;
   model?: string;
-  onSend: (text: string) => boolean;
+  onSend: (text: string, attachment?: RemoteAttachment) => boolean;
   onInterrupt: () => void;
   onSetPermissionMode: (mode: PermissionMode) => void;
   onSetModel: (model: string) => void;
@@ -44,9 +49,12 @@ export function RemoteComposer({
 }: Props) {
   const [text, setText] = useState('');
   const [sheet, setSheet] = useState<'mode' | 'model' | null>(null);
+  const [attachment, setAttachment] = useState<PickedMedia | null>(null);
 
   const hasText = text.trim().length > 0;
-  const showStop = isWorking && !hasText;
+  const hasAttachment = !!attachment;
+  const canSubmit = (hasText || hasAttachment) && enabled;
+  const showStop = isWorking && !hasText && !hasAttachment;
   const modeLabel =
     PERMISSION_MODES.find(m => m.mode === permissionMode)?.label || 'Ask';
   const models =
@@ -54,13 +62,66 @@ export function RemoteComposer({
       ? [model, ...REMOTE_MODELS]
       : REMOTE_MODELS;
 
+  const handleAttach = async () => {
+    try {
+      const media = await NativePicker.pickMedia();
+      if (!media) return;
+      if (!isValidAttachment(media)) {
+        Alert.alert(
+          'Unsupported attachment',
+          'Attach a PNG, JPEG, GIF, or WEBP image under 700KB.',
+        );
+        return;
+      }
+      setAttachment(media);
+    } catch (err: any) {
+      Alert.alert('Attachment error', err?.message || 'Could not attach file');
+    }
+  };
+
   const submit = () => {
-    if (!hasText || !enabled) return;
-    if (onSend(text)) setText('');
+    if (!canSubmit) return;
+    const sent = onSend(
+      text,
+      attachment && attachment.base64
+        ? {
+            uri: attachment.uri,
+            base64: attachment.base64,
+            mediaType: attachment.type,
+          }
+        : undefined,
+    );
+    if (sent) {
+      setText('');
+      setAttachment(null);
+    }
   };
 
   return (
     <View style={styles.container}>
+      {attachment ? (
+        <View style={styles.attachmentRow}>
+          <View style={styles.attachmentThumbWrap}>
+            <Image
+              source={{ uri: attachment.uri }}
+              style={styles.attachmentThumb}
+            />
+            <TouchableOpacity
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Remove attachment"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={() => setAttachment(null)}
+              style={[
+                styles.attachmentRemove,
+                { backgroundColor: theme.cardBackground },
+              ]}
+            >
+              <CloseIcon size={11} color={theme.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
       <View
         style={[
           styles.card,
@@ -70,6 +131,17 @@ export function RemoteComposer({
           },
         ]}
       >
+        <TouchableOpacity
+          activeOpacity={0.6}
+          disabled={!enabled}
+          accessibilityRole="button"
+          accessibilityLabel="Attach image"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={handleAttach}
+          style={[styles.attachBtn, !enabled && styles.dimmed]}
+        >
+          <PaperclipIcon size={18} color={theme.textMuted} />
+        </TouchableOpacity>
         <TextInput
           style={[styles.input, { color: theme.textPrimary }]}
           placeholder={enabled ? 'Type / for commands' : disabledHint}
@@ -103,8 +175,8 @@ export function RemoteComposer({
             activeOpacity={0.6}
             accessibilityRole="button"
             accessibilityLabel="Send"
-            accessibilityState={{ disabled: !hasText || !enabled }}
-            disabled={!hasText || !enabled}
+            accessibilityState={{ disabled: !canSubmit }}
+            disabled={!canSubmit}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={submit}
             style={styles.sendBtn}
@@ -113,8 +185,7 @@ export function RemoteComposer({
               style={[
                 styles.sendGlyph,
                 {
-                  color:
-                    hasText && enabled ? theme.textPrimary : theme.textMuted,
+                  color: canSubmit ? theme.textPrimary : theme.textMuted,
                 },
               ]}
             >
@@ -203,10 +274,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     borderRadius: 18,
-    paddingLeft: 16,
+    paddingLeft: 10,
     paddingRight: 12,
     paddingVertical: 10,
     borderWidth: 1,
+  },
+  attachBtn: {
+    width: 28,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
+  },
+  attachmentRow: {
+    paddingHorizontal: 4,
+    paddingBottom: 6,
+  },
+  attachmentThumbWrap: {
+    width: 56,
+    height: 56,
+  },
+  attachmentThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+  },
+  attachmentRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,

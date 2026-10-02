@@ -118,7 +118,12 @@ export function ChatEmptyState({
             {greeting.name}
           </Text>
         </View>
-        <View style={styles.computerWrapper}>
+        <View
+          style={[
+            styles.computerWrapper,
+            { backgroundColor: theme.cardBackground, borderColor: theme.outline },
+          ]}
+        >
           <Image
             source={require('../../../../assets/images/retro_puku_computer.png')}
             style={styles.computerImage}
@@ -206,6 +211,9 @@ const styles = StyleSheet.create({
   computerWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12, // official Puku "panelRadius" token
+    borderWidth: 1,
   },
   computerImage: {
     width: 120,

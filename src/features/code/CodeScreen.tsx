@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,8 +14,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CloseIcon,
   ConnectedLinkIcon,
+  InfoIcon,
   LogoutIcon,
   MoonIcon,
+  PukuBotGradientIcon,
+  PukuLogoIcon,
   RefreshIcon,
   RemoteIcon,
   SidebarToggleIcon,
@@ -28,16 +32,14 @@ import {
 import { formatActivityDate } from '../../utils/date';
 import type { ActiveRelaySession } from '../../types';
 
+interface DetailRow {
+  label: string;
+  value: string;
+}
+
 export function CodeScreen() {
   const insets = useSafeAreaInsets();
-  const {
-    theme,
-    isDark,
-    updateSettings,
-    setDrawerOpen,
-    navigate,
-    profile,
-  } = useApp();
+  const { theme, isDark, updateSettings, setDrawerOpen, navigate } = useApp();
   const {
     session,
     isActive: isCurrentSessionActive,
@@ -51,8 +53,20 @@ export function CodeScreen() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [manualSessionInput, setManualSessionInput] = useState('');
+  const [details, setDetails] = useState<{
+    title: string;
+    rows: DetailRow[];
+  } | null>(null);
 
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
+  // Puku brand accent (the logo's lavender/indigo), used for every "online /
+  // connected / live" indicator on this screen instead of a generic green.
+  const accent = theme.primaryLight;
+  const accentSoftBg = isDark
+    ? 'rgba(176, 179, 252, 0.16)'
+    : 'rgba(72, 77, 208, 0.12)';
+  // Official Puku "on accent" ink — readable text color for a solid-accent background.
+  const accentInk = isDark ? '#242449' : '#fafaff';
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -71,18 +85,53 @@ export function CodeScreen() {
     navigate('remoteSession');
   };
 
-  // Partition sessions into Open/Active vs Ended/Closed
+  const isAttachedOrActive =
+    session.sessionId &&
+    ['connecting', 'open', 'attached', 'reconnecting'].includes(session.phase);
+
+  // Partition sessions into Open/Active vs Ended/Closed. The currently
+  // attached session already gets its own "Current Attached Session" card
+  // above, so it's excluded here to avoid showing it twice.
   const openSessions = activeRelaySessions.filter(
-    (s: ActiveRelaySession) => (s.workerConnected || s.live) && !s.expired,
+    (s: ActiveRelaySession) =>
+      (s.workerConnected || s.live) &&
+      !s.expired &&
+      !(isAttachedOrActive && s.sessionId === session.sessionId),
   );
 
   const endedSessions = activeRelaySessions.filter(
     (s: ActiveRelaySession) => !((s.workerConnected || s.live) && !s.expired),
   );
 
-  const isAttachedOrActive =
-    session.sessionId &&
-    ['connecting', 'open', 'attached', 'reconnecting'].includes(session.phase);
+  const openSessionDetails = (s: ActiveRelaySession, ended: boolean) => {
+    setDetails({
+      title: s.title || 'puku-cli',
+      rows: [
+        { label: 'Session ID', value: s.sessionId },
+        { label: 'Created', value: formatActivityDate(s.createdAt) },
+        {
+          label: ended ? 'Closed' : 'Last activity',
+          value: formatActivityDate(s.titleUpdatedAt || s.createdAt),
+        },
+        {
+          label: 'Clients connected',
+          value: String(s.clientCount ?? (s.clientConnected ? 1 : 0)),
+        },
+        ...(s.ownerEmail ? [{ label: 'Owner', value: s.ownerEmail }] : []),
+      ],
+    });
+  };
+
+  const openCurrentSessionDetails = () => {
+    setDetails({
+      title: session.title || 'Laptop CLI Session',
+      rows: [
+        { label: 'Session ID', value: session.sessionId },
+        ...(session.cwd ? [{ label: 'Working directory', value: session.cwd }] : []),
+        { label: 'Status', value: session.phase },
+      ],
+    });
+  };
 
   return (
     <View
@@ -119,11 +168,31 @@ export function CodeScreen() {
               { color: theme.textPrimary, fontFamily: monoFont },
             ]}
           >
-            Terminal Sessions
+            Puku Remote
           </Text>
         </View>
 
         <View style={styles.trailingGroup}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Puku AI"
+            activeOpacity={0.7}
+            onPress={() => navigate('chat')}
+            style={styles.actionBtn}
+          >
+            <PukuLogoIcon size={19} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Puku Bot"
+            activeOpacity={0.7}
+            onPress={() => navigate('pukuBot')}
+            style={styles.actionBtn}
+          >
+            <PukuBotGradientIcon size={20} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Refresh"
@@ -164,52 +233,6 @@ export function CodeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Account Sync Status Banner */}
-        <View
-          style={[
-            styles.accountPill,
-            {
-              backgroundColor: theme.cardBackground,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <View style={styles.accountPillLeft}>
-            <View
-              style={[
-                styles.syncDot,
-                { backgroundColor: profile?.email ? '#52C41A' : '#FAAD14' },
-              ]}
-            />
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.accountStatusText,
-                { color: theme.textSecondary, fontFamily: monoFont },
-              ]}
-            >
-              {profile?.email
-                ? `Account: ${profile.email}`
-                : 'Sign in to sync your laptop terminals'}
-            </Text>
-          </View>
-          {!profile?.email && (
-            <TouchableOpacity
-              onPress={() => navigate('login')}
-              style={styles.signInBtn}
-            >
-              <Text
-                style={[
-                  styles.signInBtnText,
-                  { color: theme.primary, fontFamily: monoFont },
-                ]}
-              >
-                Sign In
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
         {/* CURRENTLY ATTACHED SESSION (If active) */}
         {isAttachedOrActive && (
           <View style={styles.section}>
@@ -222,16 +245,11 @@ export function CodeScreen() {
               >
                 Current Attached Session
               </Text>
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: 'rgba(82, 196, 26, 0.15)' },
-                ]}
-              >
+              <View style={[styles.badge, { backgroundColor: accentSoftBg }]}>
                 <Text
                   style={[
                     styles.badgeText,
-                    { color: '#52C41A', fontFamily: monoFont },
+                    { color: accent, fontFamily: monoFont },
                   ]}
                 >
                   {session.phase === 'attached' ? 'CONNECTED' : session.phase.toUpperCase()}
@@ -244,15 +262,13 @@ export function CodeScreen() {
                 styles.currentCard,
                 {
                   backgroundColor: theme.cardBackground,
-                  borderColor: '#52C41A',
+                  borderColor: accent,
                 },
               ]}
             >
               <View style={styles.sessionHeaderRow}>
                 <View style={styles.sessionTitleGroup}>
-                  <View
-                    style={[styles.liveDot, { backgroundColor: '#52C41A' }]}
-                  />
+                  <View style={[styles.liveDot, { backgroundColor: accent }]} />
                   <Text
                     numberOfLines={1}
                     style={[
@@ -263,16 +279,11 @@ export function CodeScreen() {
                     {session.title || 'Laptop CLI Session'}
                   </Text>
                 </View>
-                <View
-                  style={[
-                    styles.liveBadge,
-                    { backgroundColor: 'rgba(82, 196, 26, 0.15)' },
-                  ]}
-                >
+                <View style={[styles.liveBadge, { backgroundColor: accentSoftBg }]}>
                   <Text
                     style={[
                       styles.liveBadgeText,
-                      { color: '#52C41A', fontFamily: monoFont },
+                      { color: accent, fontFamily: monoFont },
                     ]}
                   >
                     LIVE NOW
@@ -280,27 +291,23 @@ export function CodeScreen() {
                 </View>
               </View>
 
-              {session.cwd ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Session details"
+                activeOpacity={0.6}
+                onPress={openCurrentSessionDetails}
+                style={styles.detailsLink}
+              >
+                <InfoIcon size={13} color={theme.textMuted} />
                 <Text
-                  numberOfLines={1}
                   style={[
-                    styles.sessionDirText,
-                    { color: theme.textSecondary, fontFamily: monoFont },
+                    styles.detailsLinkText,
+                    { color: theme.textMuted, fontFamily: monoFont },
                   ]}
                 >
-                  {session.cwd}
+                  Details
                 </Text>
-              ) : null}
-
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.sessionIdText,
-                  { color: theme.textMuted, fontFamily: monoFont },
-                ]}
-              >
-                ID: {session.sessionId}
-              </Text>
+              </TouchableOpacity>
 
               <View style={styles.currentActionsRow}>
                 <TouchableOpacity
@@ -348,7 +355,7 @@ export function CodeScreen() {
                 {
                   backgroundColor:
                     openSessions.length > 0
-                      ? 'rgba(82, 196, 26, 0.12)'
+                      ? accentSoftBg
                       : theme.pillBackground || 'rgba(255, 255, 255, 0.06)',
                 },
               ]}
@@ -357,7 +364,7 @@ export function CodeScreen() {
                 style={[
                   styles.countBadgeText,
                   {
-                    color: openSessions.length > 0 ? '#52C41A' : theme.textMuted,
+                    color: openSessions.length > 0 ? accent : theme.textMuted,
                     fontFamily: monoFont,
                   },
                 ]}
@@ -378,19 +385,14 @@ export function CodeScreen() {
                       backgroundColor: theme.cardBackground,
                       borderColor:
                         session.sessionId === s.sessionId
-                          ? '#52C41A'
+                          ? accent
                           : theme.border,
                     },
                   ]}
                 >
                   <View style={styles.sessionHeaderRow}>
                     <View style={styles.sessionTitleGroup}>
-                      <View
-                        style={[
-                          styles.liveDot,
-                          { backgroundColor: '#52C41A' },
-                        ]}
-                      />
+                      <View style={[styles.liveDot, { backgroundColor: accent }]} />
                       <Text
                         numberOfLines={1}
                         style={[
@@ -401,16 +403,11 @@ export function CodeScreen() {
                         {s.title || 'puku-cli'}
                       </Text>
                     </View>
-                    <View
-                      style={[
-                        styles.liveBadge,
-                        { backgroundColor: 'rgba(82, 196, 26, 0.15)' },
-                      ]}
-                    >
+                    <View style={[styles.liveBadge, { backgroundColor: accentSoftBg }]}>
                       <Text
                         style={[
                           styles.liveBadgeText,
-                          { color: '#52C41A', fontFamily: monoFont },
+                          { color: accent, fontFamily: monoFont },
                         ]}
                       >
                         ONLINE
@@ -428,15 +425,15 @@ export function CodeScreen() {
                     >
                       Online · {formatActivityDate(s.titleUpdatedAt || s.createdAt)}
                     </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.sessionIdText,
-                        { color: theme.textMuted, fontFamily: monoFont },
-                      ]}
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Session details"
+                      activeOpacity={0.6}
+                      onPress={() => openSessionDetails(s, false)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      {s.sessionId.slice(0, 16)}…
-                    </Text>
+                      <InfoIcon size={14} color={theme.textMuted} />
+                    </TouchableOpacity>
                   </View>
 
                   <TouchableOpacity
@@ -450,7 +447,7 @@ export function CodeScreen() {
                       {
                         backgroundColor:
                           session.sessionId === s.sessionId
-                            ? '#52C41A'
+                            ? accent
                             : theme.textPrimary,
                       },
                     ]}
@@ -461,7 +458,7 @@ export function CodeScreen() {
                         {
                           color:
                             session.sessionId === s.sessionId
-                              ? '#FFFFFF'
+                              ? accentInk
                               : theme.background,
                         },
                       ]}
@@ -484,9 +481,7 @@ export function CodeScreen() {
                 },
               ]}
             >
-              <View style={styles.emptyIconWrap}>
-                <RemoteIcon size={24} color={theme.textPrimary} />
-              </View>
+              <RemoteIcon size={28} color={theme.textMuted} />
               <Text
                 style={[
                   styles.emptyTitle,
@@ -515,7 +510,7 @@ export function CodeScreen() {
                 <Text
                   style={[
                     styles.codeText,
-                    { color: '#52C41A', fontFamily: monoFont },
+                    { color: accent, fontFamily: monoFont },
                   ]}
                 >
                   /remote-control
@@ -627,15 +622,15 @@ export function CodeScreen() {
                     >
                       Closed · {formatActivityDate(s.titleUpdatedAt || s.createdAt)}
                     </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.sessionIdText,
-                        { color: theme.textMuted, fontFamily: monoFont },
-                      ]}
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Session details"
+                      activeOpacity={0.6}
+                      onPress={() => openSessionDetails(s, true)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      {s.sessionId.slice(0, 16)}…
-                    </Text>
+                      <InfoIcon size={14} color={theme.textMuted} />
+                    </TouchableOpacity>
                   </View>
 
                   <TouchableOpacity
@@ -733,6 +728,76 @@ export function CodeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={!!details}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDetails(null)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setDetails(null)}
+          style={styles.modalBackdrop}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={e => e.stopPropagation()}
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: theme.cardBackground,
+                paddingBottom: Math.max(insets.bottom + 12, 24),
+              },
+            ]}
+          >
+            <View style={[styles.modalHandle, { backgroundColor: theme.outline }]} />
+            <View style={styles.modalHeader}>
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.modalTitle,
+                  { color: theme.textPrimary, fontFamily: monoFont },
+                ]}
+              >
+                {details?.title}
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => setDetails(null)}
+              >
+                <CloseIcon size={16} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            {details?.rows.map(row => (
+              <View
+                key={row.label}
+                style={[styles.modalRow, { borderBottomColor: theme.outline }]}
+              >
+                <Text
+                  style={[
+                    styles.modalRowLabel,
+                    { color: theme.textMuted, fontFamily: monoFont },
+                  ]}
+                >
+                  {row.label}
+                </Text>
+                <Text
+                  selectable
+                  style={[
+                    styles.modalRowValue,
+                    { color: theme.textPrimary, fontFamily: monoFont },
+                  ]}
+                >
+                  {row.value}
+                </Text>
+              </View>
+            ))}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -780,38 +845,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 20,
-  },
-  accountPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  accountPillLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  syncDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  accountStatusText: {
-    fontSize: 12,
-    flex: 1,
-  },
-  signInBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  signInBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   section: {
     gap: 10,
@@ -929,11 +962,14 @@ const styles = StyleSheet.create({
   sessionMetaText: {
     fontSize: 11.5,
   },
-  sessionDirText: {
-    fontSize: 11.5,
+  detailsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
   },
-  sessionIdText: {
-    fontSize: 11,
+  detailsLinkText: {
+    fontSize: 11.5,
   },
   connectBtn: {
     paddingVertical: 10,
@@ -952,15 +988,6 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     gap: 8,
-  },
-  emptyIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
   },
   emptyTitle: {
     fontSize: 15,
@@ -1011,5 +1038,49 @@ const styles = StyleSheet.create({
   manualBtnText: {
     fontWeight: '700',
     fontSize: 12,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 12,
+  },
+  modalRow: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 2,
+  },
+  modalRowLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
+  },
+  modalRowValue: {
+    fontSize: 13,
   },
 });
