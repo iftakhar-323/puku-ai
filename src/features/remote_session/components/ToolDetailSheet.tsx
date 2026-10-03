@@ -19,6 +19,7 @@ import { ThemeColors } from '../../../theme/theme';
 import type { ToolCall } from '../relay/protocol';
 import { describeTool, toolCommand } from '../relay/feed';
 import { DiffBlockBody, looksLikeDiff } from '../../chat/components/MarkdownRenderer';
+import { SmartOutputView } from '../../../components/common/SmartOutputView';
 
 const monoFont = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -141,17 +142,24 @@ export function ToolDetailSheet({ tool, theme, onClose }: Props) {
             ]}
           >
             <ScrollView nestedScrollEnabled>
-              {tool?.output?.trim() && looksLikeDiff(tool.output) ? (
-                <DiffBlockBody code={tool.output.trim()} theme={theme} />
+              {tool?.output?.trim() ? (
+                looksLikeDiff(tool.output) ? (
+                  <DiffBlockBody code={tool.output.trim()} theme={theme} />
+                ) : (
+                  <SmartOutputView
+                    data={tool.output}
+                    theme={theme}
+                    monoFont={monoFont}
+                  />
+                )
               ) : (
                 <Text
                   selectable
                   style={[styles.mono, { color: theme.textPrimary }]}
                 >
-                  {tool?.output?.trim() ||
-                    (tool?.status === 'running'
-                      ? 'Waiting for output…'
-                      : 'No output.')}
+                  {tool?.status === 'running'
+                    ? 'Waiting for output…'
+                    : 'No output.'}
                 </Text>
               )}
             </ScrollView>
