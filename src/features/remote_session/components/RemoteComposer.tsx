@@ -265,7 +265,7 @@ export function RemoteComposer({
 
       <OptionSheet
         visible={sheet === 'mode'}
-        title="Permission mode"
+        title={t('remoteSession.permissionModeTitle')}
         theme={theme}
         selectedKey={permissionMode}
         options={PERMISSION_MODES.map(m => ({
@@ -282,7 +282,7 @@ export function RemoteComposer({
       />
       <OptionSheet
         visible={sheet === 'model'}
-        title="Model"
+        title={t('remoteSession.modelTitle')}
         theme={theme}
         selectedKey={model}
         options={models.map(m => ({ key: m, label: m }))}
@@ -295,7 +295,7 @@ export function RemoteComposer({
       <MediaPickerModal
         visible={showPickerSheet}
         theme={theme}
-        title="Attach Image"
+        title={t('remoteSession.attachImageTitle')}
         onClose={() => setShowPickerSheet(false)}
         onTakePhoto={handleTakePhoto}
         onPickMedia={handlePickMedia}

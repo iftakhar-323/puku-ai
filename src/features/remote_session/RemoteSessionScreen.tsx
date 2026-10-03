@@ -409,7 +409,7 @@ function RemoteSessionScreenContent() {
               style={[styles.menuHandle, { backgroundColor: theme.outline }]}
             />
             <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>
-              Session controls
+              {t('remoteSession.sessionControls')}
             </Text>
 
             <TouchableOpacity
@@ -421,7 +421,7 @@ function RemoteSessionScreenContent() {
             >
               <View style={styles.menuInfo}>
                 <Text style={[styles.menuLabel, { color: theme.textMuted }]}>
-                  Session ID
+                  {t('code.sessionId')}
                 </Text>
                 <Text
                   numberOfLines={1}

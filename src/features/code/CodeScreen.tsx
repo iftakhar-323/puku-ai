@@ -385,7 +385,7 @@ export function CodeScreen() {
                 >
                   <LogoutIcon size={15} color={theme.error} />
                   <Text style={[styles.disconnectBtnText, { color: theme.error }]}>
-                    Disconnect
+                    {t('code.disconnect')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -727,7 +727,7 @@ export function CodeScreen() {
                   fontFamily: monoFont,
                 },
               ]}
-              placeholder="Paste session ID or link..."
+              placeholder={t('code.pasteSessionPlaceholder')}
               placeholderTextColor={theme.textMuted}
               value={manualSessionInput}
               onChangeText={setManualSessionInput}

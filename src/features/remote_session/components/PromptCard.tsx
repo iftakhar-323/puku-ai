@@ -304,7 +304,7 @@ function PermissionBody({
           <TextInput
             value={feedbackText}
             onChangeText={setFeedbackText}
-            placeholder="What should change before starting? (optional)"
+            placeholder={t('remoteSession.feedbackPlaceholder')}
             placeholderTextColor={theme.placeholderText}
             multiline
             style={[
@@ -321,7 +321,7 @@ function PermissionBody({
               style={[styles.secondaryBtn, { borderColor: theme.outline }]}
             >
               <Text style={[styles.btnText, { color: theme.textSecondary }]}>
-                Cancel
+                {t('remoteSession.cancel')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -333,7 +333,7 @@ function PermissionBody({
             >
               <CheckmarkIcon size={13} color={theme.background} />
               <Text style={[styles.btnText, { color: theme.background }]}>
-                Send
+                {t('remoteSession.send')}
               </Text>
             </TouchableOpacity>
           </View>

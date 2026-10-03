@@ -120,7 +120,7 @@ export function ToolDetailSheet({ tool, theme, onClose }: Props) {
 
           <View style={styles.outputHeader}>
             <Text style={[styles.outputLabel, { color: theme.textMuted }]}>
-              OUTPUT
+              {t('remoteSession.outputLabel')}
             </Text>
             <View style={styles.status}>
               {tool?.status === 'running' ? (

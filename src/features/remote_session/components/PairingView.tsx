@@ -84,15 +84,14 @@ export function PairingView({
           <PukuRemoteGradientIcon size={24} />
         </View>
         <Text style={[styles.title, { color: theme.textPrimary }]}>
-          Connect to Laptop CLI
+          {t('remoteSession.connectToLaptopCli')}
         </Text>
         <Text style={[styles.hint, { color: theme.textSecondary }]}>
-          Run{' '}
+          {t('remoteSession.pairingHintBefore')}{' '}
           <Text style={[styles.hintCode, { color: theme.textPrimary }]}>
             /remote-control
           </Text>{' '}
-          in Puku CLI on your laptop. Sessions on your account show up below
-          automatically.
+          {t('remoteSession.pairingHintAfter')}
         </Text>
 
         <TouchableOpacity
@@ -104,7 +103,7 @@ export function PairingView({
         >
           <CameraIcon size={16} color={theme.textPrimary} />
           <Text style={[styles.scanBtnText, { color: theme.textPrimary }]}>
-            Scan QR code
+            {t('remoteSession.scanQrCode')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -158,7 +157,7 @@ export function PairingView({
                 style={[styles.connectPill, { backgroundColor: theme.textPrimary }]}
               >
                 <Text style={[styles.connectPillText, { color: theme.background }]}>
-                  Connect
+                  {t('remoteSession.connect')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -194,7 +193,7 @@ export function PairingView({
         style={styles.manualToggle}
       >
         <Text style={[styles.manualToggleText, { color: theme.textSecondary }]}>
-          Connect with a session ID instead
+          {t('remoteSession.connectWithSessionId')}
         </Text>
         {showManual ? (
           <ChevronDownIcon size={14} color={theme.textSecondary} />
@@ -211,7 +210,7 @@ export function PairingView({
           ]}
         >
           <Text style={[styles.label, { color: theme.textSecondary }]}>
-            Relay session ID
+            {t('remoteSession.relaySessionId')}
           </Text>
           <TextInput
             style={[
@@ -223,7 +222,7 @@ export function PairingView({
                 fontFamily: monoFont,
               },
             ]}
-            placeholder="e.g. af689a1b-2858-..."
+            placeholder={t('remoteSession.sessionIdPlaceholder')}
             placeholderTextColor={theme.placeholderText}
             value={sessionId}
             onChangeText={setSessionId}
@@ -233,7 +232,7 @@ export function PairingView({
           />
 
           <Text style={[styles.label, { color: theme.textSecondary }]}>
-            Mobile token (optional)
+            {t('remoteSession.mobileTokenOptional')}
           </Text>
           <View
             style={[
@@ -249,7 +248,7 @@ export function PairingView({
                 styles.tokenInput,
                 { color: theme.textPrimary, fontFamily: monoFont },
               ]}
-              placeholder="Resolved automatically on the same account"
+              placeholder={t('remoteSession.tokenPlaceholder')}
               placeholderTextColor={theme.placeholderText}
               secureTextEntry={!showToken}
               value={token}
@@ -287,7 +286,7 @@ export function PairingView({
             ]}
           >
             <Text style={[styles.primaryBtnText, { color: theme.background }]}>
-              Connect manually
+              {t('remoteSession.connectManually')}
             </Text>
           </TouchableOpacity>
         </View>

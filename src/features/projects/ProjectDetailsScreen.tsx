@@ -52,10 +52,10 @@ export function ProjectDetailsScreen() {
   if (!activeProject) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <AppHeader showBack title="Project Details" />
+        <AppHeader showBack title={t('projects.detailsTitle')} />
         <View style={styles.centerBox}>
           <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-            No project selected
+            {t('projects.noProjectSelected')}
           </Text>
         </View>
       </View>

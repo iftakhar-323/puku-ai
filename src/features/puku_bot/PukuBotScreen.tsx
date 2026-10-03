@@ -330,7 +330,7 @@ export function PukuBotScreen() {
       const file = await NativePicker.takePhoto();
       if (file) setPendingAttachment(file);
     } catch (err: any) {
-      Alert.alert('Camera Error', err?.message || 'Could not take photo');
+      Alert.alert(t('pukuBot.cameraErrorTitle'), err?.message || t('pukuBot.couldNotTakePhoto'));
     }
   };
 
@@ -339,7 +339,7 @@ export function PukuBotScreen() {
       const file = await NativePicker.pickMedia();
       if (file) setPendingAttachment(file);
     } catch (err: any) {
-      Alert.alert('Upload Error', err?.message || 'Could not pick file');
+      Alert.alert(t('pukuBot.uploadErrorTitle'), err?.message || t('pukuBot.couldNotPickFile'));
     }
   };
 
@@ -595,7 +595,7 @@ export function PukuBotScreen() {
               setIsStreaming(false);
               activeStreamAbortRef.current = null;
               {
-                const errMsg = event.message || 'Turn could not be completed';
+                const errMsg = event.message || t('pukuBot.turnNotCompleted');
                 setMessages(prev =>
                   prev.map(m =>
                     m.id === assistantMsgId
@@ -674,9 +674,9 @@ export function PukuBotScreen() {
       await pukuBotApi.sendComputerSecret(needsPerson.botId, secretInput.trim());
       setSecretInput('');
       setNeedsPerson(null);
-      Alert.alert('Secret Transmitted', 'Value sent securely to the Bot computer.');
+      Alert.alert(t('pukuBot.secretTransmittedTitle'), t('pukuBot.secretTransmittedMessage'));
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to submit secret');
+      Alert.alert(t('pukuBot.errorTitle'), err.message || t('pukuBot.failedToSubmitSecret'));
     } finally {
       setIsSubmittingSecret(false);
     }
@@ -711,7 +711,7 @@ export function PukuBotScreen() {
       }
       setScreenshotTimestamp(Date.now());
     } catch (err: any) {
-      Alert.alert('Control Error', err.message || 'Failed to toggle computer control');
+      Alert.alert(t('pukuBot.controlErrorTitle'), err.message || t('pukuBot.failedToggleControl'));
     } finally {
       setIsTakingControl(false);
     }
@@ -725,7 +725,7 @@ export function PukuBotScreen() {
       await pukuBotApi.startAuth();
       setShowSettingsModal(false);
     } catch (err: any) {
-      Alert.alert('Sign-In Error', err.message || 'Could not start OAuth flow');
+      Alert.alert(t('pukuBot.signInErrorTitle'), err.message || t('pukuBot.couldNotStartOAuth'));
     } finally {
       setIsConnectingAuth(false);
     }
@@ -768,7 +768,7 @@ export function PukuBotScreen() {
           <View style={styles.titleContainer}>
             <PukuBotGradientIcon size={20} />
             <Text style={[styles.screenTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-              puku bot
+              {t('pukuBot.screenTitle')}
             </Text>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -786,7 +786,7 @@ export function PukuBotScreen() {
                 },
               ]}>
               <Text style={[styles.badgeText, { color: theme.primaryLight, fontFamily: monoFont }]}>
-                {isAuthenticated ? (availableBots.find(b => b.id === selectedBotId)?.name || 'LIVE') : 'AI'}
+                {isAuthenticated ? (availableBots.find(b => b.id === selectedBotId)?.name || t('pukuBot.liveBadge')) : t('pukuBot.aiBadge')}
               </Text>
               {isAuthenticated && availableBots.length > 1 && (
                 <ChevronDownIcon size={10} color={theme.primaryLight} />
@@ -890,7 +890,7 @@ export function PukuBotScreen() {
           </View>
 
           <Text style={[styles.needsPersonReason, { color: theme.textPrimary, fontFamily: monoFont }]}>
-            {needsPerson.reason || (needsPerson.kind === 'secret' ? 'Bot requests a sensitive credential' : 'Bot requests human intervention on its computer')}
+            {needsPerson.reason || (needsPerson.kind === 'secret' ? t('pukuBot.needsSecretReason') : t('pukuBot.needsHelpReason'))}
           </Text>
 
           {needsPerson.kind === 'secret' ? (
@@ -900,7 +900,7 @@ export function PukuBotScreen() {
                   secureTextEntry={isSecretMasked}
                   value={secretInput}
                   onChangeText={setSecretInput}
-                  placeholder={needsPerson.label || 'Enter requested secret...'}
+                  placeholder={needsPerson.label || t('pukuBot.secretPlaceholder')}
                   placeholderTextColor={theme.placeholderText}
                   style={[styles.secretTextInput, { color: theme.textPrimary, fontFamily: monoFont }]}
                 />
@@ -924,7 +924,7 @@ export function PukuBotScreen() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={[styles.secretSubmitText, { color: isDark ? '#141613' : '#FFFFFF', fontFamily: monoFont }]}>
-                    Submit
+                    {t('pukuBot.submit')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -935,14 +935,14 @@ export function PukuBotScreen() {
                 onPress={handleOpenComputerModal}
                 style={[styles.needsPersonBtn, { backgroundColor: isDark ? '#3E3420' : '#F4E5BE' }]}>
                 <Text style={[styles.needsPersonBtnText, { color: isDark ? '#F5D070' : '#8A5800', fontFamily: monoFont }]}>
-                  View Screen
+                  {t('pukuBot.viewScreen')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleToggleControl}
                 style={[styles.needsPersonBtn, { backgroundColor: isDark ? '#35D6B4' : '#1A1D18' }]}>
                 <Text style={[styles.needsPersonBtnText, { color: isDark ? '#141613' : '#FFFFFF', fontFamily: monoFont }]}>
-                  Take Control
+                  {t('pukuBot.takeControl')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -983,7 +983,7 @@ export function PukuBotScreen() {
           {/* 2. Recent Conversations Section matching Puku AI */}
           <View style={styles.botRecentsSection}>
             <Text style={[styles.botRecentsTitle, { color: theme.textSecondary, fontFamily: monoFont }]}>
-              Recent conversations
+              {t('pukuBot.recentConversations')}
             </Text>
             <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
 
@@ -1019,7 +1019,7 @@ export function PukuBotScreen() {
 
           {/* 3. Prompt Chips */}
           <Text style={[styles.promptChipsTitle, { color: theme.textMuted, fontFamily: monoFont }]}>
-            Try asking:
+            {t('pukuBot.tryAsking')}
           </Text>
           <View style={styles.chipsWrap}>
             {STARTER_PROMPTS.map((item, idx) => (
@@ -1209,7 +1209,7 @@ export function PukuBotScreen() {
               isTyping && !isStreaming ? (
                 <View style={styles.typingIndicatorRow}>
                   <Text style={[styles.typingText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                    Puku Bot is typing...
+                    {t('pukuBot.typingIndicator')}
                   </Text>
                 </View>
               ) : undefined
@@ -1257,7 +1257,7 @@ export function PukuBotScreen() {
           ref={inputRef}
           value={inputVal}
           onChangeText={setInputVal}
-          placeholder="Ask Puku Bot anything..."
+          placeholder={t('pukuBot.composerPlaceholder')}
           placeholderTextColor={theme.placeholderText}
           multiline
           style={[styles.composerInput, { color: theme.textPrimary, fontFamily: monoFont }]}
@@ -1314,7 +1314,7 @@ export function PukuBotScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <ComputerMonitorIcon size={20} color={theme.textPrimary} />
                 <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                  Bot Computer
+                  {t('pukuBot.botComputer')}
                 </Text>
               </View>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowComputerModal(false)}>
@@ -1340,12 +1340,19 @@ export function PukuBotScreen() {
                     ]}
                   />
                   <Text style={[styles.statusText, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                    State: {computerInfo?.status?.state || 'Unknown'}
+                    {t('pukuBot.stateLabel', {
+                      state: computerInfo?.status?.state || t('pukuBot.unknownState'),
+                    })}
                   </Text>
                 </View>
 
                 <Text style={[styles.statusText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                  Control: {computerInfo?.control?.holder === 'human' ? 'You' : 'Bot'}
+                  {t('pukuBot.controlLabel', {
+                    holder:
+                      computerInfo?.control?.holder === 'human'
+                        ? t('pukuBot.youLabel')
+                        : t('pukuBot.botLabel'),
+                  })}
                 </Text>
               </View>
 
@@ -1405,7 +1412,7 @@ export function PukuBotScreen() {
                   style={[styles.secondaryActionBtn, { borderColor: theme.border }]}>
                   <RefreshIcon size={16} color={theme.textPrimary} />
                   <Text style={[styles.secondaryBtnText, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                    Refresh
+                    {t('pukuBot.refresh')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1424,7 +1431,7 @@ export function PukuBotScreen() {
           <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                Puku Bot Settings
+                {t('pukuBot.settingsTitle')}
               </Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowSettingsModal(false)}>
                 <CloseIcon size={20} color={theme.textPrimary} />
@@ -1433,7 +1440,7 @@ export function PukuBotScreen() {
 
             <View style={{ paddingVertical: 14 }}>
               <Text style={[styles.sectionLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
-                API BASE URL:
+                {t('pukuBot.apiBaseUrlLabel')}
               </Text>
 
               <TextInput
@@ -1460,7 +1467,7 @@ export function PukuBotScreen() {
                     onPress={() => setCustomApiUrl(ENV.PUKU_BOT_API_BASE_URL)}
                     style={[styles.quickEnvPill, { borderColor: theme.border }]}>
                     <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                      Cloud (Prod)
+                      {t('pukuBot.envCloudProd')}
                     </Text>
                   </TouchableOpacity>
 
@@ -1468,7 +1475,7 @@ export function PukuBotScreen() {
                     onPress={() => setCustomApiUrl(ENV.PUKU_BOT_LOCAL_BASE_URL)}
                     style={[styles.quickEnvPill, { borderColor: theme.border }]}>
                     <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                      Local (3001)
+                      {t('pukuBot.envLocal')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1479,27 +1486,27 @@ export function PukuBotScreen() {
                 {isAuthenticated ? (
                   <View>
                     <Text style={[styles.accountTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                      Signed in as:
+                      {t('pukuBot.signedInAs')}
                     </Text>
                     <Text style={[styles.accountEmail, { color: theme.textSecondary, fontFamily: monoFont }]}>
-                      {botUser?.email || 'Puku Bot User'}
+                      {botUser?.email || t('pukuBot.defaultUserFallback')}
                     </Text>
 
                     <TouchableOpacity
                       onPress={handleSignOut}
                       style={[styles.signOutBtn, { borderColor: '#FF4D4F' }]}>
                       <Text style={[styles.signOutText, { color: '#FF4D4F', fontFamily: monoFont }]}>
-                        Sign Out
+                        {t('pukuBot.signOut')}
                       </Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
                   <View>
                     <Text style={[styles.accountTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                      Connect Puku Bot (v1)
+                      {t('pukuBot.connectTitle')}
                     </Text>
                     <Text style={[styles.accountDesc, { color: theme.textMuted, fontFamily: monoFont }]}>
-                      Sign in with PKCE flow to access real-time computer tools, active agents, and synced web channels.
+                      {t('pukuBot.connectDescription')}
                     </Text>
 
                     <TouchableOpacity
@@ -1510,7 +1517,7 @@ export function PukuBotScreen() {
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
                         <Text style={[styles.signInBtnText, { color: isDark ? '#141613' : '#FFFFFF', fontFamily: monoFont }]}>
-                          Sign In with Puku Bot
+                          {t('pukuBot.signInButton')}
                         </Text>
                       )}
                     </TouchableOpacity>
@@ -1532,7 +1539,7 @@ export function PukuBotScreen() {
           <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                Select Bot
+                {t('pukuBot.selectBot')}
               </Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowBotModal(false)}>
                 <CloseIcon size={20} color={theme.textPrimary} />
@@ -1583,7 +1590,7 @@ export function PukuBotScreen() {
         visible={showBotPickerSheet}
         theme={theme}
         isDark={isDark}
-        title="Attach Photo or File"
+        title={t('pukuBot.attachPhotoOrFile')}
         onClose={() => setShowBotPickerSheet(false)}
         onTakePhoto={handleTakePhoto}
         onPickMedia={handlePickFile}
