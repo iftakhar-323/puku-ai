@@ -380,6 +380,35 @@ function PermissionBody({
   );
 }
 
+function normalizeOptions(rawOptions: any[]) {
+  return rawOptions
+    .map((opt: any, optIdx: number) => {
+      if (typeof opt === 'string') {
+        return { label: opt, description: '' };
+      }
+      if (opt && typeof opt === 'object') {
+        return {
+          label:
+            safeRenderString(opt.label || opt.text || opt.title) ||
+            `Option ${optIdx + 1}`,
+          description: safeRenderString(opt.description),
+        };
+      }
+      return {
+        label: safeRenderString(opt) || `Option ${optIdx + 1}`,
+        description: '',
+      };
+    })
+    .filter(opt => Boolean(opt.label));
+}
+
+/**
+ * A multi-question `AskUserQuestion` is shown one question per page (Back/
+ * Next/Submit), mirroring the CLI's own wizard UX (Flutter's
+ * question_wizard_card.dart) rather than dumping every question into one
+ * long scroll — each question tends to depend on context from the one
+ * before it.
+ */
 function QuestionPicker({
   prompt,
   theme,
@@ -391,9 +420,13 @@ function QuestionPicker({
 }) {
   const rawQuestions = Array.isArray(prompt.questions) ? prompt.questions : [];
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [pageIndex, setPageIndex] = useState(0);
 
-  // A new prompt starts with no selections.
-  useEffect(() => setAnswers({}), [prompt.requestId]);
+  // A new prompt starts with no selections, at the first question.
+  useEffect(() => {
+    setAnswers({});
+    setPageIndex(0);
+  }, [prompt.requestId]);
 
   const toggle = (question: string, label: string, multi: boolean) => {
     setAnswers(prev => {
@@ -407,146 +440,147 @@ function QuestionPicker({
     });
   };
 
-  const complete =
-    rawQuestions.length > 0 &&
-    rawQuestions.every(q => {
-      const qKey = safeRenderString(q?.question);
-      return (answers[qKey] || []).length > 0;
-    });
+  if (rawQuestions.length === 0) {
+    return null;
+  }
+
+  const clampedIndex = Math.min(pageIndex, rawQuestions.length - 1);
+  const q = rawQuestions[clampedIndex];
+  const qText = safeRenderString(q?.question) || `Question ${clampedIndex + 1}`;
+  const qHeader = q?.header ? safeRenderString(q.header) : '';
+  const isMulti = Boolean(q?.multiSelect);
+  const options = normalizeOptions(Array.isArray(q?.options) ? q.options : []);
+  const isFirstPage = clampedIndex === 0;
+  const isLastPage = clampedIndex === rawQuestions.length - 1;
+  const currentAnswered = (answers[qText] || []).length > 0;
 
   return (
     <>
-      <Text style={[styles.eyebrow, { color: theme.warning }]}>
-        YOUR LAPTOP IS ASKING
-      </Text>
+      <View style={styles.wizardHeaderRow}>
+        <Text style={[styles.eyebrow, { color: theme.warning }]}>
+          YOUR LAPTOP IS ASKING
+        </Text>
+        {rawQuestions.length > 1 ? (
+          <Text style={[styles.wizardPageLabel, { color: theme.textMuted }]}>
+            {clampedIndex + 1} / {rawQuestions.length}
+          </Text>
+        ) : null}
+      </View>
       <ScrollView style={styles.questionScroll} nestedScrollEnabled>
-        {rawQuestions.map((q, qIdx) => {
-          const qText = safeRenderString(q?.question) || `Question ${qIdx + 1}`;
-          const qHeader = q?.header ? safeRenderString(q.header) : '';
-          const isMulti = Boolean(q?.multiSelect);
-          const rawOptions = Array.isArray(q?.options) ? q.options : [];
-          const options = rawOptions
-            .map((opt: any, optIdx: number) => {
-              if (typeof opt === 'string') {
-                return { label: opt, description: '' };
-              }
-              if (opt && typeof opt === 'object') {
-                return {
-                  label:
-                    safeRenderString(opt.label || opt.text || opt.title) ||
-                    `Option ${optIdx + 1}`,
-                  description: safeRenderString(opt.description),
-                };
-              }
-              return {
-                label: safeRenderString(opt) || `Option ${optIdx + 1}`,
-                description: '',
-              };
-            })
-            .filter(opt => Boolean(opt.label));
-
-          return (
-            <View key={`${qText}_${qIdx}`} style={styles.question}>
-              {qHeader ? (
-                <Text style={[styles.header, { color: theme.textMuted }]}>
-                  {qHeader}
-                </Text>
-              ) : null}
-              <Text style={[styles.title, { color: theme.textPrimary }]}>
-                {qText}
-              </Text>
-              {options.map((option, optIdx) => {
-                const selected = (answers[qText] || []).includes(option.label);
-                return (
-                  <TouchableOpacity
-                    key={`${option.label}_${optIdx}`}
-                    activeOpacity={0.7}
-                    accessibilityRole={isMulti ? 'checkbox' : 'radio'}
-                    accessibilityState={{ checked: selected }}
-                    onPress={() => toggle(qText, option.label, isMulti)}
-                    style={[
-                      styles.option,
-                      {
-                        borderColor: selected
-                          ? theme.textPrimary
-                          : theme.outline,
-                        backgroundColor: selected
-                          ? theme.pillBackground
-                          : undefined,
-                      },
-                    ]}
-                  >
+        <View style={styles.question}>
+          {qHeader ? (
+            <Text style={[styles.header, { color: theme.textMuted }]}>
+              {qHeader}
+            </Text>
+          ) : null}
+          <Text style={[styles.title, { color: theme.textPrimary }]}>
+            {qText}
+          </Text>
+          {options.map((option, optIdx) => {
+            const selected = (answers[qText] || []).includes(option.label);
+            return (
+              <TouchableOpacity
+                key={`${option.label}_${optIdx}`}
+                activeOpacity={0.7}
+                accessibilityRole={isMulti ? 'checkbox' : 'radio'}
+                accessibilityState={{ checked: selected }}
+                onPress={() => toggle(qText, option.label, isMulti)}
+                style={[
+                  styles.option,
+                  {
+                    borderColor: selected
+                      ? theme.textPrimary
+                      : theme.outline,
+                    backgroundColor: selected
+                      ? theme.pillBackground
+                      : undefined,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    isMulti ? styles.checkbox : styles.radio,
+                    {
+                      borderColor: selected
+                        ? theme.textPrimary
+                        : theme.textMuted,
+                    },
+                  ]}
+                >
+                  {selected && (
                     <View
                       style={[
-                        isMulti ? styles.checkbox : styles.radio,
-                        {
-                          borderColor: selected
-                            ? theme.textPrimary
-                            : theme.textMuted,
-                        },
+                        isMulti ? styles.checkboxFill : styles.radioFill,
+                        { backgroundColor: theme.textPrimary },
+                      ]}
+                    />
+                  )}
+                </View>
+                <View style={styles.optionText}>
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      { color: theme.textPrimary },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {option.description ? (
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        { color: theme.textMuted },
                       ]}
                     >
-                      {selected && (
-                        <View
-                          style={[
-                            isMulti ? styles.checkboxFill : styles.radioFill,
-                            { backgroundColor: theme.textPrimary },
-                          ]}
-                        />
-                      )}
-                    </View>
-                    <View style={styles.optionText}>
-                      <Text
-                        style={[
-                          styles.optionLabel,
-                          { color: theme.textPrimary },
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                      {option.description ? (
-                        <Text
-                          style={[
-                            styles.optionDescription,
-                            { color: theme.textMuted },
-                          ]}
-                        >
-                          {option.description}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          );
-        })}
+                      {option.description}
+                    </Text>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </ScrollView>
       <View style={styles.actions}>
+        {isFirstPage ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            onPress={() => onAnswer(null)}
+            style={[styles.secondaryBtn, { borderColor: theme.outline }]}
+          >
+            <Text style={[styles.btnText, { color: theme.textSecondary }]}>
+              Skip
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            onPress={() => setPageIndex(p => p - 1)}
+            style={[styles.secondaryBtn, { borderColor: theme.outline }]}
+          >
+            <Text style={[styles.btnText, { color: theme.textSecondary }]}>
+              Back
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           activeOpacity={0.8}
           accessibilityRole="button"
-          onPress={() => onAnswer(null)}
-          style={[styles.secondaryBtn, { borderColor: theme.outline }]}
-        >
-          <Text style={[styles.btnText, { color: theme.textSecondary }]}>
-            Skip
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !complete }}
-          disabled={!complete}
-          onPress={() => onAnswer(answers)}
+          accessibilityState={{ disabled: !currentAnswered }}
+          disabled={!currentAnswered}
+          onPress={() =>
+            isLastPage ? onAnswer(answers) : setPageIndex(p => p + 1)
+          }
           style={[
             styles.primaryBtn,
             { backgroundColor: theme.textPrimary },
-            !complete && styles.disabled,
+            !currentAnswered && styles.disabled,
           ]}
         >
           <Text style={[styles.btnText, { color: theme.background }]}>
-            Submit
+            {isLastPage ? 'Submit' : 'Next'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -567,6 +601,15 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '800',
     letterSpacing: 1,
+  },
+  wizardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  wizardPageLabel: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   title: {
     fontSize: 15,

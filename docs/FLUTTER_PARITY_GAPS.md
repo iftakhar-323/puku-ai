@@ -24,7 +24,7 @@ Most of the gaps below have since been implemented on the
 - ✅ Android `puku://remote` deep link, iOS `pukubot://` scheme
 - ✅ CI coverage-threshold gate, tag-triggered release workflow
 - ✅ Removed the dead `puku-ui`/`cmdk`/`@base-ui/react` component library
-- 📄 iOS `react-native-config` wiring documented as a manual Xcode step in `docs/IOS_ENV_SETUP.md` (requires macOS/Xcode to apply and verify, so it wasn't safe to hand-edit `project.pbxproj` blind from this environment)
+- ✅ iOS `react-native-config` wiring — turned out to need no Xcode change at all: the installed version's podspec already declares the env-codegen script phase, auto-injected by `pod install`. Corrected the misleading comment in `env.ts` and rewrote `docs/IOS_ENV_SETUP.md`; still only verifiable by an actual `pod install` + build on macOS, which isn't available here
 - ⏭️ Not replicated (confirmed non-functional on the Flutter side too): fake thinking/tool-use blocks in main chat, the Live Voice Chat mock, the "New Code Session" composer mock, and the "research" toggle
 
 ---
@@ -117,7 +117,7 @@ Both apps currently ship English only, but the underlying i18n groundwork differ
 | Minimum code-coverage gate | ✅ CI fails below 59% line coverage | ❌ RN uploads coverage to Codecov but doesn't fail the build on low coverage (current RN coverage is ~25%) |
 | Automated integration/E2E tests in CI | ✅ Runs `integration_test` on a real Android emulator (API 31) in CI | ❌ No E2E/Detox/Maestro tests; RN's only device-automation script (`scripts/run-argent-demo.sh`) is a manual, non-CI smoke script |
 | Tag-triggered release pipeline | ✅ `release.yml` triggers on `v*.*.*` tags, builds signed APK + AppBundle, auto-creates a GitHub Release, and dispatches a webhook to an external `puku-mobile-automation` repo to run automated tests against the fresh build | ❌ RN's `android-build.yml` builds on every push to `main` (no tag trigger, no auto GitHub Release, no downstream test dispatch) |
-| iOS per-flavor env config | ✅ Separate `Info-dev/qa/prod.plist` per flavor | ❌ `react-native-config` is Android-only in this RN setup — iOS silently falls back to hardcoded production defaults regardless of flavor |
+| iOS per-flavor env config | ✅ Separate `Info-dev/qa/prod.plist` per flavor, 3 schemes-worth of icon sets | 🟡 iOS has one scheme reading a single `.env` (works automatically via the installed `react-native-config`'s podspec, no dev/qa/prod split) — see `docs/IOS_ENV_SETUP.md` for how to add that split if ever needed, same as Android's 3 flavors |
 
 ## 9. Misc
 
