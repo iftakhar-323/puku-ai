@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { AppHeader } from '../../components/common/AppHeader';
 import {
   CheckmarkIcon,
@@ -24,6 +25,7 @@ import { NativeClipboard } from '../../services/nativeModules';
 import { ignore } from '../../utils/devLog';
 
 export function ArtifactsScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { theme, artifacts } = useApp();
 
@@ -46,17 +48,17 @@ export function ArtifactsScreen() {
     setTimeout(() => setIsCopied(false), 1500);
   };
 
-  const types = [
-    { id: 'all', label: 'All' },
-    { id: 'code', label: 'Code' },
-    { id: 'markdown', label: 'Markdown' },
-    { id: 'svg', label: 'SVG' },
-    { id: 'html', label: 'HTML' },
+  const typeFilters = [
+    { id: 'all', label: t('artifacts.filterAll') },
+    { id: 'code', label: t('artifacts.filterCode') },
+    { id: 'markdown', label: t('artifacts.filterMarkdown') },
+    { id: 'svg', label: t('artifacts.filterSvg') },
+    { id: 'html', label: t('artifacts.filterHtml') },
   ];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <AppHeader showBack title="Artifacts" />
+      <AppHeader showBack title={t('artifacts.title')} />
 
       {/* Search Input */}
       <View style={styles.searchContainer}>
@@ -71,7 +73,7 @@ export function ArtifactsScreen() {
           <SearchIcon size={18} color={theme.placeholderText} />
           <TextInput
             style={[styles.searchInput, { color: theme.textPrimary }]}
-            placeholder="Search Artifacts"
+            placeholder={t('artifacts.searchPlaceholder')}
             placeholderTextColor={theme.placeholderText}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -81,22 +83,22 @@ export function ArtifactsScreen() {
 
       {/* Type Filter Pills */}
       <View style={styles.filtersRow}>
-        {types.map(t => (
+        {typeFilters.map(filter => (
           <TouchableOpacity
-            key={t.id}
-            onPress={() => setSelectedType(t.id)}
+            key={filter.id}
+            onPress={() => setSelectedType(filter.id)}
             style={[
               styles.filterPill,
-              selectedType === t.id
+              selectedType === filter.id
                 ? { backgroundColor: theme.primary }
                 : { backgroundColor: theme.buttonBackground },
             ]}>
             <Text
               style={[
                 styles.filterText,
-                { color: selectedType === t.id ? '#FFFFFF' : theme.textSecondary },
+                { color: selectedType === filter.id ? '#FFFFFF' : theme.textSecondary },
               ]}>
-              {t.label}
+              {filter.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -106,7 +108,7 @@ export function ArtifactsScreen() {
       {filteredArtifacts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            No artifacts yet
+            {t('artifacts.noArtifacts')}
           </Text>
         </View>
       ) : (
@@ -153,7 +155,7 @@ export function ArtifactsScreen() {
 
               <View style={styles.cardFooter}>
                 <Text style={[styles.dateText, { color: theme.textMuted }]}>
-                  Created {item.createdAt}
+                  {t('artifacts.createdAt', { date: item.createdAt })}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -186,7 +188,10 @@ export function ArtifactsScreen() {
                 {activeArtifact?.title}
               </Text>
               <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
-                Type: {activeArtifact?.type} • Language: {activeArtifact?.language || 'plain'}
+                {t('artifacts.typeAndLanguage', {
+                  type: activeArtifact?.type,
+                  language: activeArtifact?.language || t('artifacts.plainLanguage'),
+                })}
               </Text>
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setActiveArtifact(null)}>
@@ -220,7 +225,7 @@ export function ArtifactsScreen() {
                 <CopyIcon size={18} color="#FFFFFF" />
               )}
               <Text style={styles.copyBtnText}>
-                {isCopied ? 'Copied to Clipboard' : 'Copy Content'}
+                {isCopied ? t('artifacts.copiedToClipboard') : t('artifacts.copyContent')}
               </Text>
             </TouchableOpacity>
           </View>

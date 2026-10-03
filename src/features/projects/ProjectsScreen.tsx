@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { AppHeader } from '../../components/common/AppHeader';
 import {
   CloseIcon,
@@ -25,6 +26,7 @@ import { ProjectScope } from '../../types';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 export function ProjectsScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { theme, projects, createProject, selectProject, refreshProjects } = useApp();
   const { keyboardHeight } = useKeyboardHeight();
@@ -62,23 +64,23 @@ export function ProjectsScreen() {
   };
 
   const tabs: Array<{ id: ProjectScope; label: string }> = [
-    { id: 'yours', label: 'Your projects' },
-    { id: 'power', label: 'Power' },
-    { id: 'shared', label: 'Shared' },
-    { id: 'archived', label: 'Archived' },
+    { id: 'yours', label: t('projects.tabYours') },
+    { id: 'power', label: t('projects.tabPower') },
+    { id: 'shared', label: t('projects.tabShared') },
+    { id: 'archived', label: t('projects.tabArchived') },
   ];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <AppHeader
         showBack
-        title="Projects"
+        title={t('projects.title')}
         rightAction={
           <TouchableOpacity
             onPress={() => setShowCreateModal(true)}
             style={[styles.newBtn, { backgroundColor: theme.primary }]}>
             <PlusIcon size={16} color="#FFFFFF" />
-            <Text style={styles.newBtnText}>New</Text>
+            <Text style={styles.newBtnText}>{t('projects.newProject')}</Text>
           </TouchableOpacity>
         }
       />
@@ -96,7 +98,7 @@ export function ProjectsScreen() {
           <SearchIcon size={18} color={theme.placeholderText} />
           <TextInput
             style={[styles.searchInput, { color: theme.textPrimary }]}
-            placeholder="Search projects"
+            placeholder={t('projects.searchPlaceholder')}
             placeholderTextColor={theme.placeholderText}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -131,7 +133,7 @@ export function ProjectsScreen() {
       {filteredProjects.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            No projects yet
+            {t('projects.noProjects')}
           </Text>
         </View>
       ) : (
@@ -191,8 +193,9 @@ export function ProjectsScreen() {
 
               <View style={styles.cardFooter}>
                 <Text style={[styles.metaText, { color: theme.textMuted }]}>
-                  {item.knowledgeItems.length} knowledge item
-                  {item.knowledgeItems.length !== 1 ? 's' : ''}
+                  {t('projects.knowledgeItemCount', {
+                    count: item.knowledgeItems.length,
+                  })}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -225,7 +228,7 @@ export function ProjectsScreen() {
             ]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                New Project
+                {t('projects.createModalTitle')}
               </Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowCreateModal(false)}>
                 <CloseIcon size={20} color={theme.textSecondary} />
@@ -237,7 +240,7 @@ export function ProjectsScreen() {
               keyboardShouldPersistTaps="handled"
               bounces={false}>
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                Name
+                {t('projects.nameLabel')}
               </Text>
               <TextInput
                 style={[
@@ -248,14 +251,14 @@ export function ProjectsScreen() {
                     borderColor: theme.border,
                   },
                 ]}
-                placeholder="My project"
+                placeholder={t('projects.namePlaceholder')}
                 placeholderTextColor={theme.placeholderText}
                 value={name}
                 onChangeText={setName}
               />
 
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                Description (Optional)
+                {t('projects.descriptionLabel')}
               </Text>
               <TextInput
                 style={[
@@ -266,14 +269,14 @@ export function ProjectsScreen() {
                     borderColor: theme.border,
                   },
                 ]}
-                placeholder="Optional short description"
+                placeholder={t('projects.descriptionPlaceholder')}
                 placeholderTextColor={theme.placeholderText}
                 value={description}
                 onChangeText={setDescription}
               />
 
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-                Custom Instructions
+                {t('projects.instructionsLabel')}
               </Text>
               <TextInput
                 style={[
@@ -284,7 +287,7 @@ export function ProjectsScreen() {
                     borderColor: theme.border,
                   },
                 ]}
-                placeholder="Tell Puku how to behave in this project..."
+                placeholder={t('projects.instructionsPlaceholder')}
                 placeholderTextColor={theme.placeholderText}
                 value={instructions}
                 onChangeText={setInstructions}
@@ -303,7 +306,7 @@ export function ProjectsScreen() {
                   { backgroundColor: theme.primary },
                   !name.trim() && styles.createBtnDisabled,
                 ]}>
-                <Text style={styles.createBtnText}>Create Project</Text>
+                <Text style={styles.createBtnText}>{t('projects.createButton')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

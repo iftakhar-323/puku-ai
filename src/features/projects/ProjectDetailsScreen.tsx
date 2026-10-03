@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { AppHeader } from '../../components/common/AppHeader';
 import {
   CameraIcon,
@@ -28,6 +29,7 @@ import { NativePicker } from '../../services/nativeModules';
 const KNOWLEDGE_ITEM_CAP = 20;
 
 export function ProjectDetailsScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { keyboardHeight } = useKeyboardHeight();
   const {
@@ -94,12 +96,12 @@ export function ProjectDetailsScreen() {
 
   const confirmDeleteProject = () => {
     Alert.alert(
-      'Delete project?',
-      `Are you sure you want to delete "${activeProject.name}"? This cannot be undone.`,
+      t('projects.deleteProjectTitle'),
+      t('projects.deleteProjectMessage', { name: activeProject.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             deleteProject(activeProject.id);
@@ -163,7 +165,7 @@ export function ProjectDetailsScreen() {
             onPress={() => startNewChat(activeProject.id)}
             style={[styles.newChatBtn, { backgroundColor: theme.primary }]}>
             <PlusIcon size={16} color="#FFFFFF" />
-            <Text style={styles.newChatBtnText}>New chat in this project</Text>
+            <Text style={styles.newChatBtnText}>{t('projects.newChatInProject')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -178,20 +180,19 @@ export function ProjectDetailsScreen() {
           ]}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-              Project Knowledge
+              {t('projects.knowledgeSectionTitle')}
             </Text>
             <TouchableOpacity
               onPress={() => setShowAddContentModal(true)}
               style={[styles.addBtn, { backgroundColor: theme.buttonBackground }]}>
               <PlusIcon size={14} color={theme.tagText} />
               <Text style={[styles.addBtnText, { color: theme.tagText }]}>
-                Add Content
+                {t('projects.addContent')}
               </Text>
             </TouchableOpacity>
           </View>
           <Text style={[styles.sectionDesc, { color: theme.textSecondary }]}>
-            Add relevant documents, code, or context for Puku to reference in all
-            conversations.
+            {t('projects.knowledgeSectionDesc')}
           </Text>
 
           <View style={styles.capacityRow}>
@@ -220,7 +221,7 @@ export function ProjectDetailsScreen() {
           {activeProject.knowledgeItems.length === 0 ? (
             <View style={styles.emptyBox}>
               <Text style={[styles.metaText, { color: theme.textMuted }]}>
-                No knowledge files attached yet.
+                {t('projects.noKnowledgeFiles')}
               </Text>
             </View>
           ) : (
@@ -262,20 +263,19 @@ export function ProjectDetailsScreen() {
           ]}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-              Custom Instructions
+              {t('projects.customInstructionsTitle')}
             </Text>
             <TouchableOpacity
               onPress={() => setShowInstructionsModal(true)}
               style={[styles.addBtn, { backgroundColor: theme.buttonBackground }]}>
               <Text style={[styles.addBtnText, { color: theme.tagText }]}>
-                {activeProject.instructions ? 'Edit' : 'Add'}
+                {activeProject.instructions ? t('projects.editLabel') : t('projects.addLabel')}
               </Text>
             </TouchableOpacity>
           </View>
 
           <Text style={[styles.sectionDesc, { color: theme.textSecondary }]}>
-            Tell Puku how to behave in this project — tone, technical stack,
-            formatting preferences.
+            {t('projects.customInstructionsDesc')}
           </Text>
 
           {activeProject.instructions ? (
@@ -294,7 +294,7 @@ export function ProjectDetailsScreen() {
           ) : (
             <View style={styles.emptyBox}>
               <Text style={[styles.metaText, { color: theme.textMuted }]}>
-                No custom instructions provided.
+                {t('projects.noCustomInstructions')}
               </Text>
             </View>
           )}
@@ -326,7 +326,7 @@ export function ProjectDetailsScreen() {
             ]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                Custom Instructions
+                {t('projects.customInstructionsTitle')}
               </Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowInstructionsModal(false)}>
                 <CloseIcon size={20} color={theme.textSecondary} />
@@ -341,7 +341,7 @@ export function ProjectDetailsScreen() {
                   borderColor: theme.border,
                 },
               ]}
-              placeholder="e.g. You are a senior React Native engineer. Respond concisely with code examples..."
+              placeholder={t('projects.instructionsPlaceholderLong')}
               placeholderTextColor={theme.placeholderText}
               value={instructionsText}
               onChangeText={setInstructionsText}
@@ -351,7 +351,7 @@ export function ProjectDetailsScreen() {
             <TouchableOpacity
               onPress={handleSaveInstructions}
               style={[styles.saveBtn, { backgroundColor: theme.primary }]}>
-              <Text style={styles.saveBtnText}>Save Instructions</Text>
+              <Text style={styles.saveBtnText}>{t('projects.saveInstructions')}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -382,7 +382,7 @@ export function ProjectDetailsScreen() {
             ]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                Add Knowledge Content
+                {t('projects.addContentModalTitle')}
               </Text>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowAddContentModal(false)}>
                 <CloseIcon size={20} color={theme.textSecondary} />
@@ -400,7 +400,7 @@ export function ProjectDetailsScreen() {
               ]}>
               <CameraIcon size={20} color={theme.textPrimary} />
               <Text style={[styles.pickerRowText, { color: theme.textPrimary }]}>
-                Take photo
+                {t('projects.takePhoto')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -415,7 +415,7 @@ export function ProjectDetailsScreen() {
               ]}>
               <PaperclipIcon size={20} color={theme.textPrimary} />
               <Text style={[styles.pickerRowText, { color: theme.textPrimary }]}>
-                Choose a file or photo
+                {t('projects.chooseFileOrPhoto')}
               </Text>
             </TouchableOpacity>
           </View>

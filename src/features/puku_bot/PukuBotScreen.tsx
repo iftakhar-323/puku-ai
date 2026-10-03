@@ -15,6 +15,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import i18next from '../../i18n';
 import Svg, { Path, Rect } from 'react-native-svg';
 import {
   ArrowUpRightIcon,
@@ -82,16 +84,16 @@ interface NeedsPersonState {
 
 function getGreeting(userName?: string): { lead: string; name: string } {
   const h = new Date().getHours();
-  let lead = 'Good morning,';
+  let lead = i18next.t('chatEmptyState.greetingMorning');
   if (h >= 12 && h < 17) {
-    lead = 'Good afternoon,';
+    lead = i18next.t('chatEmptyState.greetingAfternoon');
   } else if (h >= 17 && h < 22) {
-    lead = 'Good evening,';
+    lead = i18next.t('chatEmptyState.greetingEvening');
   } else if (h >= 22 || h < 5) {
-    lead = 'Back at it,';
+    lead = i18next.t('chatEmptyState.greetingLate');
   }
 
-  let name = 'there';
+  let name = i18next.t('chatEmptyState.greetingFallbackName');
   if (userName?.trim()) {
     name = userName.trim().split(/\s+/)[0];
     name = name.charAt(0).toUpperCase() + name.slice(1);
@@ -126,6 +128,7 @@ function StopSquareIcon({ size = 16, color = '#FFFFFF' }: { size?: number; color
 }
 
 export function PukuBotScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const {
     theme,
@@ -153,8 +156,8 @@ export function PukuBotScreen() {
     botConversations.length > 0
       ? botConversations.slice(0, 4).map(c => ({
           id: c.id,
-          title: c.title || 'Untitled bot session',
-          time: formatActivityDate((c as any).updated_at || (c as any).created_at || (c as any).updatedAt || (c as any).createdAt || (c as any).activityDate) || 'Recent',
+          title: c.title || t('pukuBot.untitledSession'),
+          time: formatActivityDate((c as any).updated_at || (c as any).created_at || (c as any).updatedAt || (c as any).createdAt || (c as any).activityDate) || t('pukuBot.recent'),
           isReal: true,
         }))
       : [
@@ -1393,7 +1396,7 @@ export function PukuBotScreen() {
                         fontFamily: monoFont,
                       },
                     ]}>
-                    {computerInfo?.control?.holder === 'human' ? 'Release Control' : 'Take Control'}
+                    {computerInfo?.control?.holder === 'human' ? t('pukuBot.releaseControl') : t('pukuBot.takeControl')}
                   </Text>
                 </TouchableOpacity>
 

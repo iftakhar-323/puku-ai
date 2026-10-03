@@ -12,6 +12,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import i18next from '../../i18n';
 import {
   CloseIcon,
   ConnectedLinkIcon,
@@ -41,16 +43,16 @@ interface DetailRow {
 
 function getGreeting(userName?: string): { lead: string; name: string } {
   const h = new Date().getHours();
-  let lead = 'Good morning,';
+  let lead = i18next.t('chatEmptyState.greetingMorning');
   if (h >= 12 && h < 17) {
-    lead = 'Good afternoon,';
+    lead = i18next.t('chatEmptyState.greetingAfternoon');
   } else if (h >= 17 && h < 22) {
-    lead = 'Good evening,';
+    lead = i18next.t('chatEmptyState.greetingEvening');
   } else if (h >= 22 || h < 5) {
-    lead = 'Back at it,';
+    lead = i18next.t('chatEmptyState.greetingLate');
   }
 
-  let name = 'there';
+  let name = i18next.t('chatEmptyState.greetingFallbackName');
   if (userName?.trim()) {
     name = userName.trim().split(/\s+/)[0];
     name = name.charAt(0).toUpperCase() + name.slice(1);
@@ -60,6 +62,7 @@ function getGreeting(userName?: string): { lead: string; name: string } {
 }
 
 export function CodeScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { theme, isDark, profile, updateSettings, setDrawerOpen, navigate } = useApp();
   const greeting = getGreeting(profile?.name);
@@ -130,28 +133,28 @@ export function CodeScreen() {
     setDetails({
       title: s.title || 'puku-cli',
       rows: [
-        { label: 'Session ID', value: s.sessionId },
-        { label: 'Created', value: formatActivityDate(s.createdAt) },
+        { label: t('code.sessionId'), value: s.sessionId },
+        { label: t('code.created'), value: formatActivityDate(s.createdAt) },
         {
-          label: ended ? 'Closed' : 'Last activity',
+          label: ended ? t('code.closed') : t('code.lastActivity'),
           value: formatActivityDate(s.titleUpdatedAt || s.createdAt),
         },
         {
-          label: 'Clients connected',
+          label: t('code.clientsConnected'),
           value: String(s.clientCount ?? (s.clientConnected ? 1 : 0)),
         },
-        ...(s.ownerEmail ? [{ label: 'Owner', value: s.ownerEmail }] : []),
+        ...(s.ownerEmail ? [{ label: t('code.owner'), value: s.ownerEmail }] : []),
       ],
     });
   };
 
   const openCurrentSessionDetails = () => {
     setDetails({
-      title: session.title || 'Laptop CLI Session',
+      title: session.title || t('code.laptopCliSession'),
       rows: [
-        { label: 'Session ID', value: session.sessionId },
-        ...(session.cwd ? [{ label: 'Working directory', value: session.cwd }] : []),
-        { label: 'Status', value: session.phase },
+        { label: t('code.sessionId'), value: session.sessionId },
+        ...(session.cwd ? [{ label: t('code.workingDirectory'), value: session.cwd }] : []),
+        { label: t('code.status'), value: session.phase },
       ],
     });
   };
@@ -304,7 +307,7 @@ export function CodeScreen() {
                     { color: accent, fontFamily: monoFont },
                   ]}
                 >
-                  {session.phase === 'attached' ? 'CONNECTED' : session.phase.toUpperCase()}
+                  {session.phase === 'attached' ? t('code.connected') : session.phase.toUpperCase()}
                 </Text>
               </View>
             </View>
@@ -328,7 +331,7 @@ export function CodeScreen() {
                       { color: theme.textPrimary, fontFamily: monoFont },
                     ]}
                   >
-                    {session.title || 'Laptop CLI Session'}
+                    {session.title || t('code.laptopCliSession')}
                   </Text>
                 </View>
                 <View style={[styles.liveBadge, { backgroundColor: accentSoftBg }]}>
@@ -371,7 +374,7 @@ export function CodeScreen() {
                   <Text
                     style={[styles.openActiveBtnText, { color: theme.background }]}
                   >
-                    Open Active Terminal
+                    {t('code.openActiveTerminal')}
                   </Text>
                 </TouchableOpacity>
 
@@ -400,7 +403,7 @@ export function CodeScreen() {
                   { color: theme.textPrimary, fontFamily: monoFont },
                 ]}
               >
-                {isAttachedOrActive ? 'Other Active Terminals' : 'Active Terminals'}
+                {isAttachedOrActive ? t('code.otherActiveTerminals') : t('code.activeTerminals')}
               </Text>
               {openSessions.length > 0 && (
                 <View
@@ -511,8 +514,8 @@ export function CodeScreen() {
                         ]}
                       >
                         {session.sessionId === s.sessionId
-                          ? 'Open Active Terminal'
-                          : 'Connect & Open Terminal'}
+                          ? t('code.openActiveTerminal')
+                          : t('code.connectAndOpenTerminal')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -570,7 +573,7 @@ export function CodeScreen() {
                   { color: theme.textPrimary, fontFamily: monoFont },
                 ]}
               >
-                Previous Terminals (Ended)
+                {t('code.previousTerminals')}
               </Text>
               <View
                 style={[
@@ -703,7 +706,7 @@ export function CodeScreen() {
               { color: theme.textPrimary, fontFamily: monoFont },
             ]}
           >
-            Direct Connect
+            {t('code.directConnect')}
           </Text>
           <View
             style={[

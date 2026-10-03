@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import i18next from '../../i18n';
 import {
   BackIcon,
   CloseIcon,
@@ -105,7 +107,7 @@ class RemoteSessionErrorBoundary extends React.Component<
             }}
           >
             {this.state.error?.message ||
-              'A display glitch was caught. Tap below to reload the session.'}
+              i18next.t('remoteSession.glitchCaught')}
           </Text>
           <TouchableOpacity
             onPress={() => {
@@ -137,6 +139,7 @@ class RemoteSessionErrorBoundary extends React.Component<
 }
 
 function RemoteSessionScreenContent() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { keyboardHeight } = useKeyboardHeight();
   const { theme, isDark, updateSettings, goBack, navigate } = useApp();
@@ -176,7 +179,7 @@ function RemoteSessionScreenContent() {
       } catch {
         // Haptics are optional.
       }
-      show({ title: 'Copied to clipboard' });
+      show({ title: t('remoteSession.copiedToClipboard') });
     },
     [show],
   );
@@ -359,8 +362,8 @@ function RemoteSessionScreenContent() {
               enabled={isAttached}
               disabledHint={
                 phase === 'closed'
-                  ? 'Session closed'
-                  : 'Waiting for your laptop…'
+                  ? t('remoteSession.sessionClosed')
+                  : t('remoteSession.waitingForLaptop')
               }
               isWorking={session.isWorking}
               permissionMode={session.permissionMode}
@@ -507,16 +510,17 @@ function ConnectionBanner({
   onStop: () => void;
   onChangeSession: () => void;
 }) {
+  const { t } = useTranslation();
   if (phase === 'attached' || phase === 'idle') return null;
 
   const message =
     phase === 'connecting'
-      ? 'Connecting to the relay…'
+      ? t('remoteSession.connectingToRelay')
       : phase === 'open'
-      ? 'Waiting for your laptop CLI…'
+      ? t('remoteSession.waitingForLaptopCli')
       : phase === 'reconnecting'
-      ? 'Connection lost. Reconnecting…'
-      : 'This session is closed.';
+      ? t('remoteSession.connectionLostReconnecting')
+      : t('remoteSession.sessionIsClosed');
 
   return (
     <View
