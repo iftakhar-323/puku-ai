@@ -9,6 +9,24 @@ places where a Flutter "feature" turned out to be a non-functional UI mock itsel
 
 Legend: ✅ fully present in RN · 🟡 partial/weaker in RN · ❌ missing in RN
 
+## Implementation status
+
+Most of the gaps below have since been implemented on the
+`feature/flutter-parity-improvements` branch:
+
+- ✅ Syntax-highlighted + diff-colored code blocks in chat (`syntaxHighlight.ts`, `MarkdownRenderer.tsx`)
+- ✅ Auto-persisting assistant code blocks as Artifacts (`utils/codeBlocks.ts`, `AppContext.sendMessage`)
+- ✅ Real file/photo picker for Project "Add Content" + a cosmetic capacity bar
+- ✅ `SettingsScreen` routing fix (was being shadowed by `ProfileScreen`)
+- ✅ Sentry hardening: session replay, structured logs, failed-request capture, trace propagation, navigation breadcrumbs
+- ✅ Remote session: Exit Plan Mode plans rendered as markdown + reject-with-feedback, colorized diff tool output
+- ✅ i18n coverage expanded across Chats/Projects/Artifacts/Transcribe/Usage/Code/RemoteSession/PukuBot
+- ✅ Android `puku://remote` deep link, iOS `pukubot://` scheme
+- ✅ CI coverage-threshold gate, tag-triggered release workflow
+- ✅ Removed the dead `puku-ui`/`cmdk`/`@base-ui/react` component library
+- 📄 iOS `react-native-config` wiring documented as a manual Xcode step in `docs/IOS_ENV_SETUP.md` (requires macOS/Xcode to apply and verify, so it wasn't safe to hand-edit `project.pbxproj` blind from this environment)
+- ⏭️ Not replicated (confirmed non-functional on the Flutter side too): fake thinking/tool-use blocks in main chat, the Live Voice Chat mock, the "New Code Session" composer mock, and the "research" toggle
+
 ---
 
 ## 1. Chat message rendering

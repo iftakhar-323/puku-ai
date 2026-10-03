@@ -76,6 +76,16 @@
             <data
                 android:scheme="pukubot"
                 android:host="callback" />
+            <!-- puku://remote?s=<sessionId>&t=<token> launches straight into a
+                 shared remote-session link (e.g. a QR code rendered as a link,
+                 SMS, or email), same as the in-app Linking listener handles. -->
+            <data
+                android:scheme="puku"
+                android:host="remote" />
+            <data
+                android:scheme="puku"
+                android:host="remote"
+                android:pathPrefix="/" />
         </intent-filter>
       </activity>
 

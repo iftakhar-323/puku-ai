@@ -16,12 +16,10 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
-    "@base-ui/react": "^1.8.0",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native/assets-registry": "^0.87.1",
     "@react-native/new-app-screen": "0.87.1",
     "@sentry/react-native": "^8.29.0",
-    "cmdk": "^1.1.1",
     "expo": "^57.0.25",
     "expo-camera": "~57.0.6",
     "expo-crypto": "~57.0.3",
