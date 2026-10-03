@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
   CheckmarkIcon,
   ChevronDownIcon,
@@ -79,6 +80,7 @@ export function ChatComposer({
   pendingAttachment,
   onRemoveAttachment,
 }: ChatComposerProps) {
+  const { t } = useTranslation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const canSubmit = inputVal.trim().length > 0 || !!pendingAttachment;
@@ -178,7 +180,7 @@ export function ChatComposer({
               ) : null}
             </View>
             {onRemoveAttachment && (
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove attachment" onPress={onRemoveAttachment} style={styles.removeAttBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.removeAttachment')} onPress={onRemoveAttachment} style={styles.removeAttBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <CloseIcon size={14} color={theme.textMuted} />
               </TouchableOpacity>
             )}
@@ -196,7 +198,7 @@ export function ChatComposer({
             onFocus?.();
           }}
           onBlur={() => setIsFocused(false)}
-          placeholder="Write a message..."
+          placeholder={t('chat.messagePlaceholder')}
           placeholderTextColor={theme.placeholderText}
           multiline
           style={[
@@ -212,7 +214,7 @@ export function ChatComposer({
         <View style={styles.bottomControls}>
           {/* Left Group: Plus (+) and Model selector */}
           <View style={styles.leftGroup}>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add attachment"
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.addAttachment')}
               activeOpacity={0.7}
               onPress={() => {
                 setDropdownOpen(false);
@@ -247,7 +249,7 @@ export function ChatComposer({
           <View style={styles.rightGroup}>
             <View style={[styles.statusDot, { backgroundColor: theme.success }]} />
 
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Voice input"
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.voiceInput')}
               activeOpacity={0.7}
               onPress={onMicrophoneTap}
               style={[
@@ -258,7 +260,7 @@ export function ChatComposer({
             </TouchableOpacity>
 
             {isSending ? (
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Stop generating"
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.stopGenerating')}
                 activeOpacity={0.7}
                 onPress={() => {
                   setDropdownOpen(false);
@@ -268,7 +270,7 @@ export function ChatComposer({
                 <View style={styles.stopSquare} />
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send"
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.send')}
                 activeOpacity={0.7}
                 disabled={!canSubmit}
                 onPress={() => {

@@ -2,6 +2,8 @@ package com.pukuai
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.OpenableColumns
@@ -15,6 +17,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 
@@ -27,6 +30,51 @@ class PickerModule(private val reactContext: ReactApplicationContext) :
     companion object {
         private const val REQUEST_PICK_MEDIA = 49102
         private const val REQUEST_TAKE_PHOTO = 49103
+
+        // Matches Flutter's attachment pipeline: cap the longest edge at 2048px
+        // and re-encode as JPEG at 85% quality before upload.
+        private const val MAX_IMAGE_DIMENSION = 2048
+        private const val JPEG_QUALITY = 85
+
+        /**
+         * Downscales and re-encodes image bytes as JPEG if they exceed
+         * [MAX_IMAGE_DIMENSION] on either edge. Returns the original bytes
+         * unchanged (with the original mime type) if the image is already
+         * within bounds or can't be decoded as a bitmap.
+         */
+        fun compressImageIfNeeded(bytes: ByteArray, mimeType: String): Pair<ByteArray, String> {
+            if (!mimeType.startsWith("image/")) return Pair(bytes, mimeType)
+
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            val width = bounds.outWidth
+            val height = bounds.outHeight
+            if (width <= 0 || height <= 0) return Pair(bytes, mimeType)
+
+            val longestEdge = maxOf(width, height)
+            if (longestEdge <= MAX_IMAGE_DIMENSION) return Pair(bytes, mimeType)
+
+            val sampleSize = Integer.highestOneBit(longestEdge / MAX_IMAGE_DIMENSION).coerceAtLeast(1)
+            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val sampledBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOptions)
+                ?: return Pair(bytes, mimeType)
+
+            val scale = MAX_IMAGE_DIMENSION.toFloat() / maxOf(sampledBitmap.width, sampledBitmap.height)
+            val targetWidth = (sampledBitmap.width * scale).toInt().coerceAtLeast(1)
+            val targetHeight = (sampledBitmap.height * scale).toInt().coerceAtLeast(1)
+            val resizedBitmap = if (scale < 1f) {
+                Bitmap.createScaledBitmap(sampledBitmap, targetWidth, targetHeight, true)
+            } else {
+                sampledBitmap
+            }
+
+            val output = ByteArrayOutputStream()
+            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+            if (resizedBitmap !== sampledBitmap) resizedBitmap.recycle()
+            sampledBitmap.recycle()
+
+            return Pair(output.toByteArray(), "image/jpeg")
+        }
     }
 
     private val activityEventListener: ActivityEventListener = object : BaseActivityEventListener() {
@@ -66,16 +114,20 @@ class PickerModule(private val reactContext: ReactApplicationContext) :
                             }
                         }
 
-                        val mimeType = reactContext.contentResolver.getType(uri) ?: "application/octet-stream"
+                        val originalMimeType = reactContext.contentResolver.getType(uri) ?: "application/octet-stream"
 
                         val inputStream = reactContext.contentResolver.openInputStream(uri)
-                        val bytes = inputStream?.readBytes() ?: ByteArray(0)
+                        val originalBytes = inputStream?.readBytes() ?: ByteArray(0)
                         inputStream?.close()
 
-                        if (fileSize == 0L) fileSize = bytes.size.toLong()
+                        val (bytes, mimeType) = compressImageIfNeeded(originalBytes, originalMimeType)
+                        fileSize = bytes.size.toLong()
 
                         // Cache local copy so React Native Image / local paths work seamlessly
-                        val cleanName = displayName.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+                        var cleanName = displayName.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+                        if (mimeType != originalMimeType && mimeType == "image/jpeg") {
+                            cleanName = cleanName.substringBeforeLast('.') + ".jpg"
+                        }
                         val cacheFile = File(reactContext.cacheDir, "picked_${System.currentTimeMillis()}_$cleanName")
                         FileOutputStream(cacheFile).use { it.write(bytes) }
 
@@ -83,7 +135,7 @@ class PickerModule(private val reactContext: ReactApplicationContext) :
 
                         val result = Arguments.createMap().apply {
                             putString("uri", Uri.fromFile(cacheFile).toString())
-                            putString("name", displayName)
+                            putString("name", cleanName)
                             putString("type", mimeType)
                             putDouble("size", fileSize.toDouble())
                             putString("base64", base64Str)
@@ -117,16 +169,19 @@ class PickerModule(private val reactContext: ReactApplicationContext) :
                             return@Thread
                         }
 
-                        val bytes = file.readBytes()
+                        val originalBytes = file.readBytes()
+                        val (bytes, mimeType) = compressImageIfNeeded(originalBytes, "image/jpeg")
+                        if (bytes !== originalBytes) {
+                            FileOutputStream(file).use { it.write(bytes) }
+                        }
                         val base64Str = Base64.encodeToString(bytes, Base64.NO_WRAP)
                         val displayName = file.name
-                        val mimeType = "image/jpeg"
 
                         val result = Arguments.createMap().apply {
                             putString("uri", Uri.fromFile(file).toString())
                             putString("name", displayName)
                             putString("type", mimeType)
-                            putDouble("size", file.length().toDouble())
+                            putDouble("size", bytes.size.toDouble())
                             putString("base64", base64Str)
                         }
                         promise.resolve(result)

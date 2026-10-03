@@ -13,6 +13,21 @@
     "error": "Something went wrong",
     "ok": "OK"
   },
+  "chat": {
+    "openMenu": "Open menu",
+    "exitIncognito": "Exit incognito",
+    "remoteSessions": "Remote laptop sessions",
+    "pukuBotButton": "Puku Bot",
+    "incognitoChatButton": "Incognito chat",
+    "incognitoChatTitle": "Incognito chat",
+    "toggleTheme": "Toggle theme",
+    "messagePlaceholder": "Write a message...",
+    "removeAttachment": "Remove attachment",
+    "addAttachment": "Add attachment",
+    "voiceInput": "Voice input",
+    "stopGenerating": "Stop generating",
+    "send": "Send"
+  },
   "chatEmptyState": {
     "greetingMorning": "Good morning,",
     "greetingAfternoon": "Good afternoon,",

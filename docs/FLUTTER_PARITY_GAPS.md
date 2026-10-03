@@ -27,12 +27,22 @@ Most of the gaps below have since been implemented on the
 - ✅ iOS `react-native-config` wiring — turned out to need no Xcode change at all: the installed version's podspec already declares the env-codegen script phase, auto-injected by `pod install`. Corrected the misleading comment in `env.ts` and rewrote `docs/IOS_ENV_SETUP.md`; still only verifiable by an actual `pod install` + build on macOS, which isn't available here
 - ✅ `AskUserQuestion` now a paginated wizard (one question per page, Back/Next/Submit) instead of all questions in one scroll
 - ✅ Ported Flutter's `SmartOutputView` (JSON/XML/key-value auto-detection with humanized labels and status coloring) for remote-session tool output
+- ✅ Image compression before attachment upload — `android/app/src/main/java/com/pukuai/PickerModule.kt`'s `compressImageIfNeeded` (max 2048px, 85% JPEG), compile-verified with `./gradlew :app:compileDevDebugKotlin`
+- ✅ iOS `Picker` native module — `ios/PukuAI/PickerModule.swift` + `PickerModule.m` (RCT_EXTERN_MODULE bridge), implementing `pickMedia`/`takePhoto`/`uploadAttachment` with the same compression, wired into `project.pbxproj`'s Sources build phase. **Not build-verified**: no macOS/Xcode in this environment, so `pod install` + an actual Xcode build is still needed before shipping (see note below)
+- ✅ Automated E2E smoke tests in CI via Maestro — `.maestro/*.yaml` flows + `.github/workflows/e2e.yml` (builds the dev-flavor debug APK, runs on a GH-hosted Android emulator). Only two flows so far (launch + email-login-modal); narrower than Flutter's `integration_test` coverage, but a real gate where there was none
+- ✅ iOS `Speech`/`Tts`/`Clipboard` native modules — `ios/PukuAI/{Speech,Tts,Clipboard}Module.{swift,m}`, mirroring the Android implementations (`SFSpeechRecognizer`+`AVAudioEngine` for live/partial transcription, `AVSpeechSynthesizer` for TTS, `UIPasteboard` for clipboard), wired into `project.pbxproj`. **Not build-verified** (see below)
+- ✅ iOS per-flavor env config — three schemes now (`PukuAI`/`PukuAI-dev`/`PukuAI-qa`), each with its own bundle ID, `Info-*.plist` (`CFBundleDisplayName`), and `ENVFILE` build setting pointing at `.env.dev`/`.env.qa`. Built via the `xcodeproj` Ruby gem rather than hand-edited text, to keep the build-configuration object graph consistent. Full detail in `docs/IOS_ENV_SETUP.md`. **Not build-verified** (see below); per-flavor app icons still not done — needs real icon artwork, not generated here
+- Four hardcoded English accessibility labels/placeholder (`ChatHeader.tsx`, `ChatComposer.tsx`) moved into `en.json` under a new `chat` namespace
+- Android ANR detection: confirmed enabled by default (no config gap after all — see §6)
 - ⏭️ Not replicated (confirmed non-functional on the Flutter side too): fake thinking/tool-use blocks in main chat, the Live Voice Chat mock, the "New Code Session" composer mock, the "research" toggle, and the Projects Power/Shared/Archived scope tabs (no backend scope field exists in either app)
 
 **Genuinely still outstanding** (real gaps, not yet started):
-- Image compression before attachment upload (needs native Android/iOS code — see §9 below)
-- An iOS native `Picker` module at all — `NativePicker` currently has no iOS implementation (found while investigating the compression gap)
-- Automated integration/E2E tests in CI (needs a framework choice first — Detox/Maestro/Appium — not started)
+- Broader Maestro flow coverage (the two flows added only cover login-screen rendering and the email modal, not authenticated flows — those need test credentials/a seeded backend that don't exist in CI)
+- Per-flavor iOS app icons (design asset work, not code)
+
+**Still needs a real device/Xcode verification pass** (written but unbuildable from this Linux environment — no macOS here):
+- All six new iOS native module files (`Picker`/`Speech`/`Tts`/`Clipboard` × `.swift`+`.m`) — need `pod install` + an actual build on macOS to confirm they compile and behave correctly at runtime (camera/document pickers, live transcription, TTS playback, clipboard)
+- The three-scheme iOS flavor split — needs opening in Xcode to confirm all three schemes build, install side-by-side, and actually pick up their respective `.env.dev`/`.env.qa` files via `ENVFILE`
 
 ---
 
@@ -102,7 +112,7 @@ Both apps use Sentry, but Flutter's configuration is notably more complete:
 |---|---|---|
 | Session Replay | ✅ `replay.onErrorSampleRate: 1.0`, `replay.sessionSampleRate` 0.05–0.1 | ✅ `Sentry.mobileReplayIntegration()` with matching sample rates in `sentryConfig.ts` |
 | Structured logging (`enableLogs`) | ✅ | ✅ `enableLogs: true` |
-| Android ANR detection (`anrEnabled`) | ✅ | ❓ Not explicitly configured — `@sentry/react-native`'s native Android layer may enable this by default, but it wasn't verified since there's no way to trigger/inspect an ANR report from this environment |
+| Android ANR detection (`anrEnabled`) | ✅ | ✅ Confirmed enabled by default — `@sentry/react-native`'s own `options.d.ts` documents `anrProfilingSampleRate` as "Requires ANR detection, which is enabled by default", so no explicit flag is needed. Still not runtime-verified (no way to trigger/inspect an actual ANR report from this environment), but no config gap |
 | Auto-capture failed HTTP requests | ✅ via `sentry_dio` integration | ✅ `Sentry.httpClientIntegration()` |
 | Distributed tracing allowlist (`tracePropagationTargets`) | ✅ Explicit allowlist for backend hosts | ✅ Configured in `sentryConfig.ts` |
 | Automatic screen-transition breadcrumbs | ✅ `SentryNavigatorObserver` on the router | ✅ Manual `Sentry.addBreadcrumb` in `AppContext.navigate()`, since the app uses a custom router instead of react-navigation |
@@ -122,13 +132,15 @@ Both apps currently ship English only, but the underlying i18n groundwork differ
 | Capability | Flutter | RN |
 |---|---|---|
 | Minimum code-coverage gate | ✅ CI fails below 59% line coverage | ✅ `jest.config.js` now has a `coverageThreshold` floor (~20%, just under today's actual ~24%) — lower than Flutter's 59%, which took years of dedicated test-writing to reach, but it's a real regression gate now instead of none at all |
-| Automated integration/E2E tests in CI | ✅ Runs `integration_test` on a real Android emulator (API 31) in CI | ❌ **Still not implemented.** No E2E/Detox/Maestro tests; RN's only device-automation script (`scripts/run-argent-demo.sh`) is a manual, non-CI smoke script. This needs a framework decision (Detox vs Maestro vs Appium) and actual test-writing — bigger scope than the other items here, intentionally not started without discussing the approach first |
+| Automated integration/E2E tests in CI | ✅ Runs `integration_test` on a real Android emulator (API 31) in CI | 🟡 `.github/workflows/e2e.yml` now builds the dev-flavor debug APK and runs 2 Maestro smoke flows (`.maestro/`) on a GH-hosted Android emulator (API 31). Narrower than Flutter's suite — only covers login-screen rendering and the email modal, nothing authenticated — but a real CI gate where there was previously only a manual script (`scripts/run-argent-demo.sh`) |
 | Tag-triggered release pipeline | ✅ `release.yml` triggers on `v*.*.*` tags, builds signed APK + AppBundle, auto-creates a GitHub Release, and dispatches a webhook to an external `puku-mobile-automation` repo to run automated tests against the fresh build | ✅ New `.github/workflows/release.yml`: tag-triggered, builds signed APK+AAB, creates a GitHub Release. No webhook dispatch to an external automation repo (RN has no equivalent repo to dispatch to) |
-| iOS per-flavor env config | ✅ Separate `Info-dev/qa/prod.plist` per flavor, 3 schemes-worth of icon sets | 🟡 iOS has one scheme reading a single `.env` (works automatically via the installed `react-native-config`'s podspec, no dev/qa/prod split) — see `docs/IOS_ENV_SETUP.md` for how to add that split if ever needed, same as Android's 3 flavors |
+| iOS per-flavor env config | ✅ Separate `Info-dev/qa/prod.plist` per flavor, 3 schemes-worth of icon sets | 🟡 Three schemes now exist (`PukuAI`/`-dev`/`-qa`), each with its own bundle ID, `Info-*.plist`, and `ENVFILE` — see `docs/IOS_ENV_SETUP.md`. Not build-verified, and per-flavor icon sets still not done (needs real icon artwork) |
 
 ## 9. Misc
 
-- **Image compression on attachment**: **Still not implemented.** Flutter explicitly resizes picked images (max 2048px, 85% quality) before upload; RN's native `PukuPicker` module (`android/app/src/main/java/com/pukuai/PickerModule.kt`) has no resize/compress step at all. This needs native code (Android `Bitmap` scaling + JPEG re-encode), not a JS/TS change — and while checking this, found a bigger related gap: **there is no iOS counterpart to `PickerModule.kt` at all** (`ios/` has no Picker native module), meaning `NativePicker.pickMedia()`/`takePhoto()` currently has no native implementation on iOS whatsoever — camera/photo attachment likely doesn't work on iOS today, independent of compression. Both are native-code changes that can't be compiled/verified from this Linux environment.
+- **Image compression on attachment**: ✅ Fixed on both platforms. Android: `compressImageIfNeeded` in `PickerModule.kt` (max 2048px, 85% JPEG), compile-verified. iOS: same logic ported into the new `PickerModule.swift` (see §4a below) — written but not build-verified (no macOS/Xcode here).
+- **iOS has no `Picker` native module**: ✅ Fixed — `ios/PukuAI/PickerModule.swift` + `PickerModule.m` now implement `pickMedia` (via `UIDocumentPickerViewController`), `takePhoto` (via `UIImagePickerController`, camera), and `uploadAttachment` (via `URLSession` multipart upload), registered in `project.pbxproj`. Camera permission string already existed in `Info.plist`; no photo-library permission needed since the document picker doesn't touch the Photos library directly. **Still needs an actual `pod install` + Xcode build on macOS** to confirm it compiles and behaves correctly at runtime — not possible from this Linux environment.
+- **iOS `Speech`/`Tts`/`Clipboard` native modules**: ✅ Fixed — `ios/PukuAI/SpeechModule.swift` (`SFSpeechRecognizer` + `AVAudioEngine`, live partial/final transcription + RMS level events), `TtsModule.swift` (`AVSpeechSynthesizer`), `ClipboardModule.swift` (`UIPasteboard`), each with a matching `.m` `RCT_EXTERN_MODULE` bridge file, same event names as the Android versions (`onSpeechStart/End/Rms/Results/PartialResults/Error`, `onTtsStart/Done/Error`). Not build-verified.
 - **Deep link to incoming remote session (`puku://remote`)**: ✅ Fixed — added as an intent-filter host in `AndroidManifest.xml`.
 - **`pukubot://` URL scheme**: ✅ Fixed — added to RN's iOS `Info.plist`.
 
@@ -139,7 +151,7 @@ Both apps currently ship English only, but the underlying i18n groundwork differ
 To keep this honest: a few things the inventory turned up are RN advantages, not
 Flutter features RN is missing —
 
-- **Live Voice Chat**: RN's version is a real, working listen → send → speak loop (`NativeSpeech` → chat → `NativeTts`). Flutter's equivalent screen is UI-only — no audio capture, no TTS, nothing wired to the bloc.
+- **Live Voice Chat**: RN's version is a real, working listen → send → speak loop (`NativeSpeech` → chat → `NativeTts`). Confirmed working on Android (`SpeechModule.kt`/`TtsModule.kt`). iOS now has matching `SpeechModule.swift`/`TtsModule.swift` (see §9) but they're unverified — no macOS here to actually run them — so treat iOS as "should work" rather than confirmed. Flutter's equivalent screen is UI-only on both platforms (no audio capture, no TTS, nothing wired to the bloc) either way.
 - **Email/token login path**: RN has a working secondary email+token/magic-link sign-in modal. Flutter's "sign in with email" button is a placeholder snackbar.
 - **Token storage security**: RN's `secureStorage` wraps real platform Keychain/Keystore (`expo-secure-store`) with plaintext-migration handling. Flutter's class is literally named `SecureTokenStorage` but stores tokens in plain `shared_preferences` — not actually secure.
 

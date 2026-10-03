@@ -34,24 +34,38 @@ This repo already has a `.env` at the root with real values, so **no action
 is needed** to get iOS reading real config — it happens the first time
 someone runs `cd ios && pod install` on this project and builds.
 
-## If you want flavor-specific values on iOS too
+## Flavor-specific values on iOS
 
-iOS doesn't have Android's three build flavors — there's one Xcode scheme
-(`PukuAI`). Two options, in increasing order of effort:
+**Done.** The project now has three schemes mirroring Android's three
+flavors:
 
-1. **Override which file is read** by setting the `ENVFILE` build setting
-   (e.g. `ENVFILE=.env.qa`) on a scheme or xcconfig — `ReadDotEnv.rb` already
-   supports this (`ENV['ENVFILE']`), with build-setting expansion like
-   `ENVFILE=.env.$(CONFIGURATION)`.
-2. **Add real dev/qa schemes**, each duplicated from `PukuAI` (Product →
-   Scheme → Manage Schemes) with its own `ENVFILE` setting — the iOS
-   equivalent of Android's three flavors. Bigger change, only worth it if iOS
-   needs the same dev/qa/prod separation Android has.
+| Scheme | Configurations | Bundle ID | Info.plist | `ENVFILE` |
+|---|---|---|---|---|
+| `PukuAI` (default) | `Debug` / `Release` | `com.pukuai` | `Info.plist` | unset → reads root `.env` |
+| `PukuAI-dev` | `Debug-dev` / `Release-dev` | `com.pukuai.dev` | `Info-Dev.plist` (`CFBundleDisplayName` = "Puku AI Dev") | `$(PROJECT_DIR)/../.env.dev` |
+| `PukuAI-qa` | `Debug-qa` / `Release-qa` | `com.pukuai.qa` | `Info-Qa.plist` (`CFBundleDisplayName` = "Puku AI QA") | `$(PROJECT_DIR)/../.env.qa` |
 
-Today, a single scheme reading the one `.env` file is enough to fix the
-actual bug (iOS silently getting empty `Config` and falling back to
-hardcoded defaults) — that's what matters for parity with Android actually
-providing real values.
+This was built by duplicating `XCBuildConfiguration` objects with the
+`xcodeproj` Ruby gem (safer than hand-editing `project.pbxproj`'s object
+graph directly) and adding two new `.xcscheme` files under
+`xcshareddata/xcschemes/`, modeled on the existing `PukuAI.xcscheme`. The
+`ENVFILE` build setting relies on `ReadDotEnv.rb`'s documented support for
+`ENV['ENVFILE']`, with Xcode expanding `$(PROJECT_DIR)` before the script
+phase runs.
+
+**Not build-verified** — no macOS/Xcode in the environment this was written
+in. Before relying on this, open the project in Xcode once and confirm:
+- All three schemes appear in the scheme picker and build successfully.
+- `PukuAI-dev`/`PukuAI-qa` install side-by-side with the default build
+  (distinct bundle IDs, so all three can be on a device/simulator at once).
+- Each build's `Config.API_BASE_URL` etc. actually reflects its own
+  `.env.dev`/`.env.qa` file (add a temporary log in `src/config/env.ts`,
+  same as the verification method below, then remove it).
+
+**Not done**: distinct per-flavor app icons (Flutter has "3 schemes-worth of
+icon sets"). That needs real designed icon artwork per flavor, which isn't
+something to generate blind — `Images.xcassets` still has a single shared
+`AppIcon` for all three schemes today.
 
 ## Verifying it worked
 

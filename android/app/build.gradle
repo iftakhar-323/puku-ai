@@ -2,6 +2,16 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// react-native-config: injects android/.env.<flavor> into BuildConfig and
+// the JS Config object. Matching is `buildFlavor.startsWith(key)`, so this
+// covers both the debug and release build type for each flavor.
+project.ext.envConfigFiles = [
+    dev: ".env.dev",
+    qa: ".env.qa",
+    prod: ".env.prod",
+]
+apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+
 // Release signing credentials live outside git (android/keystore.properties,
 // android/app/release.keystore); machines without them fall back to the
 // debug keystore so the build never breaks, but that output must not be
@@ -95,6 +105,34 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+    }
+
+    // react-native-config needs BuildConfig generation enabled explicitly
+    // on AGP 8+ (disabled by default there).
+    buildFeatures {
+        buildConfig true
+    }
+
+    // dev/qa/prod install side by side (distinct applicationId) and each
+    // picks up its own android/.env.<flavor> via project.ext.envConfigFiles
+    // above. prod keeps the bare applicationId so it matches the existing
+    // Play Store listing.
+    flavorDimensions = ["env"]
+    productFlavors {
+        dev {
+            dimension "env"
+            applicationIdSuffix ".dev"
+            resValue "string", "app_name", "Puku AI Dev"
+        }
+        qa {
+            dimension "env"
+            applicationIdSuffix ".qa"
+            resValue "string", "app_name", "Puku AI QA"
+        }
+        prod {
+            dimension "env"
+            resValue "string", "app_name", "Puku AI"
+        }
     }
 
     splits {
