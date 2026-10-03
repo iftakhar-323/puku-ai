@@ -60,6 +60,32 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO
 
+      # Actually launches the built app on a real iOS Simulator and watches
+      # for a crash report, instead of only checking that it compiled. This
+      # specifically exercises app startup — where React Native's bridgeless
+      # init constructs the Expo JSI RuntimeScheduler — which matters because
+      # patches/expo-modules-jsi+*.patch touches that type's retain/release
+      # contract (removed an invalid SWIFT_RETURNS_RETAINED annotation from
+      # its constructors) and a mistake there wouldn't show up as a compile
+      # error, only as a runtime crash or leak.
+      - name: Smoke-test app launch on iOS Simulator
+        run: |
+          set -e
+          UDID=$(xcrun simctl list devices available iOS | grep -m1 -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}')
+          echo "Using simulator $UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" ios/build/Build/Products/Release-iphonesimulator/PukuAI.app
+          rm -rf ~/Library/Logs/DiagnosticReports/PukuAI*
+          xcrun simctl launch "$UDID" com.pukuai
+          sleep 10
+          if ls ~/Library/Logs/DiagnosticReports/PukuAI* >/dev/null 2>&1; then
+            echo "App crashed within 10s of launch:"
+            cat ~/Library/Logs/DiagnosticReports/PukuAI*
+            exit 1
+          fi
+          echo "App launched and stayed up for 10s without crashing."
+          xcrun simctl shutdown "$UDID"
+
       - name: Package iOS Simulator App (.app.zip)
         run: |
           cd ios/build/Build/Products/Release-iphonesimulator
