@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { ChevronDownIcon, CloseIcon, PaperclipIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import { NativePicker, PickedMedia } from '../../../services/nativeModules';
@@ -48,6 +49,7 @@ export function RemoteComposer({
   onSetPermissionMode,
   onSetModel,
 }: Props) {
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const [sheet, setSheet] = useState<'mode' | 'model' | null>(null);
   const [attachment, setAttachment] = useState<PickedMedia | null>(null);
@@ -58,7 +60,8 @@ export function RemoteComposer({
   const canSubmit = (hasText || hasAttachment) && enabled;
   const showStop = isWorking && !hasText && !hasAttachment;
   const modeLabel =
-    PERMISSION_MODES.find(m => m.mode === permissionMode)?.label || 'Ask';
+    PERMISSION_MODES.find(m => m.mode === permissionMode)?.label ||
+    t('remoteSession.askModeFallback');
   const models =
     model && !REMOTE_MODELS.includes(model)
       ? [model, ...REMOTE_MODELS]
@@ -74,14 +77,17 @@ export function RemoteComposer({
       if (!media) return;
       if (!isValidAttachment(media)) {
         Alert.alert(
-          'Unsupported attachment',
-          'Attach a PNG, JPEG, GIF, or WEBP image under 700KB.',
+          t('remoteSession.unsupportedAttachmentTitle'),
+          t('remoteSession.unsupportedAttachmentMessage'),
         );
         return;
       }
       setAttachment(media);
     } catch (err: any) {
-      Alert.alert('Camera Error', err?.message || 'Could not take photo');
+      Alert.alert(
+        t('remoteSession.cameraErrorTitle'),
+        err?.message || t('remoteSession.couldNotTakePhoto'),
+      );
     }
   };
 
@@ -91,14 +97,17 @@ export function RemoteComposer({
       if (!media) return;
       if (!isValidAttachment(media)) {
         Alert.alert(
-          'Unsupported attachment',
-          'Attach a PNG, JPEG, GIF, or WEBP image under 700KB.',
+          t('remoteSession.unsupportedAttachmentTitle'),
+          t('remoteSession.unsupportedAttachmentMessage'),
         );
         return;
       }
       setAttachment(media);
     } catch (err: any) {
-      Alert.alert('File Error', err?.message || 'Could not pick file');
+      Alert.alert(
+        t('remoteSession.fileErrorTitle'),
+        err?.message || t('remoteSession.couldNotPickFile'),
+      );
     }
   };
 
@@ -245,7 +254,7 @@ export function RemoteComposer({
             numberOfLines={1}
             style={[styles.controlText, { color: theme.textSecondary }]}
           >
-            {model || 'Default model'}
+            {model || t('remoteSession.defaultModel')}
           </Text>
           <ChevronDownIcon size={11} color={theme.textMuted} />
         </TouchableOpacity>

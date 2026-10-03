@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   CheckmarkIcon,
   CloseIcon,
@@ -31,6 +32,7 @@ interface Props {
 
 /** Bottom sheet with a tool call's input and real output/status. */
 export function ToolDetailSheet({ tool, theme, onClose }: Props) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const statusColor =
     tool?.status === 'error'
@@ -40,10 +42,10 @@ export function ToolDetailSheet({ tool, theme, onClose }: Props) {
       : theme.textMuted;
   const statusLabel =
     tool?.status === 'error'
-      ? 'Failed'
+      ? t('remoteSession.statusFailed')
       : tool?.status === 'success'
-      ? 'Success'
-      : 'Running';
+      ? t('remoteSession.statusSuccess')
+      : t('remoteSession.statusRunning');
 
   return (
     <Modal
@@ -70,7 +72,7 @@ export function ToolDetailSheet({ tool, theme, onClose }: Props) {
         >
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.textPrimary }]}>
-              {tool?.name || 'Tool'}
+              {tool?.name || t('remoteSession.toolFallback')}
             </Text>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -158,8 +160,8 @@ export function ToolDetailSheet({ tool, theme, onClose }: Props) {
                   style={[styles.mono, { color: theme.textPrimary }]}
                 >
                   {tool?.status === 'running'
-                    ? 'Waiting for output…'
-                    : 'No output.'}
+                    ? t('remoteSession.waitingForOutput')
+                    : t('remoteSession.noOutput')}
                 </Text>
               )}
             </ScrollView>

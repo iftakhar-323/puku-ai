@@ -8,11 +8,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { CheckmarkIcon, CloseIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import type { PendingPrompt } from '../relay/protocol';
 import { describeTool, toolKind } from '../relay/feed';
 import { MarkdownRenderer } from '../../chat/components/MarkdownRenderer';
+import i18next from '../../../i18n';
 
 const monoFont = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -70,13 +72,13 @@ class PromptCardErrorBoundary extends React.Component<
           ]}
         >
           <Text style={[styles.eyebrow, { color: theme.warning }]}>
-            PERMISSION REQUIRED
+            {i18next.t('remoteSession.permissionRequired')}
           </Text>
           <Text style={[styles.title, { color: theme.textPrimary }]}>
-            Permission prompt
+            {i18next.t('remoteSession.permissionPrompt')}
           </Text>
           <Text style={[styles.description, { color: theme.textSecondary }]}>
-            A tool request is waiting for your approval.
+            {i18next.t('remoteSession.toolRequestWaiting')}
           </Text>
           <View style={styles.actions}>
             <TouchableOpacity
@@ -85,7 +87,9 @@ class PromptCardErrorBoundary extends React.Component<
               style={[styles.secondaryBtn, { borderColor: theme.outline }]}
             >
               <CloseIcon size={13} color={theme.error} />
-              <Text style={[styles.btnText, { color: theme.error }]}>Deny</Text>
+              <Text style={[styles.btnText, { color: theme.error }]}>
+                {i18next.t('remoteSession.deny')}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.8}
@@ -94,7 +98,7 @@ class PromptCardErrorBoundary extends React.Component<
             >
               <CheckmarkIcon size={13} color={theme.background} />
               <Text style={[styles.btnText, { color: theme.background }]}>
-                Allow
+                {i18next.t('remoteSession.allow')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -147,7 +151,8 @@ function PermissionBody({
   theme: ThemeColors;
   onAnswer: (allow: boolean | 'always', message?: string) => void;
 }) {
-  const toolName = safeRenderString(prompt.toolName) || 'Tool';
+  const { t } = useTranslation();
+  const toolName = safeRenderString(prompt.toolName) || t('remoteSession.toolFallback');
   const isExitPlanMode = toolName.toLowerCase() === 'exitplanmode';
   const [isRejecting, setIsRejecting] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
@@ -206,28 +211,30 @@ function PermissionBody({
     toolName.toLowerCase().includes('write') || Boolean(prompt.input?.content);
 
   const eyebrowText = isExitPlanMode
-    ? 'PLAN READY FOR APPROVAL'
+    ? t('remoteSession.planReadyForApproval')
     : isFetch
-    ? 'NETWORK ACCESS REQUIRED'
-    : 'PERMISSION REQUIRED';
+    ? t('remoteSession.networkAccessRequired')
+    : t('remoteSession.permissionRequired');
 
   const titleText = isExitPlanMode
-    ? 'Ready to start coding?'
+    ? t('remoteSession.readyToStartCoding')
     : isFetch
     ? fetchUrl
-      ? `Allow fetching ${fetchUrl}?`
-      : 'Allow network request?'
+      ? t('remoteSession.allowFetching', { url: fetchUrl })
+      : t('remoteSession.allowNetworkRequest')
     : isEdit
     ? fileBasename
-      ? `Allow Puku to ${isWrite ? 'write' : 'edit'} ${fileBasename}?`
-      : `Allow ${toolName}?`
+      ? isWrite
+        ? t('remoteSession.allowWriteFile', { file: fileBasename })
+        : t('remoteSession.allowEditFile', { file: fileBasename })
+      : t('remoteSession.allowToolGeneric', { tool: toolName })
     : isRead
     ? fileBasename
-      ? `Allow Puku to read ${fileBasename}?`
-      : `Allow ${toolName}?`
+      ? t('remoteSession.allowReadFile', { file: fileBasename })
+      : t('remoteSession.allowToolGeneric', { tool: toolName })
     : isCommand
-    ? 'Allow running command?'
-    : `Allow ${toolName}?`;
+    ? t('remoteSession.allowRunningCommand')
+    : t('remoteSession.allowToolGeneric', { tool: toolName });
 
   const commandText = isExitPlanMode
     ? safeRenderString(prompt.input?.plan || descriptionText || summary)
@@ -342,7 +349,7 @@ function PermissionBody({
           >
             <CloseIcon size={13} color={theme.error} />
             <Text style={[styles.btnText, { color: theme.error }]}>
-              {isExitPlanMode ? 'Reject' : 'Deny'}
+              {isExitPlanMode ? t('remoteSession.reject') : t('remoteSession.deny')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -359,7 +366,7 @@ function PermissionBody({
             ]}
           >
             <Text style={[styles.btnText, { color: theme.textPrimary }]}>
-              {isExitPlanMode ? 'Start Coding' : 'Allow Once'}
+              {isExitPlanMode ? t('remoteSession.startCoding') : t('remoteSession.allowOnce')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -371,7 +378,7 @@ function PermissionBody({
           >
             <CheckmarkIcon size={13} color={theme.background} />
             <Text style={[styles.btnText, { color: theme.background }]}>
-              {isExitPlanMode ? 'Autopilot' : 'Always'}
+              {isExitPlanMode ? t('remoteSession.autopilot') : t('remoteSession.always')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -418,6 +425,7 @@ function QuestionPicker({
   theme: ThemeColors;
   onAnswer: (answers: Record<string, string[]> | null) => void;
 }) {
+  const { t } = useTranslation();
   const rawQuestions = Array.isArray(prompt.questions) ? prompt.questions : [];
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [pageIndex, setPageIndex] = useState(0);
@@ -458,7 +466,7 @@ function QuestionPicker({
     <>
       <View style={styles.wizardHeaderRow}>
         <Text style={[styles.eyebrow, { color: theme.warning }]}>
-          YOUR LAPTOP IS ASKING
+          {t('remoteSession.yourLaptopIsAsking')}
         </Text>
         {rawQuestions.length > 1 ? (
           <Text style={[styles.wizardPageLabel, { color: theme.textMuted }]}>
@@ -550,7 +558,7 @@ function QuestionPicker({
             style={[styles.secondaryBtn, { borderColor: theme.outline }]}
           >
             <Text style={[styles.btnText, { color: theme.textSecondary }]}>
-              Skip
+              {t('remoteSession.skip')}
             </Text>
           </TouchableOpacity>
         ) : (
@@ -561,7 +569,7 @@ function QuestionPicker({
             style={[styles.secondaryBtn, { borderColor: theme.outline }]}
           >
             <Text style={[styles.btnText, { color: theme.textSecondary }]}>
-              Back
+              {t('remoteSession.back')}
             </Text>
           </TouchableOpacity>
         )}
@@ -580,7 +588,7 @@ function QuestionPicker({
           ]}
         >
           <Text style={[styles.btnText, { color: theme.background }]}>
-            {isLastPage ? 'Submit' : 'Next'}
+            {isLastPage ? t('remoteSession.submit') : t('remoteSession.next')}
           </Text>
         </TouchableOpacity>
       </View>

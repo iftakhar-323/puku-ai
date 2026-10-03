@@ -16,6 +16,7 @@ import {
   CopyIcon,
   RefreshIcon,
 } from '../../../components/common/Icons';
+import i18next from '../../../i18n';
 import { RetroComputerIllustration } from '../../../components/common/RetroComputerIllustration';
 import { useApp } from '../../../store/AppContext';
 import { ThemeColors } from '../../../theme/theme';
@@ -38,16 +39,16 @@ const NEAR_BOTTOM_PX = 160;
 
 function getGreeting(userName?: string): { lead: string; name: string } {
   const h = new Date().getHours();
-  let lead = 'Good morning,';
+  let lead = i18next.t('chatEmptyState.greetingMorning');
   if (h >= 12 && h < 17) {
-    lead = 'Good afternoon,';
+    lead = i18next.t('chatEmptyState.greetingAfternoon');
   } else if (h >= 17 && h < 22) {
-    lead = 'Good evening,';
+    lead = i18next.t('chatEmptyState.greetingEvening');
   } else if (h >= 22 || h < 5) {
-    lead = 'Back at it,';
+    lead = i18next.t('chatEmptyState.greetingLate');
   }
 
-  let name = 'there';
+  let name = i18next.t('chatEmptyState.greetingFallbackName');
   if (userName?.trim()) {
     name = userName.trim().split(/\s+/)[0];
     name = name.charAt(0).toUpperCase() + name.slice(1);
@@ -480,7 +481,9 @@ const FeedRow = memo(function FeedRowView({
             style={styles.thinkingHeader}
           >
             <Text style={[styles.thinkingHeaderText, { color: theme.textMuted }]}>
-              {item.streaming ? 'Thinking…' : 'Thought'}
+              {item.streaming
+                ? i18next.t('remoteSession.thinking')
+                : i18next.t('remoteSession.thought')}
             </Text>
             {isExpanded ? (
               <ChevronDownIcon size={12} color={theme.textMuted} />

@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
   CameraIcon,
   ChevronDownIcon,
@@ -48,6 +49,7 @@ export function PairingView({
   initialToken,
   onConnect,
 }: Props) {
+  const { t } = useTranslation();
   const [sessionId, setSessionId] = useState(initialSessionId);
   const [token, setToken] = useState(initialToken);
   const [showToken, setShowToken] = useState(false);
@@ -178,8 +180,8 @@ export function PairingView({
           )}
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
             {isLoading
-              ? 'Looking for sessions on your account…'
-              : 'No laptop sessions found yet'}
+              ? t('remoteSession.lookingForSessions')
+              : t('remoteSession.noSessionsFound')}
           </Text>
         </View>
       )}
@@ -259,7 +261,7 @@ export function PairingView({
             <TouchableOpacity
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={showToken ? 'Hide token' : 'Show token'}
+              accessibilityLabel={showToken ? t('remoteSession.hideToken') : t('remoteSession.showToken')}
               onPress={() => setShowToken(v => !v)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.eyeBtn}
