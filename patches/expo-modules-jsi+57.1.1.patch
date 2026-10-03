@@ -21,7 +21,7 @@ index bedb057..22744c6 100644
    init(runtime: JavaScriptRuntime) {
      self.runtime = runtime
 diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptPropNameID.swift b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptPropNameID.swift
-index d43cdd5..91ee97e 100644
+index d43cdd5..01b3667 100644
 --- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptPropNameID.swift
 +++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptPropNameID.swift
 @@ -3,7 +3,7 @@ internal import jsi
@@ -29,7 +29,7 @@ index d43cdd5..91ee97e 100644
  /// Represents something that can be a JS property key.
  public final class JavaScriptPropNameID: JavaScriptType {
 -  private weak let runtime: JavaScriptRuntime?
-+  private weak var runtime: JavaScriptRuntime?
++  nonisolated(unsafe) private weak var runtime: JavaScriptRuntime?
    internal let pointee: facebook.jsi.PropNameID
  
    /// Creates a PropNameID from existing `facebook.jsi.PropNameID`.
@@ -73,7 +73,7 @@ index 1339b7c..a9d18bf 100644
  
    /// Creates a BigInt from an existing JSI BigInt.
 diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptError.swift b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptError.swift
-index 936aaa2..8788a97 100644
+index 936aaa2..54c533a 100644
 --- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptError.swift
 +++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptError.swift
 @@ -12,7 +12,7 @@ internal import jsi
@@ -81,7 +81,7 @@ index 936aaa2..8788a97 100644
  ///   JavaScript thread while the runtime is alive.
  public final class JavaScriptError: Error, Sendable {
 -  private weak let runtime: JavaScriptRuntime?
-+  private weak var runtime: JavaScriptRuntime?
++  nonisolated(unsafe) private weak var runtime: JavaScriptRuntime?
    nonisolated(unsafe) private let pointee: facebook.jsi.JSError
  
    internal init(_ runtime: JavaScriptRuntime, _ error: facebook.jsi.JSError) {
@@ -138,7 +138,7 @@ index 280c18a..8d472a3 100644
  
    /// The underlying `ArrayBuffer` backing this typed array. Stored alongside `pointee`
 diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptValue.swift b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptValue.swift
-index 75500be..e5a7bcf 100644
+index 75500be..0e9664d 100644
 --- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptValue.swift
 +++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptValue.swift
 @@ -7,7 +7,7 @@ internal import jsi
@@ -146,7 +146,7 @@ index 75500be..e5a7bcf 100644
  /// and stored in containers that don't support non-copyable types etc.
  public final class JavaScriptValue: JavaScriptType, Equatable, Escapable {
 -  internal weak let runtime: JavaScriptRuntime?
-+  internal weak var runtime: JavaScriptRuntime?
++  nonisolated(unsafe) internal weak var runtime: JavaScriptRuntime?
    internal let pointee: facebook.jsi.Value
  
    /// Takes ownership of the given JSI value. Only runtime-free values (undefined, null, booleans and
