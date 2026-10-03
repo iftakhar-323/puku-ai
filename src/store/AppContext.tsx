@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Sentry from '@sentry/react-native';
 import {
   AppRoute,
   AppSettings,
@@ -21,6 +22,8 @@ import { tokenManager } from '../services/tokenManager';
 import { extractJwtData } from '../utils/auth';
 import { formatActivityDate, getConversationTimestamp } from '../utils/date';
 import { ignore } from '../utils/devLog';
+import { extractFencedCodeBlocks, titleForLanguage } from '../utils/codeBlocks';
+import { formatFileSize } from '../utils/fileSize';
 
 interface AppContextValue {
   theme: ThemeColors;
@@ -61,12 +64,22 @@ interface AppContextValue {
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
   refreshProjects: () => Promise<void>;
-  addProjectKnowledge: (projectId: string, fileName: string, type: string) => void;
+  addProjectKnowledge: (
+    projectId: string,
+    fileName: string,
+    type: string,
+    sizeBytes?: number
+  ) => void;
   // Artifacts
   artifacts: Artifact[];
   activeArtifact: Artifact | null;
   selectArtifact: (id: string | null) => void;
-  createArtifact: (title: string, type: Artifact['type'], content: string) => Artifact;
+  createArtifact: (
+    title: string,
+    type: Artifact['type'],
+    content: string,
+    options?: { conversationId?: string; language?: string }
+  ) => Artifact;
   // Code sessions
   codeSessions: CodeSession[];
   activeCodeSession: CodeSession | null;
@@ -615,6 +628,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRouteParams(params);
     setRouteHistory(prev => [...prev, route]);
     setActiveRoute(route);
+    // RN equivalent of Flutter's SentryNavigatorObserver, since the app uses
+    // a custom router instead of react-navigation.
+    Sentry.addBreadcrumb({
+      category: 'navigation',
+      message: `Navigated to ${route}`,
+      level: 'info',
+      data: { from: activeRoute, to: route },
+    });
     if (route !== 'login') {
       AsyncStorage.setItem('@puku_active_route', route).catch(ignore('AppContext'));
     }
@@ -1116,6 +1137,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         setActiveConversationId(finalServerId);
       }
+
+      // Best-effort: mirror Flutter's auto-persistence of fenced code blocks
+      // from assistant replies as Artifacts. Never blocks the chat flow.
+      try {
+        const blocks = extractFencedCodeBlocks(response.text);
+        for (const block of blocks) {
+          createArtifact(titleForLanguage(block.language), 'code', block.code, {
+            conversationId: finalServerId || undefined,
+            language: block.language,
+          });
+        }
+      } catch {}
     } catch (err: any) {
       const errorMsg =
         err?.message ||
@@ -1234,12 +1267,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addProjectKnowledge = (projectId: string, fileName: string, type: string) => {
+  const addProjectKnowledge = (
+    projectId: string,
+    fileName: string,
+    type: string,
+    sizeBytes?: number
+  ) => {
     const newItem = {
       id: 'k_' + Date.now(),
       name: fileName,
       type,
-      size: '256 KB',
+      size: formatFileSize(sizeBytes),
       date: 'Just now',
     };
     setProjects(prev =>
@@ -1257,13 +1295,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveArtifactId(id);
   };
 
-  const createArtifact = (title: string, type: Artifact['type'], content: string) => {
+  const createArtifact = (
+    title: string,
+    type: Artifact['type'],
+    content: string,
+    options?: { conversationId?: string; language?: string }
+  ) => {
     const newArt: Artifact = {
-      id: 'art_' + Date.now(),
+      id: 'art_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       title,
       type,
+      language: options?.language,
       content,
       createdAt: 'Just now',
+      conversationId: options?.conversationId,
     };
     setArtifacts(prev => [newArt, ...prev]);
     return newArt;

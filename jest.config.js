@@ -11,6 +11,6 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov'],
   transformIgnorePatterns: [
-    'node_modules/(?!(@react-native|react-native|@react-native-async-storage|react-native-inappbrowser-reborn|react-native-safe-area-context|react-native-svg|@sentry)/)',
+    'node_modules/(?!(@react-native|react-native|@react-native-async-storage|react-native-config|react-native-inappbrowser-reborn|react-native-safe-area-context|react-native-svg|@sentry)/)',
   ],
 };

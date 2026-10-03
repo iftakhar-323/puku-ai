@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -11,6 +12,7 @@ import { CheckmarkIcon, CloseIcon } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 import type { PendingPrompt } from '../relay/protocol';
 import { describeTool, toolKind } from '../relay/feed';
+import { MarkdownRenderer } from '../../chat/components/MarkdownRenderer';
 
 const monoFont = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
@@ -35,14 +37,14 @@ function safeRenderString(val: unknown): string {
 interface Props {
   prompt: PendingPrompt;
   theme: ThemeColors;
-  onAnswer: (allow: boolean | 'always') => void;
+  onAnswer: (allow: boolean | 'always', message?: string) => void;
   onAnswerQuestions: (answers: Record<string, string[]> | null) => void;
 }
 
 class PromptCardErrorBoundary extends React.Component<
   {
     theme: ThemeColors;
-    onAnswer: (allow: boolean | 'always') => void;
+    onAnswer: (allow: boolean | 'always', message?: string) => void;
     children: React.ReactNode;
   },
   { hasError: boolean }
@@ -143,10 +145,17 @@ function PermissionBody({
 }: {
   prompt: PendingPrompt;
   theme: ThemeColors;
-  onAnswer: (allow: boolean | 'always') => void;
+  onAnswer: (allow: boolean | 'always', message?: string) => void;
 }) {
   const toolName = safeRenderString(prompt.toolName) || 'Tool';
   const isExitPlanMode = toolName.toLowerCase() === 'exitplanmode';
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+
+  useEffect(() => {
+    setIsRejecting(false);
+    setFeedbackText('');
+  }, [prompt.requestId]);
   const kind = toolKind(toolName);
   const isEdit = kind === 'edit';
   const isRead = kind === 'read';
@@ -254,17 +263,27 @@ function PermissionBody({
       <Text style={[styles.title, { color: theme.textPrimary }]}>
         {titleText}
       </Text>
-      <View
-        style={[styles.commandBox, { backgroundColor: theme.codeBackground }]}
-      >
-        <Text
-          selectable
-          numberOfLines={6}
-          style={[styles.command, { color: theme.textPrimary }]}
+      {isExitPlanMode ? (
+        <View
+          style={[styles.planBox, { backgroundColor: theme.codeBackground }]}
         >
-          {commandText}
-        </Text>
-      </View>
+          <ScrollView style={styles.planScroll} nestedScrollEnabled>
+            <MarkdownRenderer content={commandText} theme={theme} />
+          </ScrollView>
+        </View>
+      ) : (
+        <View
+          style={[styles.commandBox, { backgroundColor: theme.codeBackground }]}
+        >
+          <Text
+            selectable
+            numberOfLines={6}
+            style={[styles.command, { color: theme.textPrimary }]}
+          >
+            {commandText}
+          </Text>
+        </View>
+      )}
       {descriptionText && !isExitPlanMode ? (
         <Text
           numberOfLines={3}
@@ -273,49 +292,90 @@ function PermissionBody({
           {descriptionText}
         </Text>
       ) : null}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`Deny ${toolName}`}
-          onPress={() => onAnswer(false)}
-          style={[styles.secondaryBtn, { borderColor: theme.outline }]}
-        >
-          <CloseIcon size={13} color={theme.error} />
-          <Text style={[styles.btnText, { color: theme.error }]}>
-            {isExitPlanMode ? 'Reject' : 'Deny'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`Allow ${toolName} once`}
-          onPress={() => onAnswer(true)}
-          style={[
-            styles.allowOnceBtn,
-            {
-              borderColor: theme.outline,
-              backgroundColor: theme.pillBackground,
-            },
-          ]}
-        >
-          <Text style={[styles.btnText, { color: theme.textPrimary }]}>
-            {isExitPlanMode ? 'Start Coding' : 'Allow Once'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`Always allow ${toolName}`}
-          onPress={() => onAnswer('always')}
-          style={[styles.primaryBtn, { backgroundColor: theme.textPrimary }]}
-        >
-          <CheckmarkIcon size={13} color={theme.background} />
-          <Text style={[styles.btnText, { color: theme.background }]}>
-            {isExitPlanMode ? 'Autopilot' : 'Always'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {isExitPlanMode && isRejecting ? (
+        <>
+          <TextInput
+            value={feedbackText}
+            onChangeText={setFeedbackText}
+            placeholder="What should change before starting? (optional)"
+            placeholderTextColor={theme.placeholderText}
+            multiline
+            style={[
+              styles.feedbackInput,
+              { color: theme.textPrimary, borderColor: theme.outline },
+            ]}
+          />
+          <View style={styles.actions}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel rejection"
+              onPress={() => setIsRejecting(false)}
+              style={[styles.secondaryBtn, { borderColor: theme.outline }]}
+            >
+              <Text style={[styles.btnText, { color: theme.textSecondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Send rejection feedback"
+              onPress={() => onAnswer(false, feedbackText.trim() || undefined)}
+              style={[styles.primaryBtn, { backgroundColor: theme.textPrimary }]}
+            >
+              <CheckmarkIcon size={13} color={theme.background} />
+              <Text style={[styles.btnText, { color: theme.background }]}>
+                Send
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      ) : (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Deny ${toolName}`}
+            onPress={() => (isExitPlanMode ? setIsRejecting(true) : onAnswer(false))}
+            style={[styles.secondaryBtn, { borderColor: theme.outline }]}
+          >
+            <CloseIcon size={13} color={theme.error} />
+            <Text style={[styles.btnText, { color: theme.error }]}>
+              {isExitPlanMode ? 'Reject' : 'Deny'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Allow ${toolName} once`}
+            onPress={() => onAnswer(true)}
+            style={[
+              styles.allowOnceBtn,
+              {
+                borderColor: theme.outline,
+                backgroundColor: theme.pillBackground,
+              },
+            ]}
+          >
+            <Text style={[styles.btnText, { color: theme.textPrimary }]}>
+              {isExitPlanMode ? 'Start Coding' : 'Allow Once'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Always allow ${toolName}`}
+            onPress={() => onAnswer('always')}
+            style={[styles.primaryBtn, { backgroundColor: theme.textPrimary }]}
+          >
+            <CheckmarkIcon size={13} color={theme.background} />
+            <Text style={[styles.btnText, { color: theme.background }]}>
+              {isExitPlanMode ? 'Autopilot' : 'Always'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </>
   );
 }
@@ -526,6 +586,24 @@ const styles = StyleSheet.create({
     fontFamily: monoFont,
     fontSize: 12.5,
     lineHeight: 18,
+  },
+  planBox: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    maxHeight: 260,
+  },
+  planScroll: {
+    maxHeight: 260,
+  },
+  feedbackInput: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    minHeight: 64,
+    textAlignVertical: 'top',
   },
   description: {
     fontSize: 12.5,

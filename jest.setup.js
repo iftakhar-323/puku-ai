@@ -62,6 +62,10 @@ jest.mock('expo-camera', () => ({
   ]),
 }));
 
+jest.mock('react-native-config', () => ({
+  default: {},
+}));
+
 jest.mock('expo-crypto', () => ({
   getRandomBytes: jest.fn(byteCount => {
     const bytes = new Uint8Array(byteCount);

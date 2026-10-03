@@ -12,6 +12,7 @@ import { ThemeColors } from '../../../theme/theme';
 import { CheckmarkIcon, CopyIcon } from '../../../components/common/Icons';
 import { NativeClipboard } from '../../../services/nativeModules';
 import { ignore } from '../../../utils/devLog';
+import { syntaxColorsForTheme, tokenizeCode } from './syntaxHighlight';
 
 /**
  * Claude Code-style accents: colored inline code, tappable links and
@@ -162,6 +163,73 @@ export function StreamingText({
   );
 }
 
+/** Renders one line of tokenized code as colored inline spans. */
+function HighlightedLine({
+  line,
+  theme,
+}: {
+  line: { text: string; kind: string }[];
+  theme: ThemeColors;
+}) {
+  const colors = syntaxColorsForTheme(theme.isDark);
+  return (
+    <Text style={styles.codeText}>
+      {line.map((tok, idx) => (
+        <Text
+          key={idx}
+          style={{
+            color: (colors as any)[tok.kind] || colors.plain,
+            fontWeight: tok.kind === 'keyword' ? '600' : '400',
+          }}>
+          {tok.text}
+        </Text>
+      ))}
+      {'\n'}
+    </Text>
+  );
+}
+
+/** Renders a `diff`/`patch` fence with colored +/-/@@ lines. */
+/** Heuristic for unprompted plain text that's actually a unified diff (e.g. tool output). */
+export function looksLikeDiff(text: string): boolean {
+  if (!text) return false;
+  const lines = text.split('\n').slice(0, 20);
+  const diffLines = lines.filter(
+    l => /^(\+\+\+|---|@@ )/.test(l) || /^[+-](?![+-])/.test(l)
+  );
+  return diffLines.length >= 2;
+}
+
+export function DiffBlockBody({ code, theme }: { code: string; theme: ThemeColors }) {
+  const lines = code.split('\n');
+  return (
+    <>
+      {lines.map((line, idx) => {
+        let color = theme.textPrimary;
+        let backgroundColor: string | undefined;
+        if (line.startsWith('+++') || line.startsWith('---')) {
+          color = theme.textSecondary;
+        } else if (line.startsWith('@@')) {
+          color = theme.link;
+        } else if (line.startsWith('+')) {
+          color = theme.success;
+          backgroundColor = theme.isDark ? 'rgba(148, 199, 160, 0.12)' : 'rgba(50, 107, 64, 0.08)';
+        } else if (line.startsWith('-')) {
+          color = theme.error;
+          backgroundColor = theme.isDark ? 'rgba(255, 145, 152, 0.12)' : 'rgba(181, 38, 62, 0.08)';
+        }
+        return (
+          <Text
+            key={idx}
+            style={[styles.codeText, { color, backgroundColor }]}>
+            {line + (idx < lines.length - 1 ? '\n' : '')}
+          </Text>
+        );
+      })}
+    </>
+  );
+}
+
 function CodeBlockItem({
   code,
   language,
@@ -181,7 +249,22 @@ function CodeBlockItem({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const normalizedLang = language ? language.toLowerCase().trim() : '';
+  const isDiff = normalizedLang === 'diff' || normalizedLang === 'patch';
   const displayLang = language ? language.toUpperCase() : 'CODE';
+  const tokenizedLines = !isDiff ? tokenizeCode(code, language) : null;
+
+  const codeContent = isDiff ? (
+    <DiffBlockBody code={code} theme={theme} />
+  ) : tokenizedLines ? (
+    <Text>
+      {tokenizedLines.map((line, idx) => (
+        <HighlightedLine key={idx} line={line} theme={theme} />
+      ))}
+    </Text>
+  ) : (
+    <Text style={[styles.codeText, { color: theme.textPrimary }]}>{code}</Text>
+  );
 
   if (compact) {
     return (
@@ -195,7 +278,7 @@ function CodeBlockItem({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={[styles.codeScrollContent, styles.codeScrollCompact]}>
-          <Text style={[styles.codeText, { color: theme.textPrimary }]}>{code}</Text>
+          {codeContent}
         </ScrollView>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy"
           onPress={handleCopy}
@@ -257,9 +340,7 @@ function CodeBlockItem({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.codeScrollContent}>
-        <Text style={[styles.codeText, { color: theme.textPrimary }]}>
-          {code}
-        </Text>
+        {codeContent}
       </ScrollView>
     </View>
   );

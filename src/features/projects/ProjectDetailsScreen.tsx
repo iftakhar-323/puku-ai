@@ -15,12 +15,17 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../../components/common/AppHeader';
 import {
+  CameraIcon,
   CloseIcon,
   DeleteIcon,
+  PaperclipIcon,
   PlusIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
+import { NativePicker } from '../../services/nativeModules';
+
+const KNOWLEDGE_ITEM_CAP = 20;
 
 export function ProjectDetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -40,7 +45,7 @@ export function ProjectDetailsScreen() {
     activeProject?.instructions || ''
   );
   const [showAddContentModal, setShowAddContentModal] = useState(false);
-  const [newFileName, setNewFileName] = useState('');
+  const [isPickingContent, setIsPickingContent] = useState(false);
 
   if (!activeProject) {
     return (
@@ -60,11 +65,31 @@ export function ProjectDetailsScreen() {
     setShowInstructionsModal(false);
   };
 
-  const handleAddKnowledge = () => {
-    if (!newFileName.trim()) return;
-    addProjectKnowledge(activeProject.id, newFileName.trim(), 'DOC');
-    setNewFileName('');
-    setShowAddContentModal(false);
+  const handlePickFile = async () => {
+    setIsPickingContent(true);
+    try {
+      const media = await NativePicker.pickMedia();
+      if (media) {
+        const type = media.type?.startsWith('image/') ? 'IMAGE' : 'DOC';
+        addProjectKnowledge(activeProject.id, media.name, type, media.size);
+        setShowAddContentModal(false);
+      }
+    } finally {
+      setIsPickingContent(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    setIsPickingContent(true);
+    try {
+      const media = await NativePicker.takePhoto();
+      if (media) {
+        addProjectKnowledge(activeProject.id, media.name, 'IMAGE', media.size);
+        setShowAddContentModal(false);
+      }
+    } finally {
+      setIsPickingContent(false);
+    }
   };
 
   const confirmDeleteProject = () => {
@@ -168,6 +193,29 @@ export function ProjectDetailsScreen() {
             Add relevant documents, code, or context for Puku to reference in all
             conversations.
           </Text>
+
+          <View style={styles.capacityRow}>
+            <View style={[styles.capacityTrack, { backgroundColor: theme.border }]}>
+              <View
+                style={[
+                  styles.capacityFill,
+                  {
+                    backgroundColor:
+                      activeProject.knowledgeItems.length >= KNOWLEDGE_ITEM_CAP
+                        ? theme.error
+                        : theme.primaryLight,
+                    width: `${Math.min(
+                      100,
+                      (activeProject.knowledgeItems.length / KNOWLEDGE_ITEM_CAP) * 100
+                    )}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.capacityLabel, { color: theme.textMuted }]}>
+              {activeProject.knowledgeItems.length}/{KNOWLEDGE_ITEM_CAP}
+            </Text>
+          </View>
 
           {activeProject.knowledgeItems.length === 0 ? (
             <View style={styles.emptyBox}>
@@ -340,32 +388,35 @@ export function ProjectDetailsScreen() {
                 <CloseIcon size={20} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
-            <TextInput
-              style={[
-                styles.fileNameInput,
-                {
-                  backgroundColor: theme.background,
-                  color: theme.textPrimary,
-                  borderColor: theme.border,
-                },
-              ]}
-              placeholder="File name (e.g. API-Spec.md)"
-              placeholderTextColor={theme.placeholderText}
-              value={newFileName}
-              onChangeText={setNewFileName}
-            />
             <TouchableOpacity
+              activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Attach to project"
-              accessibilityState={{ disabled: !newFileName.trim() }}
-              disabled={!newFileName.trim()}
-              onPress={handleAddKnowledge}
+              accessibilityLabel="Take photo"
+              disabled={isPickingContent}
+              onPress={handleTakePhoto}
               style={[
-                styles.saveBtn,
-                { backgroundColor: theme.primary },
-                !newFileName.trim() && styles.saveBtnDisabled,
+                styles.pickerRow,
+                { backgroundColor: theme.background, borderColor: theme.border },
               ]}>
-              <Text style={styles.saveBtnText}>Attach to Project</Text>
+              <CameraIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.pickerRowText, { color: theme.textPrimary }]}>
+                Take photo
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Choose file or photo"
+              disabled={isPickingContent}
+              onPress={handlePickFile}
+              style={[
+                styles.pickerRow,
+                { backgroundColor: theme.background, borderColor: theme.border },
+              ]}>
+              <PaperclipIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.pickerRowText, { color: theme.textPrimary }]}>
+                Choose a file or photo
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -461,6 +512,26 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 12,
   },
+  capacityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  capacityTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  capacityFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  capacityLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   emptyBox: {
     padding: 16,
     alignItems: 'center',
@@ -521,12 +592,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlignVertical: 'top',
   },
-  fileNameInput: {
-    height: 48,
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    height: 52,
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
-    fontSize: 14,
+    marginBottom: 10,
+  },
+  pickerRowText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   saveBtn: {
     height: 48,

@@ -1,6 +1,7 @@
 import { AppColors } from './colors';
 
 export interface ThemeColors {
+  isDark: boolean;
   background: string;
   secondaryBackground: string;
   cardBackground: string;
@@ -39,6 +40,7 @@ export interface ThemeColors {
 }
 
 export const darkTheme: ThemeColors = {
+  isDark: true,
   background: AppColors.background, // #151614 (official Puku deep charcoal black)
   secondaryBackground: AppColors.secondaryBackground, // #1c1d1a (official Puku panel)
   cardBackground: AppColors.secondaryBackground, // #1c1d1a
@@ -76,6 +78,7 @@ export const darkTheme: ThemeColors = {
 };
 
 export const lightTheme: ThemeColors = {
+  isDark: false,
   background: '#f1f0e9', // official Puku light "main"
   secondaryBackground: '#e9e9e0', // official Puku light "sidebar"
   cardBackground: '#fafaf5', // official Puku light "panel"

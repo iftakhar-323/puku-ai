@@ -19,6 +19,7 @@ import { CodeScreen } from './src/features/code/CodeScreen';
 import { LiveVoiceScreen } from './src/features/live_voice/LiveVoiceScreen';
 import { LoginScreen } from './src/features/login/LoginScreen';
 import { ProfileScreen } from './src/features/settings/ProfileScreen';
+import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { ProjectDetailsScreen } from './src/features/projects/ProjectDetailsScreen';
 import { ProjectsScreen } from './src/features/projects/ProjectsScreen';
 import { PukuBotScreen } from './src/features/puku_bot/PukuBotScreen';
@@ -137,6 +138,7 @@ function MainNavigator(): React.JSX.Element {
       case 'liveVoice':
         return <LiveVoiceScreen />;
       case 'settings':
+        return <SettingsScreen />;
       case 'profile':
         return <ProfileScreen />;
       case 'usage':

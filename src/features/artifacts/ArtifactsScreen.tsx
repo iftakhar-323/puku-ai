@@ -51,6 +51,7 @@ export function ArtifactsScreen() {
     { id: 'code', label: 'Code' },
     { id: 'markdown', label: 'Markdown' },
     { id: 'svg', label: 'SVG' },
+    { id: 'html', label: 'HTML' },
   ];
 
   return (
