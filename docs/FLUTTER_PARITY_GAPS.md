@@ -29,15 +29,20 @@ Most of the gaps below have since been implemented on the
 - ✅ Ported Flutter's `SmartOutputView` (JSON/XML/key-value auto-detection with humanized labels and status coloring) for remote-session tool output
 - ⏭️ Not replicated (confirmed non-functional on the Flutter side too): fake thinking/tool-use blocks in main chat, the Live Voice Chat mock, the "New Code Session" composer mock, the "research" toggle, and the Projects Power/Shared/Archived scope tabs (no backend scope field exists in either app)
 
+**Genuinely still outstanding** (real gaps, not yet started):
+- Image compression before attachment upload (needs native Android/iOS code — see §9 below)
+- An iOS native `Picker` module at all — `NativePicker` currently has no iOS implementation (found while investigating the compression gap)
+- Automated integration/E2E tests in CI (needs a framework choice first — Detox/Maestro/Appium — not started)
+
 ---
 
 ## 1. Chat message rendering
 
 | Capability | Flutter | RN (puku ai) |
 |---|---|---|
-| Code block syntax highlighting | ✅ Real tokenized/colorized highlighting via the `highlight` package (`chat_markdown_syntax_highlighter.dart`) | 🟡 Plain monospace text with just an uppercase language badge — no token coloring (`MarkdownRenderer.tsx`) |
-| Diff/patch rendering | ✅ Dedicated colored diff view for ` ```diff ` / ` ```patch ` fences (+green/−red/@@ hunk headers) | ❌ Not implemented — diff fences render as a generic code block |
-| "Smart output" fallback rendering (auto-detect JSON/XML/key-value, humanize field names, semantic color for status/exit-code) | ✅ Shared `SmartOutputView`, used in both chat and remote session | 🟡 Remote session has an expandable raw-JSON `ToolDetailSheet`, but no humanized/semantic auto-formatting; main chat has none |
+| Code block syntax highlighting | ✅ Real tokenized/colorized highlighting via the `highlight` package (`chat_markdown_syntax_highlighter.dart`) | ✅ Hand-rolled tokenizer (`syntaxHighlight.ts`), wired into `MarkdownRenderer.tsx`'s code blocks |
+| Diff/patch rendering | ✅ Dedicated colored diff view for ` ```diff ` / ` ```patch ` fences (+green/−red/@@ hunk headers) | ✅ `DiffBlockBody` in `MarkdownRenderer.tsx`, also reused for remote-session tool output |
+| "Smart output" fallback rendering (auto-detect JSON/XML/key-value, humanize field names, semantic color for status/exit-code) | ✅ Shared `SmartOutputView`, used in both chat and remote session | ✅ Ported as `src/components/common/SmartOutputView.tsx`, wired into `ToolDetailSheet.tsx` (main chat has no tool-call rendering to attach it to either, since that data path is dead on both apps — see correction above) |
 
 > Correction: an earlier pass of this doc listed "thinking blocks" and
 > "tool-use blocks in normal chat" as Flutter-only capabilities. On closer
@@ -52,7 +57,7 @@ Most of the gaps below have since been implemented on the
 
 | Capability | Flutter | RN |
 |---|---|---|
-| Auto-creation of artifacts from chat | ✅ Every assistant reply is scanned for fenced code blocks and auto-persisted as a titled, language-tagged artifact (`_persistArtifactsFromMessage`) | ❌ `createArtifact()` exists in `AppContext` but is **never called anywhere** — the Artifacts screen is permanently empty for a real user |
+| Auto-creation of artifacts from chat | ✅ Every assistant reply is scanned for fenced code blocks and auto-persisted as a titled, language-tagged artifact (`_persistArtifactsFromMessage`) | ✅ `utils/codeBlocks.ts` + a call from `AppContext.sendMessage`'s persistent-conversation success path |
 
 Note: neither app actually renders HTML/SVG/live-preview artifacts — both only persist/display code-type text snippets, so that's parity, not a gap.
 
@@ -60,8 +65,8 @@ Note: neither app actually renders HTML/SVG/live-preview artifacts — both only
 
 | Capability | Flutter | RN |
 |---|---|---|
-| "Add content" ingestion sheet | 🟡 Offers upload-from-device / take picture / choose image / "create document" options (wiring into a repository call wasn't confirmed, but the picker UI covers multiple real content types) | ❌ "Add Content" only lets the user type a filename string; hardcodes `type: 'DOC'` and a fake "256 KB" size — no real file/image picking at all |
-| Capacity/usage indicator | ✅ `capacity_progress_bar.dart` shows project usage/at-capacity state | ❌ No equivalent in `ProjectsScreen`/`ProjectDetailsScreen` |
+| "Add content" ingestion sheet | 🟡 Offers upload-from-device / take picture / choose image / "create document" options (wiring into a repository call wasn't confirmed, but the picker UI covers multiple real content types) | ✅ Real "Take photo" / "Choose a file or photo" rows using the same `NativePicker` as chat attachments, with a real file name/size instead of the hardcoded filename-only modal |
+| Capacity/usage indicator | ✅ `capacity_progress_bar.dart` shows project usage/at-capacity state | ✅ Cosmetic capacity bar in `ProjectDetailsScreen.tsx` (not backend-driven on either side) |
 | Scope tabs (yours/power/shared/archived) | ❌ Confirmed non-functional: `ProjectDto.toEntity({scope = ProjectScope.yours})` is called from every site in `projects_repository_impl.dart` with no scope argument, so every project is always `.yours` — the backend has no scope field at all | ❌ Same — only "yours" ever has a data source. **Not a real gap**: both apps show the same 4 tabs but neither has backend support for anything but "yours", so there's nothing to replicate |
 
 ## 4. Code / Remote Session (CLI remote-control feature)
@@ -72,10 +77,10 @@ both are deep, so the gaps here are about sophistication, not absence:
 
 | Capability | Flutter | RN |
 |---|---|---|
-| "Exit Plan Mode" flow | ✅ Dedicated card + dialog: renders the agent's plan as markdown, lets the user Approve (choosing an exit mode) or Reject with freeform feedback | 🟡 RN already has this (`PromptCard.tsx`'s `isExitPlanMode` branch — "Ready to start coding?" / Start Coding / Autopilot / Reject), just missed in the first pass since it's inline rather than a separate component. Real gap: the plan is shown as plain truncated text instead of rendered markdown, and "Reject" fires immediately with no feedback text box — even though `answerPrompt(allow, message?)` already supports sending one |
-| `AskUserQuestion` multi-question flow | ✅ Multi-page wizard dialog — one question per page with Next/Back/Submit, single & multi-select | 🟡 `PromptCard` handles `AskUserQuestion` but as a single inline prompt, not a paged wizard |
-| Inline file-diff rendering in the agent feed | ✅ Dedicated add/remove/hunk-header colored diff rows (`diff_line_row.dart`) | 🟡 Tool calls are grouped into collapsible summaries with an expandable JSON detail sheet, but no dedicated colored-diff renderer |
-| "New session" composer (model/environment/GitHub/Figma pickers, suggested prompts) | 🟡 UI exists but is non-functional (submit does nothing, Connect GitHub/Figma have no handler) — real sessions only ever start via QR pairing | ❌ No equivalent screen at all — RN's `CodeScreen` only lists existing sessions + a "Direct Connect" session-ID/QR path |
+| "Exit Plan Mode" flow | ✅ Dedicated card + dialog: renders the agent's plan as markdown, lets the user Approve (choosing an exit mode) or Reject with freeform feedback | ✅ `PromptCard.tsx`'s `isExitPlanMode` branch now renders the plan via `MarkdownRenderer` and has a reject-with-feedback text box (`answerPrompt(allow, message?)`) |
+| `AskUserQuestion` multi-question flow | ✅ Multi-page wizard dialog — one question per page with Next/Back/Submit, single & multi-select | ✅ `QuestionPicker` in `PromptCard.tsx` now paginates one question per page with Back/Next/Submit |
+| Inline file-diff rendering in the agent feed | ✅ Dedicated add/remove/hunk-header colored diff rows (`diff_line_row.dart`) | ✅ `DiffBlockBody` wired into `ToolDetailSheet.tsx` for tool output that looks like a unified diff |
+| "New session" composer (model/environment/GitHub/Figma pickers, suggested prompts) | 🟡 UI exists but is non-functional (submit does nothing, Connect GitHub/Figma have no handler) — real sessions only ever start via QR pairing | ❌ No equivalent screen at all — RN's `CodeScreen` only lists existing sessions + a "Direct Connect" session-ID/QR path. **Not implemented**: Flutter's own version is a non-functional mock (confirmed by reading `code_bloc.dart._onSubmitSession` — submit just resets local state), so there's no working feature to replicate |
 
 RN's protocol implementation (`relay/protocol.ts`) is actually the best-tested code
 in the RN repo (85–100% coverage) and appears to be a faithful, thorough port —
@@ -85,8 +90,8 @@ this section is about UI-layer polish, not protocol-level gaps.
 
 | Capability | Flutter | RN |
 |---|---|---|
-| Settings screen reachable from the app | 🟡 Reachable, but Billing/Usage/Capabilities/Permissions/Voice/Notifications/Shared-Links rows are all placeholder snackbars | ❌ **Worse: a fully-built `SettingsScreen.tsx` (699 lines) exists in the repo but the app router never renders it** — `App.tsx` maps both `settings` and `profile` routes to the much thinner `ProfileScreen` instead. This is a near-free fix: wire the existing screen into the router. |
-| Theme switcher UI | ❌ `ThemeCubit` supports light/dark/system persistence under the hood, but no Settings row exposes it, and `getThemeData()` maps all 3 modes to the same dark theme anyway — single fixed dark theme in practice | 🟡 RN's orphaned `SettingsScreen` *does* have a working dark-theme `Switch`, but since that screen is unrouted, no theme switcher is reachable either. "System" theme mode is typed in RN (`AppSettings.themeMode`) but has no `useColorScheme()` reader anywhere — not implemented on either side. |
+| Settings screen reachable from the app | 🟡 Reachable, but Billing/Usage/Capabilities/Permissions/Voice/Notifications/Shared-Links rows are all placeholder snackbars | ✅ Fixed: `App.tsx` now routes `'settings'` to `SettingsScreen` instead of `ProfileScreen` |
+| Theme switcher UI | ❌ `ThemeCubit` supports light/dark/system persistence under the hood, but no Settings row exposes it, and `getThemeData()` maps all 3 modes to the same dark theme anyway — single fixed dark theme in practice | ✅ Now reachable via the routing fix above — `SettingsScreen`'s dark-theme `Switch` works. "System" theme mode is still typed but unimplemented on both sides (no `useColorScheme()` reader) — parity, not a gap |
 | Usage dashboard with real data | ❌ Placeholder snackbar only | 🟡 RN has a full `UsageScreen` UI (plan, billing period, token quotas, request history) but every field is hardcoded mock data — no backend integration either side |
 
 ## 6. Crash reporting / Observability (Sentry)
@@ -95,12 +100,12 @@ Both apps use Sentry, but Flutter's configuration is notably more complete:
 
 | Capability | Flutter | RN |
 |---|---|---|
-| Session Replay | ✅ `replay.onErrorSampleRate: 1.0`, `replay.sessionSampleRate` 0.05–0.1 | ❌ Not configured |
-| Structured logging (`enableLogs`) | ✅ | ❌ Not configured |
-| Android ANR detection (`anrEnabled`) | ✅ | ❌ Not configured |
-| Auto-capture failed HTTP requests | ✅ via `sentry_dio` integration | ❌ RN's API client doesn't report failed requests to Sentry automatically |
-| Distributed tracing allowlist (`tracePropagationTargets`) | ✅ Explicit allowlist for backend hosts | ❌ Not configured |
-| Automatic screen-transition breadcrumbs | ✅ `SentryNavigatorObserver` on the router | ❌ RN's custom string-based router has no equivalent instrumentation |
+| Session Replay | ✅ `replay.onErrorSampleRate: 1.0`, `replay.sessionSampleRate` 0.05–0.1 | ✅ `Sentry.mobileReplayIntegration()` with matching sample rates in `sentryConfig.ts` |
+| Structured logging (`enableLogs`) | ✅ | ✅ `enableLogs: true` |
+| Android ANR detection (`anrEnabled`) | ✅ | ❓ Not explicitly configured — `@sentry/react-native`'s native Android layer may enable this by default, but it wasn't verified since there's no way to trigger/inspect an ANR report from this environment |
+| Auto-capture failed HTTP requests | ✅ via `sentry_dio` integration | ✅ `Sentry.httpClientIntegration()` |
+| Distributed tracing allowlist (`tracePropagationTargets`) | ✅ Explicit allowlist for backend hosts | ✅ Configured in `sentryConfig.ts` |
+| Automatic screen-transition breadcrumbs | ✅ `SentryNavigatorObserver` on the router | ✅ Manual `Sentry.addBreadcrumb` in `AppContext.navigate()`, since the app uses a custom router instead of react-navigation |
 | Screenshot + view-hierarchy on crash | ✅ | ✅ (RN has `attachScreenshot`/`attachViewHierarchy` too — parity here) |
 
 ## 7. Localization
@@ -116,16 +121,16 @@ Both apps currently ship English only, but the underlying i18n groundwork differ
 
 | Capability | Flutter | RN |
 |---|---|---|
-| Minimum code-coverage gate | ✅ CI fails below 59% line coverage | ❌ RN uploads coverage to Codecov but doesn't fail the build on low coverage (current RN coverage is ~25%) |
-| Automated integration/E2E tests in CI | ✅ Runs `integration_test` on a real Android emulator (API 31) in CI | ❌ No E2E/Detox/Maestro tests; RN's only device-automation script (`scripts/run-argent-demo.sh`) is a manual, non-CI smoke script |
-| Tag-triggered release pipeline | ✅ `release.yml` triggers on `v*.*.*` tags, builds signed APK + AppBundle, auto-creates a GitHub Release, and dispatches a webhook to an external `puku-mobile-automation` repo to run automated tests against the fresh build | ❌ RN's `android-build.yml` builds on every push to `main` (no tag trigger, no auto GitHub Release, no downstream test dispatch) |
+| Minimum code-coverage gate | ✅ CI fails below 59% line coverage | ✅ `jest.config.js` now has a `coverageThreshold` floor (~20%, just under today's actual ~24%) — lower than Flutter's 59%, which took years of dedicated test-writing to reach, but it's a real regression gate now instead of none at all |
+| Automated integration/E2E tests in CI | ✅ Runs `integration_test` on a real Android emulator (API 31) in CI | ❌ **Still not implemented.** No E2E/Detox/Maestro tests; RN's only device-automation script (`scripts/run-argent-demo.sh`) is a manual, non-CI smoke script. This needs a framework decision (Detox vs Maestro vs Appium) and actual test-writing — bigger scope than the other items here, intentionally not started without discussing the approach first |
+| Tag-triggered release pipeline | ✅ `release.yml` triggers on `v*.*.*` tags, builds signed APK + AppBundle, auto-creates a GitHub Release, and dispatches a webhook to an external `puku-mobile-automation` repo to run automated tests against the fresh build | ✅ New `.github/workflows/release.yml`: tag-triggered, builds signed APK+AAB, creates a GitHub Release. No webhook dispatch to an external automation repo (RN has no equivalent repo to dispatch to) |
 | iOS per-flavor env config | ✅ Separate `Info-dev/qa/prod.plist` per flavor, 3 schemes-worth of icon sets | 🟡 iOS has one scheme reading a single `.env` (works automatically via the installed `react-native-config`'s podspec, no dev/qa/prod split) — see `docs/IOS_ENV_SETUP.md` for how to add that split if ever needed, same as Android's 3 flavors |
 
 ## 9. Misc
 
-- **Image compression on attachment**: Flutter explicitly resizes picked images (max 2048px, 85% quality) before upload; this constraint wasn't found in RN's `NativePicker` flow.
-- **Deep link to incoming remote session (`puku://remote`)**: handled in RN's JS `Linking` listener, but Android's manifest only registers intent-filters for `callback`-style hosts — a `puku://remote?...` link tapped from outside the app (QR rendered as a link, SMS, etc.) would not currently launch the app on Android.
-- **`pukubot://` URL scheme**: registered on Android, missing from RN's iOS `Info.plist` — Puku Bot's OAuth callback likely can't complete on iOS.
+- **Image compression on attachment**: **Still not implemented.** Flutter explicitly resizes picked images (max 2048px, 85% quality) before upload; RN's native `PukuPicker` module (`android/app/src/main/java/com/pukuai/PickerModule.kt`) has no resize/compress step at all. This needs native code (Android `Bitmap` scaling + JPEG re-encode), not a JS/TS change — and while checking this, found a bigger related gap: **there is no iOS counterpart to `PickerModule.kt` at all** (`ios/` has no Picker native module), meaning `NativePicker.pickMedia()`/`takePhoto()` currently has no native implementation on iOS whatsoever — camera/photo attachment likely doesn't work on iOS today, independent of compression. Both are native-code changes that can't be compiled/verified from this Linux environment.
+- **Deep link to incoming remote session (`puku://remote`)**: ✅ Fixed — added as an intent-filter host in `AndroidManifest.xml`.
+- **`pukubot://` URL scheme**: ✅ Fixed — added to RN's iOS `Info.plist`.
 
 ---
 
