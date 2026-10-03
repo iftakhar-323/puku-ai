@@ -25,7 +25,9 @@ Most of the gaps below have since been implemented on the
 - ✅ CI coverage-threshold gate, tag-triggered release workflow
 - ✅ Removed the dead `puku-ui`/`cmdk`/`@base-ui/react` component library
 - ✅ iOS `react-native-config` wiring — turned out to need no Xcode change at all: the installed version's podspec already declares the env-codegen script phase, auto-injected by `pod install`. Corrected the misleading comment in `env.ts` and rewrote `docs/IOS_ENV_SETUP.md`; still only verifiable by an actual `pod install` + build on macOS, which isn't available here
-- ⏭️ Not replicated (confirmed non-functional on the Flutter side too): fake thinking/tool-use blocks in main chat, the Live Voice Chat mock, the "New Code Session" composer mock, and the "research" toggle
+- ✅ `AskUserQuestion` now a paginated wizard (one question per page, Back/Next/Submit) instead of all questions in one scroll
+- ✅ Ported Flutter's `SmartOutputView` (JSON/XML/key-value auto-detection with humanized labels and status coloring) for remote-session tool output
+- ⏭️ Not replicated (confirmed non-functional on the Flutter side too): fake thinking/tool-use blocks in main chat, the Live Voice Chat mock, the "New Code Session" composer mock, the "research" toggle, and the Projects Power/Shared/Archived scope tabs (no backend scope field exists in either app)
 
 ---
 
@@ -60,7 +62,7 @@ Note: neither app actually renders HTML/SVG/live-preview artifacts — both only
 |---|---|---|
 | "Add content" ingestion sheet | 🟡 Offers upload-from-device / take picture / choose image / "create document" options (wiring into a repository call wasn't confirmed, but the picker UI covers multiple real content types) | ❌ "Add Content" only lets the user type a filename string; hardcodes `type: 'DOC'` and a fake "256 KB" size — no real file/image picking at all |
 | Capacity/usage indicator | ✅ `capacity_progress_bar.dart` shows project usage/at-capacity state | ❌ No equivalent in `ProjectsScreen`/`ProjectDetailsScreen` |
-| Scope tabs (yours/power/shared/archived) | 🟡 Same 4 scopes defined, population not fully traced | 🟡 Same 4 tabs exist in UI, but only "yours" ever has a data source — power/shared/archived always render empty |
+| Scope tabs (yours/power/shared/archived) | ❌ Confirmed non-functional: `ProjectDto.toEntity({scope = ProjectScope.yours})` is called from every site in `projects_repository_impl.dart` with no scope argument, so every project is always `.yours` — the backend has no scope field at all | ❌ Same — only "yours" ever has a data source. **Not a real gap**: both apps show the same 4 tabs but neither has backend support for anything but "yours", so there's nothing to replicate |
 
 ## 4. Code / Remote Session (CLI remote-control feature)
 
