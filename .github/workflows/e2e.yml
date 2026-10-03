@@ -89,6 +89,13 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            APK_PATH=$(find android/app/build/outputs/apk/dev/debug -iname "*universal*debug.apk" | head -n 1)
+            # The "universal" ABI-split APK didn't actually get produced for
+            # the debug build type in practice (find came back empty, so
+            # adb install failed on an empty path) — target the x86_64 split
+            # instead, which matches this job's emulator arch and is
+            # guaranteed to exist since x86_64 is in app/build.gradle's
+            # splits.abi include list.
+            find android/app/build/outputs/apk/dev/debug -iname "*.apk"
+            APK_PATH=$(find android/app/build/outputs/apk/dev/debug -iname "*x86_64*debug.apk" | head -n 1)
             adb install -r "$APK_PATH"
             maestro test .maestro/
