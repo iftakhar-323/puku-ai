@@ -75,7 +75,6 @@ import { isOnline, addConnectivityListener } from '../../utils/connectivity';
 import { ignore } from '../../utils/devLog';
 import { useApp } from '../../store/AppContext';
 import { useRemoteSession } from '../../store/RemoteSessionContext';
-import { tokenManager } from '../../services/tokenManager';
 import {
   PukuBotAttachment,
   PukuBotConnection,
@@ -424,14 +423,6 @@ function toLocalMessages(list: PukuBotMessage[]): LocalChatMessage[] {
 /** How many conversations the home screen lists: the latest ones only. */
 export const HOME_RECENT_LIMIT = 3;
 
-/**
- * Signing in to Puku AI does not sign in to Puku Bot: they are separate services, and Puku Bot has
- * no way to take the app's Puku token. So the first time someone signed in to the app opens Puku Bot
- * without a Puku Bot session, its sign-in starts on its own, once per launch. The browser already
- * holds their Puku account from the app's sign-in, so it comes straight back.
- */
-let autoSignInTried = false;
-
 export function PukuBotScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -476,6 +467,13 @@ export function PukuBotScreen() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => pukuBotApi.isAuthenticated());
   const [authReady, setAuthReady] = useState(() => pukuBotApi.isReady());
   const [conversationsLoaded, setConversationsLoaded] = useState(false);
+  // Why the last session ended, shown on the sign-in card.
+  const [lastSignOut, setLastSignOut] = useState<{ reason: string; at: string } | null>(null);
+  useEffect(() => {
+    if (authReady && !isAuthenticated) {
+      pukuBotApi.getLastSignOut().then(setLastSignOut).catch(ignore('PukuBotScreen'));
+    }
+  }, [authReady, isAuthenticated]);
   const [botUser, setBotUser] = useState<PukuBotUser | null>(null);
   const [availableBots, setAvailableBots] = useState<PukuBotItem[]>([]);
   const [selectedBotId, setSelectedBotId] = useState<string>('general-assistant');
@@ -753,25 +751,6 @@ export function PukuBotScreen() {
     // Runs on the drawer's pick only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botPick]);
-
-  // Signed in to Puku AI but not to Puku Bot: start Puku Bot's sign-in once, without a tap.
-  useEffect(() => {
-    if (!authReady || isAuthenticated || autoSignInTried) return;
-    let cancelled = false;
-    tokenManager
-      .getAccessToken()
-      .then(appToken => {
-        if (cancelled || !appToken || autoSignInTried || pukuBotApi.isAuthenticated()) return;
-        autoSignInTried = true;
-        handleConnectAuth();
-      })
-      .catch(ignore('PukuBotScreen'));
-    return () => {
-      cancelled = true;
-    };
-    // handleConnectAuth only uses state setters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authReady, isAuthenticated]);
 
   // Initialize Puku Bot API
   useEffect(() => {
@@ -1770,6 +1749,14 @@ export function PukuBotScreen() {
                     ? t('pukuBot.noConversations', { defaultValue: 'No conversations yet. Send a message to start one.' })
                     : t('pukuBot.signInForConversations', { defaultValue: 'Sign in to Puku Bot to see your conversations and chat.' })}
                 </Text>
+                {!isAuthenticated && lastSignOut && (
+                  <Text style={[styles.botRecentsEmpty, { color: theme.textMuted, fontFamily: monoFont, marginTop: 6 }]}>
+                    {(lastSignOut.reason === 'server'
+                      ? 'The Puku Bot server ended your session'
+                      : 'You signed out') +
+                      ` at ${new Date(lastSignOut.at).toLocaleString()}.`}
+                  </Text>
+                )}
                 {!isAuthenticated && (
                   <TouchableOpacity
                     onPress={handleConnectAuth}

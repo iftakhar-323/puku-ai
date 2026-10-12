@@ -713,6 +713,46 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(client.isAuthenticated()).toBe(false);
   });
 
+  test('sign-in runs once at a time, and a failed sign-in never reopens the website', async () => {
+    const { InAppBrowser } = require('react-native-inappbrowser-reborn');
+    const { Linking } = require('react-native');
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    let finish!: (r: any) => void;
+    InAppBrowser.openAuth = jest.fn(() => new Promise(resolve => (finish = resolve)));
+
+    await client.setToken(null);
+    const first = client.startAuth();
+    const second = client.startAuth();
+    await new Promise<void>(r => setTimeout(() => r(), 0));
+    expect(InAppBrowser.openAuth).toHaveBeenCalledTimes(1);
+
+    // The code exchange fails (e.g. an expired code): the error surfaces, no page reopens.
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'That sign-in code could not be used.' }),
+    });
+    const startUrl = (InAppBrowser.openAuth as jest.Mock).mock.calls[0][0] as string;
+    const state = new URL(startUrl).searchParams.get('state');
+    finish({ type: 'success', url: `pukubot://auth/callback?code=c1&state=${state}` });
+    await expect(first).rejects.toThrow('That sign-in code could not be used.');
+    await expect(second).rejects.toThrow('That sign-in code could not be used.');
+    expect(openURL).not.toHaveBeenCalled();
+    openURL.mockRestore();
+  });
+
+  test('records why the last session ended', async () => {
+    await client.setToken('tok_x');
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+    await client.getBots().catch(() => {});
+    expect((await client.getLastSignOut())?.reason).toBe('server');
+
+    await client.setToken('tok_y');
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
+    await client.signOut();
+    expect((await client.getLastSignOut())?.reason).toBe('you');
+  });
+
   test('a 401 from one route does not end a session /me still accepts', async () => {
     await client.setToken('tok_still_good');
     (globalThis as any).fetch = jest

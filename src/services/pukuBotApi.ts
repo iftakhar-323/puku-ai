@@ -54,6 +54,7 @@ const STORAGE_KEYS = {
   SKILLS: '@pukubot_skills',
   CONNECTIONS: '@pukubot_connections',
   INSTRUCTIONS: '@pukubot_instructions',
+  LAST_SIGN_OUT: '@pukubot_last_sign_out',
 };
 
 const MAX_RESUME_ATTEMPTS = 3;
@@ -291,10 +292,25 @@ export class PukuBotApiClient {
   // AUTHENTICATION (PKCE FLOW)
   // ══════════════════════════════════════════════════════════════════════════
 
+  private authInFlight: Promise<{ success: boolean; url?: string }> | null = null;
+
   /**
    * Starts PKCE sign-in flow by opening system browser / Custom Tabs.
+   *
+   * One at a time: a second start would replace the stored verifier and state, and the first
+   * flow's code would then fail ("state mismatch"). A failure to finish signing in is thrown, not
+   * answered by opening the sign-in page again.
    */
   public async startAuth(customRedirect?: string): Promise<{ success: boolean; url?: string }> {
+    if (!this.authInFlight) {
+      this.authInFlight = this.runAuth(customRedirect).finally(() => {
+        this.authInFlight = null;
+      });
+    }
+    return this.authInFlight;
+  }
+
+  private async runAuth(customRedirect?: string): Promise<{ success: boolean; url?: string }> {
     await this.init();
 
     const redirectUri = customRedirect || ENV.PUKU_BOT_REDIRECT_URI || 'pukubot://auth/callback';
@@ -310,30 +326,33 @@ export class PukuBotApiClient {
       `&code_challenge=${encodeURIComponent(challenge)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
+    let authResponse: { type: string; url?: string } | null = null;
     try {
-      const isAvailable = await InAppBrowser.isAvailable();
-      if (isAvailable) {
-        const authResponse = await InAppBrowser.openAuth(authUrl, redirectUri, {
+      if (await InAppBrowser.isAvailable()) {
+        authResponse = await InAppBrowser.openAuth(authUrl, redirectUri, {
           ephemeralWebSession: false,
           showTitle: false,
           enableUrlBarHiding: true,
           enableDefaultShare: false,
           forceCloseOnRedirection: true,
         });
-
-        if (authResponse.type === 'success' && authResponse.url) {
-          await this.handleAuthCallback(authResponse.url);
-          return { success: true, url: authResponse.url };
-        }
       } else {
         await Linking.openURL(authUrl);
+        return { success: true };
       }
-      return { success: true };
     } catch (err: any) {
+      // Only when the in-app browser itself could not open: the system browser instead.
       console.warn('[PukuBotApi] InAppBrowser error, falling back to openURL:', err);
       await Linking.openURL(authUrl);
       return { success: true };
     }
+
+    // The redirect may also arrive as a pukubot:// deep link; handleAuthCallback takes it once.
+    if (authResponse?.type === 'success' && authResponse.url) {
+      await this.handleAuthCallback(authResponse.url);
+      return { success: true, url: authResponse.url };
+    }
+    return { success: this.isAuthenticated() };
   }
 
   /**
@@ -432,11 +451,27 @@ export class PukuBotApiClient {
       }
     }
 
-    await this.clearSession();
+    await this.clearSession('you');
+  }
+
+  /** Why and when the last session ended: `server` when the server stopped accepting it. */
+  public async getLastSignOut(): Promise<{ reason: 'you' | 'server'; at: string } | null> {
+    const raw = await AsyncStorage.getItem(STORAGE_KEYS.LAST_SIGN_OUT).catch(() => null);
+    try {
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Forgets the session on this device only. */
-  private async clearSession(): Promise<void> {
+  private async clearSession(reason: 'you' | 'server'): Promise<void> {
+    if (this.token) {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.LAST_SIGN_OUT,
+        JSON.stringify({ reason, at: new Date().toISOString() })
+      ).catch(ignore('pukuBotApi'));
+    }
     this.token = null;
     this.user = null;
 
@@ -464,7 +499,7 @@ export class PukuBotApiClient {
           () => null
         );
         if (res?.status === 401) {
-          await this.clearSession();
+          await this.clearSession('server');
           return true;
         }
         return false;
