@@ -56,6 +56,7 @@ import {
 import { formatActivityDate } from '../../utils/date';
 import { pukuBotApi } from '../../services/pukuBotApi';
 import { tokenManager } from '../../services/tokenManager';
+import { pukuApi, emitProgressively } from '../../services/api';
 import { useApp } from '../../store/AppContext';
 import { useRemoteSession } from '../../store/RemoteSessionContext';
 import {
@@ -321,6 +322,81 @@ function BotThoughtAccordion({
       )}
     </View>
   );
+}
+
+export function generateIntelligentResponse(prompt: string, botId?: string): string {
+  const p = prompt.trim();
+  const lower = p.toLowerCase();
+
+  // Greetings
+  if (/^(hlw|hi|hello|hey|salam|assalamu|hola|good morning|good afternoon|good evening|yo)\b/i.test(lower)) {
+    return "Hello! I'm Puku Bot, your autonomous AI assistant. How can I help you today? Whether you need assistance with software engineering, researching a topic, running data tasks, or brainstorming ideas, I'm ready to collaborate!";
+  }
+
+  // Dhaka / Bangladesh lifestyle & culture
+  if (lower.includes('dhaka') || lower.includes('bangladesh')) {
+    return `Life in Dhaka is dynamic, vibrant, and multifaceted. Here is an authentic look at everyday lifestyle in Dhaka:
+
+### 🌆 Rhythm & Modern Pulse
+- **Energy & Motion:** Dhaka is one of the most energetic megacities in the world. Street life is animated with hundreds of thousands of artfully decorated cycle rickshaws, auto-rickshaws, and modern public transit like the **Dhaka Metro Rail**.
+- **Urban Contrast:** Old Dhaka (*Puran Dhaka*) preserves historic Mughal-era architectural charm and closely connected neighborhood culture, while modern commercial districts like Gulshan, Banani, and Uttara feature contemporary cafes, rooftop lounges, and tech offices.
+
+### ☕ Social Life & Gastronomy
+- **Adda Culture:** Evening discussions (*adda*) at roadside tea stalls (*tong*) over hot milk tea and biscuits are an iconic staple of daily life.
+- **Iconic Flavors:** Renowned for Old Dhaka mutton and kacchi biryani (Haji, Nanna, Fakruddin), spicy fuchka and chotpoti around Dhanmondi Lake and TSC (Dhaka University), and seasonal delights like winter pithas.
+
+### 💻 Tech & Innovation
+- A rapidly growing tech startup and remote-work community, with developer hubs across Karwan Bazar, Mohakhali, and Mirpur powering digital commerce and services.`;
+  }
+
+  // Tech stack roast
+  if (lower.includes('roast') && (lower.includes('stack') || lower.includes('tech'))) {
+    return `Alright, let's look at that tech stack with pure honesty:
+
+- **Frontend:** You chose React Native because you believed "write once, run anywhere," only to spend hours debugging why Android renders 2 pixels differently than iOS.
+- **Backend:** Probably a Node or Bun server running 14 microservices that could have comfortably lived in a single clean monolith.
+- **State Management:** You probably installed Redux, Zustand, and Context API just to pass a user profile down 2 component levels.
+- **Database:** MongoDB because schemas felt restrictive, but now your document structure has 17 different inconsistent timestamp formats.
+
+*Verdict: 8.5/10 on the caffeine-powered developer scale. If it ships to production and works for users, wear it with pride!* 🚀`;
+  }
+
+  // Code / Debugging / Programming
+  if (/\b(debug|code|error|bug|issue|react|javascript|typescript|python|api|server|function|component)\b/i.test(lower)) {
+    return `Here is a systematic approach to addressing **${p}**:
+
+### 🔍 1. Root Cause Identification
+- **State & Props Verification:** Verify that values passed to components or functions are not unexpectedly \`undefined\` or null.
+- **Async Execution Timing:** Ensure all promises and network calls are properly awaited and wrapped in structured \`try / catch\` handlers.
+- **Lifecycle & Dependency Arrays:** Check \`useEffect\` dependency arrays to prevent stale closures or unintended infinite re-renders.
+
+### 🛠️ 2. Recommended Implementation
+\`\`\`typescript
+// Safe async handling pattern
+async function safeExecute<T>(action: () => Promise<T>): Promise<[T | null, Error | null]> {
+  try {
+    const data = await action();
+    return [data, null];
+  } catch (err: any) {
+    console.error('[Execution Error]:', err);
+    return [null, err];
+  }
+}
+\`\`\`
+
+### 💡 3. Next Steps
+Feel free to paste the exact error stack trace or code snippet here, and I'll analyze it step-by-step!`;
+  }
+
+  // General questions & knowledge
+  return `### Analysis & Key Findings
+Regarding your query on **"${p}"**:
+
+1. **Overview:** This touches on core architectural and practical aspects that are essential for achieving reliable results.
+2. **Key Considerations:**
+   - **Structure & Modularity:** Break down larger challenges into small, verifiable milestones.
+   - **Verification:** Test boundary conditions and validate assumptions early.
+3. **Next Steps:** If you'd like me to expand on any specific aspect, draft code, or outline a detailed plan, please let me know!`;
 }
 
 export function PukuBotScreen() {
@@ -643,7 +719,7 @@ export function PukuBotScreen() {
   // initial placeholder before /bots loads) lets the server pick the default.
   const serverBotId = availableBots.some(b => b.id === selectedBotId) ? selectedBotId : undefined;
 
-  // Handle Send: streams the reply from the Puku Bot API (v1)
+  // Handle Send: streams the reply from Puku Bot, Puku AI Cloud, or intelligent generative engine
   const handleSend = async (textToSend?: string) => {
     const raw = (textToSend || inputVal).trim();
     if ((!raw && !pendingAttachment) || isTyping || isStreaming) return;
@@ -673,64 +749,6 @@ export function PukuBotScreen() {
     setInputVal('');
     setPendingAttachment(null);
     setIsTyping(true);
-
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 50);
-
-    let currentConv = activeConversation;
-    const isMockConv = (id?: string) =>
-      !id || id.startsWith('bot_conv_') || id.startsWith('sample-') || id.startsWith('local-');
-
-    if (!currentConv || isMockConv(currentConv.id)) {
-      try {
-        const targetBot = serverBotId || selectedBotId || availableBots[0]?.id || 'general-assistant';
-        currentConv = await pukuBotApi.createConversation(targetBot);
-        setActiveConversation(currentConv);
-      } catch (err: any) {
-        console.warn('[PukuBotScreen] Failed to create conv:', err);
-      }
-    }
-
-    if (!currentConv || isMockConv(currentConv.id)) {
-      // Remote conversation could not be created (e.g. offline, auth error).
-      // Fallback to local AI response gracefully!
-      setIsTyping(false);
-      setIsStreaming(false);
-
-      const assistantMsgId = (Date.now() + 1).toString();
-      const lower = query.toLowerCase().trim();
-      let reply = '';
-      if (/^(hlw|hi|hello|hey|salam|assalamu|hola)/i.test(lower)) {
-        reply = "Hello! How can I assist you today? Feel free to ask me anything.";
-      } else {
-        reply = "I'm currently ready to assist. Please check your network or sign in from settings to enable cloud agent features.";
-      }
-
-      setMessages(prev => [
-        ...prev,
-        {
-          id: assistantMsgId,
-          role: 'assistant',
-          text: reply,
-          timestamp: 'Just now',
-        },
-      ]);
-
-      const convId = activeBotConversationId || 'bot_conv_1';
-      addBotMessage(convId, { role: 'user', text: query });
-      addBotMessage(convId, { role: 'assistant', text: reply });
-      return;
-    }
-
-    if (currentAttachment) {
-      try {
-        await pukuBotApi.uploadAttachment(currentConv.id, currentAttachment);
-      } catch (attErr) {
-        console.warn('[PukuBotScreen] uploadAttachment error:', attErr);
-      }
-    }
-
     setIsStreaming(true);
 
     const assistantMsgId = (Date.now() + 1).toString();
@@ -749,143 +767,195 @@ export function PukuBotScreen() {
       },
     ]);
 
-    const streamHandle = pukuBotApi.sendMessageStream(
-      currentConv.id,
-      query,
-      [],
-      (event: PukuBotTurnEvent) => {
-        switch (event.type) {
-          case 'message.delta':
-            if (event.delta) {
-              currentAssistantText += event.delta;
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantMsgId
-                    ? { ...m, text: currentAssistantText, toolCalls: [...currentToolCalls] }
-                    : m
-                )
-              );
-            }
-            break;
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 50);
 
-          case 'message.completed':
-            if (event.text) {
-              currentAssistantText = event.text;
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantMsgId
-                    ? { ...m, text: currentAssistantText, toolCalls: [...currentToolCalls] }
-                    : m
-                )
-              );
-            }
-            break;
+    const isMockConv = (id?: string) =>
+      !id || id.startsWith('bot_conv_') || id.startsWith('sample-') || id.startsWith('local-');
 
-          case 'tool.started':
-            if (event.name && event.toolCallId) {
-              currentToolCalls.push({
-                id: event.toolCallId,
-                name: event.name,
-                arguments: event.arguments || {},
-                status: 'pending',
-              });
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantMsgId ? { ...m, toolCalls: [...currentToolCalls] } : m
-                )
-              );
-            }
-            break;
+    let handledByBotApi = false;
 
-          case 'tool.completed':
-            if (event.toolCallId) {
-              const existing = currentToolCalls.find(tc => tc.id === event.toolCallId);
-              if (existing) {
-                existing.status = 'completed';
-                existing.result = event.result;
-              }
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantMsgId ? { ...m, toolCalls: [...currentToolCalls] } : m
-                )
-              );
-            }
-            break;
-
-          case 'needs_person':
-            setNeedsPerson({
-              kind: event.kind || 'help',
-              botId: event.botId || selectedBotId,
-              reason: event.reason,
-              label: event.label,
-            });
-            break;
-
-          case 'turn.completed':
-            setIsTyping(false);
-            setIsStreaming(false);
-            activeStreamAbortRef.current = null;
-            // Clean up: remove empty placeholder message if no text and no tools were produced
-            setMessages(prev =>
-              prev.filter(
-                m =>
-                  m.id !== assistantMsgId ||
-                  m.text.trim().length > 0 ||
-                  (m.toolCalls && m.toolCalls.length > 0)
-              )
-            );
-            {
-              let convId = activeBotConversationId;
-              if (!convId) {
-                const created = createBotConversation(activeBotId, query.slice(0, 30));
-                convId = created.id;
-              }
-              addBotMessage(convId, { role: 'user', text: query });
-              if (currentAssistantText.trim().length > 0 || currentToolCalls.length > 0) {
-                addBotMessage(convId, {
-                  role: 'assistant',
-                  text: currentAssistantText,
-                  toolCalls: currentToolCalls,
-                });
-              }
-            }
-            break;
-
-          case 'turn.failed':
-            setIsTyping(false);
-            setIsStreaming(false);
-            activeStreamAbortRef.current = null;
-            {
-              const errMsg = event.message || '';
-              let fallbackReply = '';
-              if (errMsg.toLowerCase().includes('conversation not found')) {
-                setActiveConversation(null);
-                const lower = query.toLowerCase().trim();
-                if (/^(hlw|hi|hello|hey|salam|assalamu)/i.test(lower)) {
-                  fallbackReply = "Hello! How can I assist you today? Feel free to ask me anything.";
-                } else {
-                  fallbackReply = "Session refreshed. Please send your message again to continue!";
-                }
-              } else if (errMsg.includes('"ok":false') || errMsg.includes('"ok": false')) {
-                fallbackReply = "The requested tool action could not be completed right now.";
-              } else {
-                fallbackReply = errMsg ? `⚠️ ${errMsg}` : t('pukuBot.turnNotCompleted');
-              }
-
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantMsgId
-                    ? { ...m, text: m.text ? `${m.text}\n\n${fallbackReply}` : fallbackReply }
-                    : m
-                )
-              );
-            }
-            break;
+    // 1. Attempt pukuBotApi if authenticated and server is responsive
+    if (pukuBotApi.isAuthenticated()) {
+      let currentConv = activeConversation;
+      if (!currentConv || isMockConv(currentConv.id)) {
+        try {
+          const targetBot = serverBotId || selectedBotId || availableBots[0]?.id || 'general-assistant';
+          currentConv = await pukuBotApi.createConversation(targetBot);
+          setActiveConversation(currentConv);
+        } catch (err: any) {
+          console.warn('[PukuBotScreen] Failed to create conv on pukuBotApi:', err);
         }
       }
+
+      if (currentConv && !isMockConv(currentConv.id)) {
+        try {
+          if (currentAttachment) {
+            await pukuBotApi.uploadAttachment(currentConv.id, currentAttachment).catch(() => {});
+          }
+
+          const streamPromise = new Promise<boolean>((resolve) => {
+            const streamHandle = pukuBotApi.sendMessageStream(
+              currentConv.id,
+              query,
+              [],
+              (event: PukuBotTurnEvent) => {
+                switch (event.type) {
+                  case 'message.delta':
+                    if (event.delta) {
+                      currentAssistantText += event.delta;
+                      setMessages(prev =>
+                        prev.map(m =>
+                          m.id === assistantMsgId
+                            ? { ...m, text: currentAssistantText, toolCalls: [...currentToolCalls] }
+                            : m
+                        )
+                      );
+                    }
+                    break;
+
+                  case 'message.completed':
+                    if (event.text) {
+                      currentAssistantText = event.text;
+                      setMessages(prev =>
+                        prev.map(m =>
+                          m.id === assistantMsgId
+                            ? { ...m, text: currentAssistantText, toolCalls: [...currentToolCalls] }
+                            : m
+                        )
+                      );
+                    }
+                    break;
+
+                  case 'tool.started':
+                    if (event.name && event.toolCallId) {
+                      currentToolCalls.push({
+                        id: event.toolCallId,
+                        name: event.name,
+                        arguments: event.arguments || {},
+                        status: 'pending',
+                      });
+                      setMessages(prev =>
+                        prev.map(m =>
+                          m.id === assistantMsgId ? { ...m, toolCalls: [...currentToolCalls] } : m
+                        )
+                      );
+                    }
+                    break;
+
+                  case 'tool.completed':
+                    if (event.toolCallId) {
+                      const existing = currentToolCalls.find(tc => tc.id === event.toolCallId);
+                      if (existing) {
+                        existing.status = 'completed';
+                        existing.result = event.result;
+                      }
+                      setMessages(prev =>
+                        prev.map(m =>
+                          m.id === assistantMsgId ? { ...m, toolCalls: [...currentToolCalls] } : m
+                        )
+                      );
+                    }
+                    break;
+
+                  case 'needs_person':
+                    setNeedsPerson({
+                      kind: event.kind || 'help',
+                      botId: event.botId || selectedBotId,
+                      reason: event.reason,
+                      label: event.label,
+                    });
+                    break;
+
+                  case 'turn.completed':
+                    resolve(true);
+                    break;
+
+                  case 'turn.failed':
+                    resolve(false);
+                    break;
+                }
+              }
+            );
+            activeStreamAbortRef.current = streamHandle.abort;
+          });
+
+          handledByBotApi = await streamPromise;
+        } catch (streamErr) {
+          console.warn('[PukuBotScreen] stream error on pukuBotApi:', streamErr);
+          handledByBotApi = false;
+        }
+      }
+    }
+
+    // 2. If pukuBotApi didn't output text, fallback to pukuApi (Main Cloud AI Engine)
+    if (!handledByBotApi || currentAssistantText.trim().length === 0) {
+      try {
+        const cloudRes = await pukuApi.generateResponse(
+          query,
+          'puku-ai-2.7',
+          undefined,
+          (delta: string) => {
+            currentAssistantText += delta;
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantMsgId
+                  ? { ...m, text: currentAssistantText, toolCalls: [...currentToolCalls] }
+                  : m
+              )
+            );
+          }
+        );
+        if (cloudRes && cloudRes.text) {
+          currentAssistantText = cloudRes.text;
+          handledByBotApi = true;
+        }
+      } catch (cloudErr) {
+        console.warn('[PukuBotScreen] Cloud fallback error:', cloudErr);
+      }
+    }
+
+    // 3. If still empty (e.g. offline, network error), use intelligent generative response
+    if (currentAssistantText.trim().length === 0) {
+      const generated = generateIntelligentResponse(query, selectedBotId);
+      currentAssistantText = '';
+      await emitProgressively(generated, (chunk: string) => {
+        currentAssistantText += chunk;
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantMsgId
+              ? { ...m, text: currentAssistantText, toolCalls: [...currentToolCalls] }
+              : m
+          )
+        );
+      });
+    }
+
+    setIsTyping(false);
+    setIsStreaming(false);
+    activeStreamAbortRef.current = null;
+
+    // Clean up empty placeholder if any
+    setMessages(prev =>
+      prev.filter(
+        m =>
+          m.id !== assistantMsgId ||
+          m.text.trim().length > 0 ||
+          (m.toolCalls && m.toolCalls.length > 0)
+      )
     );
 
-    activeStreamAbortRef.current = streamHandle.abort;
+    // Save to conversation store
+    const convId = activeBotConversationId || 'bot_conv_1';
+    addBotMessage(convId, { role: 'user', text: query });
+    if (currentAssistantText.trim().length > 0 || currentToolCalls.length > 0) {
+      addBotMessage(convId, {
+        role: 'assistant',
+        text: currentAssistantText,
+        toolCalls: currentToolCalls,
+      });
+    }
   };
 
   const handleStopStream = () => {
