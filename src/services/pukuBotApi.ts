@@ -27,6 +27,7 @@ import {
 import { generatePkcePair, generateRandomString } from '../utils/auth';
 import { NativePicker } from './nativeModules';
 import { secureStorage } from './secureStorage';
+import { tokenManager } from './tokenManager';
 import { ignore } from '../utils/devLog';
 
 const STORAGE_KEYS = {
@@ -79,6 +80,13 @@ export class PukuBotApiClient {
       }
       if (savedToken) {
         this.token = savedToken;
+      } else {
+        const appToken =
+          (await tokenManager.ensureValidToken().catch(() => null)) ||
+          tokenManager.getAccessTokenSync();
+        if (appToken) {
+          this.token = appToken;
+        }
       }
       if (savedUser) {
         try {
@@ -110,7 +118,7 @@ export class PukuBotApiClient {
   }
 
   public getToken(): string | null {
-    return this.token;
+    return this.token || tokenManager.getAccessTokenSync();
   }
 
   public getUser(): PukuBotUser | null {
@@ -118,7 +126,23 @@ export class PukuBotApiClient {
   }
 
   public isAuthenticated(): boolean {
-    return !!this.token;
+    return !!(this.token || tokenManager.getAccessTokenSync());
+  }
+
+  public async setToken(token: string | null, user?: PukuBotUser | null): Promise<void> {
+    this.token = token;
+    this.user = user || null;
+    if (token) {
+      await secureStorage.setItem(STORAGE_KEYS.TOKEN, token);
+    } else {
+      await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
+    }
+    if (this.user) {
+      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.user));
+    } else {
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER);
+    }
+    this.notifyAuthChange();
   }
 
   public onAuthChange(listener: (user: PukuBotUser | null) => void): () => void {
@@ -191,6 +215,23 @@ export class PukuBotApiClient {
    * Handles the redirect URL (pukubot://auth/callback?code=...&state=...)
    */
   public async handleAuthCallback(url: string): Promise<{ token: string; user: PukuBotUser | null }> {
+    const code = new URL(url).searchParams.get('code');
+    // The same redirect reaches us twice (InAppBrowser.openAuth's result and
+    // the pukubot:// deep link); a code can only be exchanged once.
+    if (code && this.pendingCallback?.code === code) {
+      return this.pendingCallback.promise;
+    }
+    const promise = this.exchangeAuthCode(url);
+    this.pendingCallback = { code: code || '', promise };
+    return promise;
+  }
+
+  private pendingCallback: {
+    code: string;
+    promise: Promise<{ token: string; user: PukuBotUser | null }>;
+  } | null = null;
+
+  private async exchangeAuthCode(url: string): Promise<{ token: string; user: PukuBotUser | null }> {
     await this.init();
 
     const urlObj = new URL(url);
@@ -333,8 +374,9 @@ export class PukuBotApiClient {
       Accept: 'application/json',
       ...additional,
     };
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+    const activeToken = this.token || tokenManager.getAccessTokenSync();
+    if (activeToken) {
+      headers.Authorization = `Bearer ${activeToken}`;
     }
     return headers;
   }
@@ -406,12 +448,16 @@ export class PukuBotApiClient {
     return res.json();
   }
 
-  public async createConversation(botId: string): Promise<PukuBotConversation> {
+  /**
+   * Starts a conversation. Without a botId the server routes it to the
+   * person's default Bot.
+   */
+  public async createConversation(botId?: string): Promise<PukuBotConversation> {
     await this.init();
     const res = await fetch(`${this.baseUrl}/conversations`, {
       method: 'POST',
       headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ botId }),
+      body: JSON.stringify(botId ? { botId } : {}),
     });
     if (res.status === 401) {
       await this.signOut();
@@ -577,8 +623,9 @@ export class PukuBotApiClient {
     xhr.open('POST', targetUrl, true);
     xhr.setRequestHeader('Accept', 'text/event-stream');
     xhr.setRequestHeader('Content-Type', 'application/json');
-    if (this.token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${this.token}`);
+    const activeToken = this.token || tokenManager.getAccessTokenSync();
+    if (activeToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${activeToken}`);
     }
 
     let processedIndex = 0;

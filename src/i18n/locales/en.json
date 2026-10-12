@@ -249,6 +249,7 @@
     "errorTitle": "Error",
     "failedToSubmitSecret": "Failed to submit secret",
     "turnNotCompleted": "Turn could not be completed",
+    "couldNotStartConversation": "Could not start a conversation: {{reason}}",
     "secretPlaceholder": "Enter requested secret...",
     "needsSecretReason": "Bot requests a sensitive credential",
     "needsHelpReason": "Bot requests human intervention on its computer",

@@ -43,6 +43,16 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(manualChallenge).toBe(challenge);
   });
 
+  test('state and verifier use only base64url characters', () => {
+    // The Puku Bot server answers "Invalid mobile sign-in request." to a
+    // state containing '.' or '~'.
+    for (let i = 0; i < 200; i++) {
+      const { verifier, state } = generatePkcePair();
+      expect(state).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(verifier).toMatch(/^[A-Za-z0-9_-]+$/);
+    }
+  });
+
   test('sets and persists base URL properly', async () => {
     const customUrl = 'http://localhost:3001/api/v1';
     await client.setBaseUrl(customUrl);

@@ -25,4 +25,67 @@ describe('Puku Bot Dedicated World & State Contracts', () => {
     expect(monitorConv).toBeDefined();
     expect(monitorConv?.title).toBe('Autonomous System Monitor');
   });
+
+  test('parseBotContent correctly separates thought process tags from response text', () => {
+    const { parseBotContent } = require('../src/features/puku_bot/PukuBotScreen');
+
+    // Case 1: Standard response without thoughts
+    const r1 = parseBotContent('Hello, how can I help you?');
+    expect(r1.thoughts).toBe('');
+    expect(r1.responseText).toBe('Hello, how can I help you?');
+
+    // Case 2: Closed <thought> tags
+    const r2 = parseBotContent('<thought>Checking user documents</thought>Here is the document analysis.');
+    expect(r2.thoughts).toBe('Checking user documents');
+    expect(r2.responseText).toBe('Here is the document analysis.');
+
+    // Case 3: Closed <thinking> tags
+    const r3 = parseBotContent('<thinking>Planning code structure</thinking>Here is the implementation.');
+    expect(r3.thoughts).toBe('Planning code structure');
+    expect(r3.responseText).toBe('Here is the implementation.');
+
+    // Case 4: Streaming / unclosed thought tag
+    const r4 = parseBotContent('<thought>Currently analyzing repository structure...');
+    expect(r4.thoughts).toBe('Currently analyzing repository structure...');
+    expect(r4.responseText).toBe('');
+
+    // Case 5: Empty input
+    const r5 = parseBotContent('');
+    expect(r5.thoughts).toBe('');
+    expect(r5.responseText).toBe('');
+  });
+
+  test('formatToolDisplay formats Wikipedia and web tools cleanly without technical errors', () => {
+    const { formatToolDisplay } = require('../src/features/puku_bot/PukuBotScreen');
+
+    // Case 1: Wikipedia navigation
+    const t1 = formatToolDisplay(
+      'computer_navigate',
+      { url: 'https://en.wikipedia.org/wiki/Dhaka' },
+      'completed',
+      { ok: false, reason: 'Quota exceeded' }
+    );
+    expect(t1.label).toBe('Wikipedia • Dhaka');
+    expect(t1.sourceUrl).toBe('https://en.wikipedia.org/wiki/Dhaka');
+    expect(t1.cleanResult).toBeUndefined(); // ok:false error suppressed
+
+    // Case 2: General website navigation
+    const t2 = formatToolDisplay(
+      'computer_navigate',
+      { url: 'https://poridhi.io/docs' },
+      'completed',
+      { output: 'Documentation loaded' }
+    );
+    expect(t2.label).toBe('Browsing poridhi.io');
+    expect(t2.sourceUrl).toBe('https://poridhi.io/docs');
+    expect(t2.cleanResult).toBe('Documentation loaded');
+
+    // Case 3: Web search
+    const t3 = formatToolDisplay('web_search', { query: 'Dhaka weather' });
+    expect(t3.label).toBe('Searching: "Dhaka weather"');
+
+    // Case 4: Terminal command
+    const t4 = formatToolDisplay('execute_command', { command: 'ls -la' });
+    expect(t4.label).toBe('Terminal command');
+  });
 });

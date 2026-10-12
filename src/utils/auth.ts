@@ -125,9 +125,13 @@ export function toBase64Url(bytes: Uint8Array): string {
  * Uses expo-crypto's CSPRNG rather than Math.random(): the PKCE verifier and
  * OAuth state must be unpredictable, and Math.random() is not a
  * cryptographically secure source of randomness.
+ *
+ * Base64url alphabet only: the Puku Bot server rejects a state containing
+ * '.' or '~' ("Invalid mobile sign-in request."), and 64 symbols divide 256
+ * evenly so `byte % 64` stays unbiased. Still a valid RFC 7636 verifier.
  */
 export function generateRandomString(length: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
   const bytes = Crypto.getRandomBytes(length);
   let res = '';
   for (let i = 0; i < length; i++) {
