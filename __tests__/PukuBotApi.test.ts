@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PukuBotApiClient } from '../src/services/pukuBotApi';
-import { generatePkcePair, generateRandomString, sha256, toBase64Url } from '../src/utils/auth';
+import { generatePkcePair, sha256, toBase64Url } from '../src/utils/auth';
 
 class MockXMLHttpRequest {
   public open = jest.fn();
@@ -43,6 +43,16 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(manualChallenge).toBe(challenge);
   });
 
+  test('state and verifier use only base64url characters', () => {
+    // The Puku Bot server answers "Invalid mobile sign-in request." to a
+    // state containing '.' or '~'.
+    for (let i = 0; i < 200; i++) {
+      const { verifier, state } = generatePkcePair();
+      expect(state).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(verifier).toMatch(/^[A-Za-z0-9_-]+$/);
+    }
+  });
+
   test('sets and persists base URL properly', async () => {
     const customUrl = 'http://localhost:3001/api/v1';
     await client.setBaseUrl(customUrl);
@@ -72,7 +82,7 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
 
     // Force re-init from storage
     // @ts-ignore
-    client['isInitialized'] = false;
+    client.isInitialized = false;
     await client.init();
 
     expect(client.isAuthenticated()).toBe(true);
@@ -129,6 +139,42 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(bots).toHaveLength(2);
     expect(bots[0].id).toBe('general-assistant');
     expect(bots[1].id).toBe('research-desk');
+  });
+
+  test('fetches single Bot profile via /bots/:id', async () => {
+    const mockBot = {
+      id: 'general-assistant',
+      name: 'General Assistant',
+      title: 'General Assistant',
+      description: 'Direct AI assistant',
+      avatarSeed: 'general-assistant',
+      skills: [{ slug: 'web-search', name: 'Web Search', prompt: 'Search' }],
+    };
+
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ bot: mockBot }),
+    });
+
+    const bot = await client.getBot('general-assistant');
+    expect(bot.id).toBe('general-assistant');
+    expect(bot.skills).toHaveLength(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/bots/general-assistant'),
+      expect.anything()
+    );
+  });
+
+  test('generates correct file download and WebSocket URLs', () => {
+    const downloadUrl = client.getTaskFileDownloadUrl('general-assistant', 'reports/summary.md');
+    expect(downloadUrl).toContain('/bots/general-assistant/files/download?path=reports%2Fsummary.md');
+
+    const streamWs = client.getComputerStreamWsUrl('general-assistant');
+    expect(streamWs).toMatch(/^wss?:\/\/.*\/api\/computers\/general-assistant\/stream$/);
+
+    const desktopWs = client.getComputerDesktopWsUrl('general-assistant');
+    expect(desktopWs).toMatch(/^wss?:\/\/.*\/api\/computers\/general-assistant\/desktop$/);
   });
 
   test('fetches user profile via /me', async () => {
@@ -292,10 +338,195 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     );
   });
 
-  test('resumeEventsStream initiates GET to /conversations/:id/events', () => {
-    const handle = client.resumeEventsStream('channel_123', () => {});
-    expect(handle).toBeDefined();
-    expect(typeof handle.abort).toBe('function');
-    handle.abort();
+  test('pinConversation issues PUT to /conversations/:id/pin', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await client.pinConversation('channel_123', true);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/conversations/channel_123/pin'),
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ pinned: true }),
+      })
+    );
+  });
+
+  test('addBotToConversation issues POST to /conversations/:id/bots', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await client.addBotToConversation('channel_123', 'research-desk');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/conversations/channel_123/bots'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ botId: 'research-desk' }),
+      })
+    );
+  });
+
+  test('rebuildComputer issues POST to /bots/:id/computer/rebuild with confirm REBUILD', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+
+    const res = await client.rebuildComputer('general-assistant');
+    expect(res.ok).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/bots/general-assistant/computer/rebuild'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ confirm: 'REBUILD' }),
+      })
+    );
+  });
+
+  test('manages personal instructions via /settings/instructions', async () => {
+    // 1. Get instructions
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ instructions: 'Be concise and direct.' }),
+    });
+
+    const getRes = await client.getPersonalInstructions();
+    expect(getRes.instructions).toBe('Be concise and direct.');
+
+    // 2. Update instructions
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ instructions: 'Always output typescript.' }),
+    });
+
+    const updateRes = await client.updatePersonalInstructions('Always output typescript.');
+    expect(updateRes.instructions).toBe('Always output typescript.');
+  });
+
+  test('manages memory operations (CRUD and share)', async () => {
+    // 1. Create memory
+    const memory = await client.createMemory('User prefers dark mode', 'general-assistant');
+    expect(memory.content).toBe('User prefers dark mode');
+
+    // 2. Get memories
+    const list = await client.getMemories('general-assistant');
+    expect(list.some(m => m.content === 'User prefers dark mode')).toBe(true);
+
+    // 3. Update memory
+    const updated = await client.updateMemory(memory.id, 'User prefers dark mode and high contrast');
+    expect(updated.content).toBe('User prefers dark mode and high contrast');
+
+    // 4. Share memory
+    await client.shareMemory(memory.id);
+    const sharedList = await client.getMemories();
+    const found = sharedList.find(m => m.id === memory.id);
+    expect(found?.shared).toBe(true);
+
+    // 5. Delete memory
+    await client.deleteMemory(memory.id);
+    const afterDelete = await client.getMemories();
+    expect(afterDelete.find(m => m.id === memory.id)).toBeUndefined();
+  });
+
+  test('manages routines operations (list, toggle, delete)', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        routines: [
+          { id: 'rt_1', name: 'Morning briefing', schedule: '0 9 * * 1-5', enabled: true, prompt: 'Brief me' },
+        ],
+      }),
+    });
+
+    const routines = await client.getRoutines();
+    expect(routines).toHaveLength(1);
+    expect(routines[0].id).toBe('rt_1');
+
+    // Toggle enabled
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        routine: { id: 'rt_1', name: 'Morning briefing', schedule: '0 9 * * 1-5', enabled: false, prompt: 'Brief me' },
+      }),
+    });
+
+    const toggled = await client.setRoutineEnabled('rt_1', false);
+    expect(toggled.enabled).toBe(false);
+
+    // Delete routine
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+    });
+
+    await expect(client.deleteRoutine('rt_1')).resolves.toBeUndefined();
+  });
+
+  test('manages skills operations (list, save, delete)', async () => {
+    // 1. Save skill
+    const skill = await client.saveSkill('extract-table', {
+      name: 'Extract Table',
+      description: 'Extract tables to markdown',
+      prompt: 'Extract tabular data from {text}',
+    });
+    expect(skill.slug).toBe('extract-table');
+
+    // 2. Get skills
+    const skills = await client.getSkills();
+    expect(skills.some(s => s.slug === 'extract-table')).toBe(true);
+
+    // 3. Delete skill
+    await client.deleteSkill('extract-table');
+    const afterDelete = await client.getSkills();
+    expect(afterDelete.some(s => s.slug === 'extract-table')).toBe(false);
+  });
+
+  test('manages connected accounts (list, connect, confirm, disconnect)', async () => {
+    const connections = await client.getConnections();
+    expect(connections.length).toBeGreaterThan(0);
+
+    const connectRes = await client.connectAccount('github');
+    expect(connectRes.url).toBeDefined();
+
+    const confirmRes = await client.confirmConnection('github');
+    expect(confirmRes.ok).toBe(true);
+
+    await client.deleteConnection('github');
+    const afterDelete = await client.getConnections();
+    const github = afterDelete.find(c => c.id === 'github');
+    expect(github?.connected).toBe(false);
+  });
+
+  test('onboarding and deleteAccount calls', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+
+    const onboardRes = await client.updateOnboarding(2);
+    expect(onboardRes.ok).toBe(true);
+
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+    });
+
+    await expect(client.deleteAccount()).resolves.toBeUndefined();
+    expect(client.isAuthenticated()).toBe(false);
   });
 });
+

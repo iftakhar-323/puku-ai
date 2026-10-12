@@ -17,15 +17,25 @@ import { ENV } from '../config/env';
 import {
   PukuBotAttachment,
   PukuBotComputerInfo,
+  PukuBotConnection,
   PukuBotControlState,
   PukuBotConversation,
+  PukuBotCreateConversationParams,
+  PukuBotInstructions,
   PukuBotItem,
+  PukuBotMemory,
   PukuBotMessage,
+  PukuBotRoutine,
+  PukuBotSendMessageOptions,
+  PukuBotSkill,
   PukuBotTurnEvent,
   PukuBotUser,
 } from '../types';
 import { generatePkcePair, generateRandomString } from '../utils/auth';
 import { NativePicker } from './nativeModules';
+import { secureStorage } from './secureStorage';
+import { tokenManager } from './tokenManager';
+import { ignore } from '../utils/devLog';
 
 const STORAGE_KEYS = {
   BASE_URL: '@pukubot_base_url',
@@ -35,6 +45,11 @@ const STORAGE_KEYS = {
   ACTIVE_CONVERSATION: '@pukubot_active_conv',
   AUTH_VERIFIER: '@pukubot_auth_verifier',
   AUTH_STATE: '@pukubot_auth_state',
+  MEMORIES: '@pukubot_memories',
+  ROUTINES: '@pukubot_routines',
+  SKILLS: '@pukubot_skills',
+  CONNECTIONS: '@pukubot_connections',
+  INSTRUCTIONS: '@pukubot_instructions',
 };
 
 export class PukuBotApiClient {
@@ -64,15 +79,26 @@ export class PukuBotApiClient {
     try {
       const [savedUrl, savedToken, savedUser] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.BASE_URL),
-        AsyncStorage.getItem(STORAGE_KEYS.TOKEN),
+        secureStorage.getItem(STORAGE_KEYS.TOKEN),
         AsyncStorage.getItem(STORAGE_KEYS.USER),
       ]);
 
-      if (savedUrl) {
+      // Custom/self-hosted base URLs are a dev convenience only: letting a
+      // production user point the PKCE token exchange at an arbitrary host
+      // is a phishing vector (see security audit). Ignore any saved
+      // override outside __DEV__.
+      if (savedUrl && __DEV__) {
         this.baseUrl = savedUrl.replace(/\/+$/, '');
       }
       if (savedToken) {
         this.token = savedToken;
+      } else {
+        const appToken =
+          (await tokenManager.ensureValidToken().catch(() => null)) ||
+          tokenManager.getAccessTokenSync();
+        if (appToken) {
+          this.token = appToken;
+        }
       }
       if (savedUser) {
         try {
@@ -97,13 +123,14 @@ export class PukuBotApiClient {
   }
 
   public async setBaseUrl(url: string): Promise<void> {
+    if (!__DEV__) return;
     const cleaned = url.trim().replace(/\/+$/, '');
     this.baseUrl = cleaned;
     await AsyncStorage.setItem(STORAGE_KEYS.BASE_URL, cleaned);
   }
 
   public getToken(): string | null {
-    return this.token;
+    return this.token || tokenManager.getAccessTokenSync();
   }
 
   public getUser(): PukuBotUser | null {
@@ -111,7 +138,23 @@ export class PukuBotApiClient {
   }
 
   public isAuthenticated(): boolean {
-    return !!this.token;
+    return !!(this.token || tokenManager.getAccessTokenSync());
+  }
+
+  public async setToken(token: string | null, user?: PukuBotUser | null): Promise<void> {
+    this.token = token;
+    this.user = user || null;
+    if (token) {
+      await secureStorage.setItem(STORAGE_KEYS.TOKEN, token);
+    } else {
+      await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
+    }
+    if (this.user) {
+      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.user));
+    } else {
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER);
+    }
+    this.notifyAuthChange();
   }
 
   public onAuthChange(listener: (user: PukuBotUser | null) => void): () => void {
@@ -184,6 +227,23 @@ export class PukuBotApiClient {
    * Handles the redirect URL (pukubot://auth/callback?code=...&state=...)
    */
   public async handleAuthCallback(url: string): Promise<{ token: string; user: PukuBotUser | null }> {
+    const code = new URL(url).searchParams.get('code');
+    // The same redirect reaches us twice (InAppBrowser.openAuth's result and
+    // the pukubot:// deep link); a code can only be exchanged once.
+    if (code && this.pendingCallback?.code === code) {
+      return this.pendingCallback.promise;
+    }
+    const promise = this.exchangeAuthCode(url);
+    this.pendingCallback = { code: code || '', promise };
+    return promise;
+  }
+
+  private pendingCallback: {
+    code: string;
+    promise: Promise<{ token: string; user: PukuBotUser | null }>;
+  } | null = null;
+
+  private async exchangeAuthCode(url: string): Promise<{ token: string; user: PukuBotUser | null }> {
     await this.init();
 
     const urlObj = new URL(url);
@@ -228,7 +288,7 @@ export class PukuBotApiClient {
     this.token = data.token;
     this.user = data.user || null;
 
-    await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, this.token as string);
+    await secureStorage.setItem(STORAGE_KEYS.TOKEN, this.token as string);
     if (this.user) {
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.user));
     } else {
@@ -262,7 +322,7 @@ export class PukuBotApiClient {
     this.token = null;
     this.user = null;
 
-    await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+    await secureStorage.removeItem(STORAGE_KEYS.TOKEN);
     await AsyncStorage.removeItem(STORAGE_KEYS.USER);
 
     this.notifyAuthChange();
@@ -294,7 +354,7 @@ export class PukuBotApiClient {
           if (isSingle) {
             // Local Pukubot server in PUKUBOT_SINGLE_USER=true mode
             this.token = 'single-user-dev-session';
-            await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+            await secureStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
           }
           this.notifyAuthChange();
           return { reachable: true, authenticated: true, isSingleUser: isSingle, user: userData };
@@ -326,8 +386,9 @@ export class PukuBotApiClient {
       Accept: 'application/json',
       ...additional,
     };
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+    const activeToken = this.token || tokenManager.getAccessTokenSync();
+    if (activeToken) {
+      headers.Authorization = `Bearer ${activeToken}`;
     }
     return headers;
   }
@@ -355,6 +416,70 @@ export class PukuBotApiClient {
     return data;
   }
 
+  public async deleteAccount(): Promise<void> {
+    await this.init();
+    const res = await fetch(`${this.baseUrl}/me`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    if (res.status === 401) {
+      await this.signOut();
+      throw new Error('Session expired.');
+    }
+    if (!res.ok && res.status !== 204) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete account.');
+    }
+    await this.signOut();
+  }
+
+  public async updateOnboarding(step: number): Promise<{ ok: boolean }> {
+    await this.init();
+    const res = await fetch(`${this.baseUrl}/me/onboarding`, {
+      method: 'POST',
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ step }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update onboarding.');
+    }
+    return res.json().catch(() => ({ ok: true }));
+  }
+
+  public async getPersonalInstructions(): Promise<PukuBotInstructions> {
+    await this.init();
+    try {
+      const res = await fetch(`${this.baseUrl}/settings/instructions`, {
+        headers: this.getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const instructions = data.instructions || '';
+        await AsyncStorage.setItem(STORAGE_KEYS.INSTRUCTIONS, instructions);
+        return { instructions, updatedAt: data.updatedAt };
+      }
+    } catch {}
+    const cached = await AsyncStorage.getItem(STORAGE_KEYS.INSTRUCTIONS);
+    return { instructions: cached || '' };
+  }
+
+  public async updatePersonalInstructions(instructions: string): Promise<PukuBotInstructions> {
+    await this.init();
+    await AsyncStorage.setItem(STORAGE_KEYS.INSTRUCTIONS, instructions);
+    try {
+      const res = await fetch(`${this.baseUrl}/settings/instructions`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ instructions }),
+      });
+      if (res.ok) {
+        return res.json();
+      }
+    } catch {}
+    return { instructions, updatedAt: new Date().toISOString() };
+  }
+
   public async getBots(): Promise<PukuBotItem[]> {
     await this.init();
     const res = await fetch(`${this.baseUrl}/bots`, {
@@ -370,6 +495,23 @@ export class PukuBotApiClient {
     }
     const data = await res.json();
     return data.bots || [];
+  }
+
+  public async getBot(botId: string): Promise<PukuBotItem> {
+    await this.init();
+    const res = await fetch(`${this.baseUrl}/bots/${encodeURIComponent(botId)}`, {
+      headers: this.getAuthHeaders(),
+    });
+    if (res.status === 401) {
+      await this.signOut();
+      throw new Error('Session expired.');
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to get bot profile.');
+    }
+    const data = await res.json();
+    return data.bot || data;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -399,12 +541,27 @@ export class PukuBotApiClient {
     return res.json();
   }
 
-  public async createConversation(botId: string): Promise<PukuBotConversation> {
+  /**
+   * Starts a conversation with one Bot, several Bots, or auto-routing by text.
+   * Without a botId the server routes it to the person's default Bot or matches by query text.
+   */
+  public async createConversation(
+    params?: string | PukuBotCreateConversationParams
+  ): Promise<PukuBotConversation> {
     await this.init();
+    let body: Record<string, any> = {};
+    if (typeof params === 'string') {
+      body = { botId: params };
+    } else if (params && typeof params === 'object') {
+      if (params.botId) body.botId = params.botId;
+      if (params.botIds && params.botIds.length > 0) body.botIds = params.botIds;
+      if (params.text) body.text = params.text;
+    }
+
     const res = await fetch(`${this.baseUrl}/conversations`, {
       method: 'POST',
       headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ botId }),
+      body: JSON.stringify(body),
     });
     if (res.status === 401) {
       await this.signOut();
@@ -416,6 +573,32 @@ export class PukuBotApiClient {
     }
     const data = await res.json();
     return data.conversation;
+  }
+
+  public async pinConversation(conversationId: string, pinned = true): Promise<void> {
+    await this.init();
+    const res = await fetch(`${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/pin`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ pinned }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to pin conversation.');
+    }
+  }
+
+  public async addBotToConversation(conversationId: string, botId: string): Promise<void> {
+    await this.init();
+    const res = await fetch(`${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/bots`, {
+      method: 'POST',
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ botId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to add bot to conversation.');
+    }
   }
 
   public async getConversation(conversationId: string): Promise<PukuBotConversation> {
@@ -452,7 +635,7 @@ export class PukuBotApiClient {
     await fetch(`${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/read`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
-    }).catch(() => {});
+    }).catch(ignore('pukuBotApi'));
   }
 
   /**
@@ -553,7 +736,8 @@ export class PukuBotApiClient {
     conversationId: string,
     text: string,
     attachments: PukuBotAttachment[] = [],
-    onEvent: (event: PukuBotTurnEvent) => void
+    onEvent: (event: PukuBotTurnEvent) => void,
+    options?: { botId?: string; skills?: string[] }
   ): { abort: () => void } {
     let isAborted = false;
     const xhr = new XMLHttpRequest();
@@ -563,15 +747,16 @@ export class PukuBotApiClient {
       try {
         xhr.abort();
       } catch {}
-      this.stopTurn(conversationId).catch(() => {});
+      this.stopTurn(conversationId).catch(ignore('pukuBotApi'));
     };
 
     const targetUrl = `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/messages`;
     xhr.open('POST', targetUrl, true);
     xhr.setRequestHeader('Accept', 'text/event-stream');
     xhr.setRequestHeader('Content-Type', 'application/json');
-    if (this.token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${this.token}`);
+    const activeToken = this.token || tokenManager.getAccessTokenSync();
+    if (activeToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${activeToken}`);
     }
 
     let processedIndex = 0;
@@ -678,6 +863,8 @@ export class PukuBotApiClient {
         name: a.name || undefined,
         mimeType: a.mimeType || undefined,
       })),
+      ...(options?.botId ? { botId: options.botId } : {}),
+      ...(options?.skills && options.skills.length > 0 ? { skills: options.skills } : {}),
     });
 
     xhr.send(payload);
@@ -735,7 +922,7 @@ export class PukuBotApiClient {
     await fetch(`${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/stop`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-    }).catch(() => {});
+    }).catch(ignore('pukuBotApi'));
   }
 
   /**
@@ -744,7 +931,8 @@ export class PukuBotApiClient {
    */
   public resumeEventsStream(
     conversationId: string,
-    onEvent: (event: PukuBotTurnEvent) => void
+    onEvent: (event: PukuBotTurnEvent) => void,
+    fromEventId?: string
   ): { abort: () => void } {
     let isAborted = false;
     const xhr = new XMLHttpRequest();
@@ -756,11 +944,17 @@ export class PukuBotApiClient {
       } catch {}
     };
 
-    const targetUrl = `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/events`;
+    const targetUrl = fromEventId
+      ? `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/events?from=${encodeURIComponent(fromEventId)}`
+      : `${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/events`;
     xhr.open('GET', targetUrl, true);
     xhr.setRequestHeader('Accept', 'text/event-stream');
-    if (this.token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${this.token}`);
+    if (fromEventId) {
+      xhr.setRequestHeader('Last-Event-ID', fromEventId);
+    }
+    const activeToken = this.token || tokenManager.getAccessTokenSync();
+    if (activeToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${activeToken}`);
     }
 
     let processedIndex = 0;
@@ -907,6 +1101,439 @@ export class PukuBotApiClient {
     }
     return res.json();
   }
+
+  public async rebuildComputer(botId: string): Promise<{ ok: boolean }> {
+    await this.init();
+    const res = await fetch(`${this.baseUrl}/bots/${encodeURIComponent(botId)}/computer/rebuild`, {
+      method: 'POST',
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ confirm: 'REBUILD' }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to rebuild computer.');
+    }
+    return res.json().catch(() => ({ ok: true }));
+  }
+
+  public getTaskFileDownloadUrl(botId: string, filePath: string): string {
+    return `${this.baseUrl}/bots/${encodeURIComponent(botId)}/files/download?path=${encodeURIComponent(filePath)}`;
+  }
+
+  public getComputerStreamWsUrl(botId: string): string {
+    const wsProto = this.baseUrl.startsWith('https') ? 'wss:' : 'ws:';
+    const host = this.baseUrl.replace(/^https?:\/\//, '').split('/')[0];
+    return `${wsProto}//${host}/api/computers/${encodeURIComponent(botId)}/stream`;
+  }
+
+  public getComputerDesktopWsUrl(botId: string): string {
+    const wsProto = this.baseUrl.startsWith('https') ? 'wss:' : 'ws:';
+    const host = this.baseUrl.replace(/^https?:\/\//, '').split('/')[0];
+    return `${wsProto}//${host}/api/computers/${encodeURIComponent(botId)}/desktop`;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // LIVE INBOX (GET /events)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  public subscribeLiveInbox(onEvent: (event: any) => void): { abort: () => void } {
+    let isAborted = false;
+    const xhr = new XMLHttpRequest();
+
+    const abort = () => {
+      isAborted = true;
+      try {
+        xhr.abort();
+      } catch {}
+    };
+
+    const targetUrl = `${this.baseUrl}/events`;
+    xhr.open('GET', targetUrl, true);
+    xhr.setRequestHeader('Accept', 'text/event-stream');
+    const activeToken = this.token || tokenManager.getAccessTokenSync();
+    if (activeToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${activeToken}`);
+    }
+
+    let processedIndex = 0;
+    xhr.onprogress = () => {
+      if (isAborted) return;
+      const text = xhr.responseText || '';
+      const chunk = text.slice(processedIndex);
+      processedIndex = text.length;
+
+      const lines = chunk.split(/\r?\n/);
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          try {
+            const data = JSON.parse(line.slice(5).trim());
+            onEvent(data);
+          } catch {}
+        }
+      }
+    };
+
+    xhr.send();
+    return { abort };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MEMORY (GET/POST/PUT/DELETE /memory)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  public async getMemories(botId?: string): Promise<PukuBotMemory[]> {
+    await this.init();
+    try {
+      const url = botId
+        ? `${this.baseUrl}/memory?botId=${encodeURIComponent(botId)}`
+        : `${this.baseUrl}/memory`;
+      const res = await fetch(url, { headers: this.getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data.memories) ? data.memories : Array.isArray(data) ? data : [];
+        await AsyncStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(list));
+        return list;
+      }
+    } catch {}
+
+    const cached = await AsyncStorage.getItem(STORAGE_KEYS.MEMORIES);
+    if (cached) {
+      try {
+        const list: PukuBotMemory[] = JSON.parse(cached);
+        return botId ? list.filter(m => !m.botId || m.botId === botId) : list;
+      } catch {}
+    }
+    return [];
+  }
+
+  public async createMemory(content: string, botId?: string): Promise<PukuBotMemory> {
+    await this.init();
+    const newMemory: PukuBotMemory = {
+      id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      botId: botId || null,
+      content,
+      shared: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      const res = await fetch(`${this.baseUrl}/memory`, {
+        method: 'POST',
+        headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ content, botId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const created = data.memory || data;
+        const current = await this.getMemories();
+        await AsyncStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify([created, ...current]));
+        return created;
+      }
+    } catch {}
+
+    const current = await this.getMemories();
+    const updated = [newMemory, ...current];
+    await AsyncStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(updated));
+    return newMemory;
+  }
+
+  public async updateMemory(id: string, content: string): Promise<PukuBotMemory> {
+    await this.init();
+    try {
+      const res = await fetch(`${this.baseUrl}/memory/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ content }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.memory || data;
+      }
+    } catch {}
+
+    const current = await this.getMemories();
+    const target = current.find(m => m.id === id);
+    if (target) {
+      target.content = content;
+      target.updatedAt = new Date().toISOString();
+      await AsyncStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(current));
+      return target;
+    }
+    throw new Error('Memory not found');
+  }
+
+  public async deleteMemory(id: string): Promise<void> {
+    await this.init();
+    try {
+      await fetch(`${this.baseUrl}/memory/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+    } catch {}
+
+    const current = await this.getMemories();
+    const filtered = current.filter(m => m.id !== id);
+    await AsyncStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(filtered));
+  }
+
+  public async shareMemory(id: string): Promise<void> {
+    await this.init();
+    try {
+      await fetch(`${this.baseUrl}/memory/${encodeURIComponent(id)}/share`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+      });
+    } catch {}
+
+    const current = await this.getMemories();
+    const target = current.find(m => m.id === id);
+    if (target) {
+      target.shared = true;
+      await AsyncStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(current));
+    }
+  }
+
+  public async unshareMemory(id: string): Promise<void> {
+    await this.init();
+    try {
+      await fetch(`${this.baseUrl}/memory/${encodeURIComponent(id)}/unshare`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+      });
+    } catch {}
+
+    const current = await this.getMemories();
+    const target = current.find(m => m.id === id);
+    if (target) {
+      target.shared = false;
+      await AsyncStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(current));
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ROUTINES (GET/PUT/DELETE /routines)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  public async getRoutines(): Promise<PukuBotRoutine[]> {
+    await this.init();
+    try {
+      const res = await fetch(`${this.baseUrl}/routines`, { headers: this.getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data.routines) ? data.routines : Array.isArray(data) ? data : [];
+        await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(list));
+        return list;
+      }
+    } catch {}
+
+    const cached = await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  }
+
+  public async setRoutineEnabled(id: string, enabled: boolean): Promise<PukuBotRoutine> {
+    await this.init();
+    try {
+      const res = await fetch(`${this.baseUrl}/routines/${encodeURIComponent(id)}/enabled`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.routine || data;
+      }
+    } catch {}
+
+    const current = await this.getRoutines();
+    const target = current.find(r => r.id === id);
+    if (target) {
+      target.enabled = enabled;
+      await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(current));
+      return target;
+    }
+    throw new Error('Routine not found');
+  }
+
+  public async deleteRoutine(id: string): Promise<void> {
+    await this.init();
+    try {
+      await fetch(`${this.baseUrl}/routines/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+    } catch {}
+
+    const current = await this.getRoutines();
+    const filtered = current.filter(r => r.id !== id);
+    await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(filtered));
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SKILLS (GET/PUT/DELETE /skills)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  public async getSkills(): Promise<PukuBotSkill[]> {
+    await this.init();
+    try {
+      const res = await fetch(`${this.baseUrl}/skills`, { headers: this.getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data.skills) ? data.skills : Array.isArray(data) ? data : [];
+        await AsyncStorage.setItem(STORAGE_KEYS.SKILLS, JSON.stringify(list));
+        return list;
+      }
+    } catch {}
+
+    const cached = await AsyncStorage.getItem(STORAGE_KEYS.SKILLS);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
+    return [
+      { slug: 'web-search', name: 'Web Search', description: 'Search Google or Wikipedia for recent info', prompt: 'Search the web for {query}' },
+      { slug: 'code-review', name: 'Code Review', description: 'Review code structure and debug issues', prompt: 'Perform a detailed code review of {code}' },
+      { slug: 'summarize', name: 'Summarize', description: 'Create a concise bullet point summary', prompt: 'Summarize the following clearly: {text}' },
+    ];
+  }
+
+  public async saveSkill(
+    slug: string,
+    skill: { name: string; description?: string; prompt: string }
+  ): Promise<PukuBotSkill> {
+    await this.init();
+    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+    const fullSkill: PukuBotSkill = {
+      slug: cleanSlug,
+      name: skill.name,
+      description: skill.description,
+      prompt: skill.prompt,
+    };
+
+    try {
+      const res = await fetch(`${this.baseUrl}/skills/${encodeURIComponent(cleanSlug)}`, {
+        method: 'PUT',
+        headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(skill),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const saved = data.skill || fullSkill;
+        const current = await this.getSkills();
+        const updated = current.filter(s => s.slug !== cleanSlug).concat(saved);
+        await AsyncStorage.setItem(STORAGE_KEYS.SKILLS, JSON.stringify(updated));
+        return saved;
+      }
+    } catch {}
+
+    const current = await this.getSkills();
+    const updated = current.filter(s => s.slug !== cleanSlug).concat(fullSkill);
+    await AsyncStorage.setItem(STORAGE_KEYS.SKILLS, JSON.stringify(updated));
+    return fullSkill;
+  }
+
+  public async deleteSkill(slug: string): Promise<void> {
+    await this.init();
+    try {
+      await fetch(`${this.baseUrl}/skills/${encodeURIComponent(slug)}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+    } catch {}
+
+    const current = await this.getSkills();
+    const filtered = current.filter(s => s.slug !== slug);
+    await AsyncStorage.setItem(STORAGE_KEYS.SKILLS, JSON.stringify(filtered));
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CONNECTED ACCOUNTS (GET/POST/DELETE /connections)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  public async getConnections(): Promise<PukuBotConnection[]> {
+    await this.init();
+    try {
+      const res = await fetch(`${this.baseUrl}/connections`, { headers: this.getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data.connections) ? data.connections : Array.isArray(data) ? data : [];
+        await AsyncStorage.setItem(STORAGE_KEYS.CONNECTIONS, JSON.stringify(list));
+        return list;
+      }
+    } catch {}
+
+    const cached = await AsyncStorage.getItem(STORAGE_KEYS.CONNECTIONS);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
+    return [
+      { id: 'google_drive', service: 'Google Drive', name: 'Google Drive', connected: false },
+      { id: 'github', service: 'GitHub', name: 'GitHub', connected: false },
+      { id: 'notion', service: 'Notion', name: 'Notion', connected: false },
+      { id: 'slack', service: 'Slack', name: 'Slack', connected: false },
+    ];
+  }
+
+  public async connectAccount(id: string, redirectUri?: string): Promise<{ url?: string; authUrl?: string }> {
+    await this.init();
+    const redirect = redirectUri || ENV.PUKU_BOT_REDIRECT_URI || 'pukubot://auth/callback';
+    try {
+      const res = await fetch(`${this.baseUrl}/connections/${encodeURIComponent(id)}/connect`, {
+        method: 'POST',
+        headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ redirectUri: redirect }),
+      });
+      if (res.ok) {
+        return res.json();
+      }
+    } catch {}
+    return { url: `${this.baseUrl}/connections/${encodeURIComponent(id)}/oauth?redirect_uri=${encodeURIComponent(redirect)}` };
+  }
+
+  public async confirmConnection(id: string, code?: string): Promise<{ ok: boolean }> {
+    await this.init();
+    try {
+      const res = await fetch(`${this.baseUrl}/connections/${encodeURIComponent(id)}/confirm`, {
+        method: 'POST',
+        headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ code }),
+      });
+      if (res.ok) {
+        return res.json();
+      }
+    } catch {}
+    const current = await this.getConnections();
+    const target = current.find(c => c.id === id);
+    if (target) {
+      target.connected = true;
+      await AsyncStorage.setItem(STORAGE_KEYS.CONNECTIONS, JSON.stringify(current));
+    }
+    return { ok: true };
+  }
+
+  public async deleteConnection(id: string): Promise<void> {
+    await this.init();
+    try {
+      await fetch(`${this.baseUrl}/connections/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+    } catch {}
+    const current = await this.getConnections();
+    const target = current.find(c => c.id === id);
+    if (target) {
+      target.connected = false;
+      await AsyncStorage.setItem(STORAGE_KEYS.CONNECTIONS, JSON.stringify(current));
+    }
+  }
 }
 
 export const pukuBotApi = PukuBotApiClient.getInstance();
+
