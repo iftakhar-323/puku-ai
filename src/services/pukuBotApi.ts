@@ -116,6 +116,29 @@ export function createSseParser(onMessage: (msg: SseMessage) => void) {
   };
 }
 
+/**
+ * A feature this server does not offer yet: its route is not mounted, so it
+ * answers a bare 404 rather than a JSON `{ error }`. The screen says so plainly
+ * instead of failing, or pretending it worked.
+ */
+export class PukuBotUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PukuBotUnavailableError';
+  }
+}
+
+/** Whether a 404 means the route is missing, not that the thing it names is. Reads the body. */
+async function isMissingRoute(res: Response): Promise<boolean> {
+  if (res.status !== 404) return false;
+  const text = await res.text().catch(() => '');
+  try {
+    return !JSON.parse(text)?.error;
+  } catch {
+    return true;
+  }
+}
+
 /** What the server accepts as a skill's slug. */
 export const SKILL_SLUG = /^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/;
 
@@ -528,8 +551,15 @@ export class PukuBotApiClient {
       headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ confirm: 'DELETE' }),
     });
-    // 404: the account was already deleted, which is the outcome asked for.
-    if (!res.ok && res.status !== 204 && res.status !== 404) {
+    if (res.status === 404) {
+      // A server without this route has deleted nothing: never report success.
+      if (await isMissingRoute(res)) {
+        throw new PukuBotUnavailableError(
+          'Deleting your account from the app is not available on this server yet. Nothing was deleted.'
+        );
+      }
+      // Otherwise the account was already deleted, which is the outcome asked for.
+    } else if (!res.ok) {
       throw await this.errorFrom(res, 'Failed to delete account.');
     }
     await this.signOut();
@@ -538,10 +568,8 @@ export class PukuBotApiClient {
   public async getPersonalInstructions(): Promise<PukuBotInstructions> {
     await this.init();
     try {
-      const res = await fetch(`${this.baseUrl}/settings/instructions`, {
-        headers: this.getAuthHeaders(),
-      });
-      if (res.ok) {
+      const res = await this.resourceFetch('GET', '/settings/instructions');
+      if (res?.ok) {
         const data = await res.json();
         const instructions = data.instructions || '';
         await AsyncStorage.setItem(STORAGE_KEYS.INSTRUCTIONS, instructions);
@@ -557,11 +585,7 @@ export class PukuBotApiClient {
     if (instructions.length > MAX_INSTRUCTIONS_LENGTH) {
       throw new Error(`Instructions can be at most ${MAX_INSTRUCTIONS_LENGTH} characters.`);
     }
-    const res = await fetch(`${this.baseUrl}/settings/instructions`, {
-      method: 'PUT',
-      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ instructions }),
-    }).catch(() => null);
+    const res = await this.resourceFetch('PUT', '/settings/instructions', { instructions });
     if (res && !res.ok) {
       throw await this.errorFrom(res, 'Failed to save instructions.');
     }
@@ -706,11 +730,12 @@ export class PukuBotApiClient {
 
   public async pinConversation(conversationId: string, pinned = true): Promise<void> {
     await this.init();
-    const res = await fetch(`${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/pin`, {
-      method: 'PUT',
-      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ pinned }),
-    });
+    const res = await this.resourceFetch(
+      'PUT',
+      `/conversations/${encodeURIComponent(conversationId)}/pin`,
+      { pinned }
+    );
+    if (!res) throw new Error('Cannot reach Puku Bot. Check your connection and try again.');
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to pin conversation.');
@@ -1229,6 +1254,11 @@ export class PukuBotApiClient {
       headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ confirm: 'REBUILD' }),
     });
+    if (await isMissingRoute(res)) {
+      throw new PukuBotUnavailableError(
+        'Rebuilding the computer from the app is not available on this server yet. Use Rebuild computer on the web.'
+      );
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to rebuild computer.');
@@ -1280,6 +1310,8 @@ export class PukuBotApiClient {
     let failures = 0;
     let current: { abort: () => void } | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // A server whose v1 API has no /events: the web's own feed, a WebSocket.
+    let viaWebSocket = false;
 
     const reconnect = () => {
       if (stopped) return;
@@ -1291,6 +1323,20 @@ export class PukuBotApiClient {
 
     const connect = () => {
       if (stopped) return;
+      if (viaWebSocket) {
+        current = this.openChannelEventsSocket(
+          () => {
+            if (failures > 0) {
+              failures = 0;
+              onStatus?.('connected');
+            }
+            // The web feed's payloads differ from v1's; any change means "refetch".
+            onEvent({ type: 'resync' });
+          },
+          reconnect
+        );
+        return;
+      }
       const headers: Record<string, string> = {};
       if (lastEventId) headers['Last-Event-ID'] = lastEventId;
       current = this.openSse('GET', `${this.baseUrl}/events`, undefined, headers, {
@@ -1315,6 +1361,18 @@ export class PukuBotApiClient {
             this.signOut().catch(ignore('pukuBotApi'));
             return;
           }
+          if (status === 404 && !viaWebSocket) {
+            viaWebSocket = true;
+            failures = 0;
+            connect();
+            return;
+          }
+          // No live updates on this deployment: the list refreshes on its own triggers.
+          if (status === 503) {
+            stopped = true;
+            onStatus?.('closed');
+            return;
+          }
           reconnect();
         },
         onNetworkError: reconnect,
@@ -1328,6 +1386,36 @@ export class PukuBotApiClient {
         if (timer) clearTimeout(timer);
         current?.abort();
         onStatus?.('closed');
+      },
+    };
+  }
+
+  /** The web's conversation-list feed (GET /api/channels/events, a WebSocket). */
+  private openChannelEventsSocket(
+    onMessage: () => void,
+    onClosed: () => void
+  ): { abort: () => void } {
+    const url = `${this.getWebOrigin().replace(/^http/, 'ws')}/api/channels/events`;
+    let aborted = false;
+    let socket: WebSocket | null = null;
+    try {
+      // React Native's WebSocket takes headers as its third argument.
+      socket = new (WebSocket as any)(url, undefined, {
+        headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+      }) as WebSocket;
+      socket.onmessage = () => {
+        if (!aborted) onMessage();
+      };
+      socket.onclose = () => {
+        if (!aborted) onClosed();
+      };
+    } catch {
+      setTimeout(() => !aborted && onClosed(), 0);
+    }
+    return {
+      abort: () => {
+        aborted = true;
+        socket?.close();
       },
     };
   }
@@ -1401,6 +1489,12 @@ export class PukuBotApiClient {
     }
     if ((m = route.match(/^\/memory\/([^/]+)$/))) {
       return { url: `${web}/memory/${m[1]}`, method, body };
+    }
+    if (route === '/settings/instructions') {
+      return { url: `${web}/settings/instructions`, method, body };
+    }
+    if ((m = route.match(/^\/conversations\/([^/]+)\/pin$/))) {
+      return { url: `${web}/channels/${m[1]}/pin`, method, body };
     }
     if (route.startsWith('/routines')) {
       return { url: `${web}${route}`, method, body };
@@ -1787,6 +1881,11 @@ export class PukuBotApiClient {
     await this.init();
     const res = await this.tryFetch('/connections');
     if (res) {
+      if (await isMissingRoute(res)) {
+        throw new PukuBotUnavailableError(
+          'Connecting accounts from the app is not available on this server yet. Use Connected accounts on the web.'
+        );
+      }
       if (!res.ok) throw await this.errorFrom(res, 'Failed to load connected accounts.');
       const data = await res.json();
       const list = Array.isArray(data.connections) ? data.connections : Array.isArray(data) ? data : [];
@@ -1797,23 +1896,22 @@ export class PukuBotApiClient {
   }
 
   /**
-   * POST /connections/:id/connect. Returns the provider's sign-in URL, which
-   * finishes by redirecting to the app's deep link. Needs the network.
+   * POST /connections/:id/connect. Returns the consent page to open in a
+   * system browser. It comes back to the deployment's own https return link
+   * (MOBILE_CONNECT_REDIRECT_URI), which the app cannot choose, so the browser
+   * may need closing by hand: re-read the list (and confirm a brokered app)
+   * whatever the browser reports. Needs the network.
    */
-  public async connectAccount(
-    id: string,
-    redirectUri?: string
-  ): Promise<{ url?: string; authUrl?: string; redirectUri: string }> {
+  public async connectAccount(id: string): Promise<{ url?: string }> {
     await this.init();
-    const redirect = redirectUri || ENV.PUKU_BOT_REDIRECT_URI || 'pukubot://auth/callback';
     const res = await this.tryFetch(`/connections/${encodeURIComponent(id)}/connect`, {
       method: 'POST',
-      body: JSON.stringify({ redirectUri: redirect }),
+      body: JSON.stringify({}),
     });
     if (!res) throw new Error('Cannot reach Puku Bot. Check your connection and try again.');
     if (!res.ok) throw await this.errorFrom(res, 'Failed to start connecting this account.');
     const data = await res.json().catch(() => ({}));
-    return { ...data, url: data.url || data.authUrl, redirectUri: redirect };
+    return { url: data.url || data.authorizationUrl };
   }
 
   /** POST /connections/:id/confirm, for brokered apps after the browser step. */

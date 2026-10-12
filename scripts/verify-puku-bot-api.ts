@@ -158,6 +158,7 @@ async function run() {
     { label: 'Memory', v1: `/memory?botId=${encodeURIComponent(defaultBotId)}`, web: `/api/memory?agentId=${encodeURIComponent(defaultBotId)}` },
     { label: 'Skills', v1: '/skills', web: '/api/plugins' },
     { label: 'Routines', v1: '/routines', web: '/api/routines' },
+    { label: 'Instructions', v1: '/settings/instructions', web: '/api/settings/instructions' },
     { label: 'Agents', web: '/api/agents' },
     { label: 'Marketplace', web: '/api/agents/marketplace' },
     { label: 'Capabilities (Agent Cloud)', web: '/api/capabilities' },

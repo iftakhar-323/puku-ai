@@ -240,4 +240,44 @@ describe('Live inbox (GET /events)', () => {
     jest.advanceTimersByTime(60000);
     expect(FakeXhr.instances).toHaveLength(3);
   });
+  test('on a server without /events, listens to the web feed over a WebSocket instead', () => {
+    const sockets: any[] = [];
+    const RealWebSocket = (globalThis as any).WebSocket;
+    (globalThis as any).WebSocket = function (this: any, url: string, protocols: any, options: any) {
+      Object.assign(this, { url, options, close: jest.fn() });
+      sockets.push(this);
+    };
+    try {
+      const events: any[] = [];
+      const statuses: string[] = [];
+      const sub = client.subscribeLiveInbox(e => events.push(e), s => statuses.push(s));
+      FakeXhr.instances[0].finish(404);
+
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0].url).toBe(`${client.getWebOrigin().replace(/^http/, 'ws')}/api/channels/events`);
+      expect(sockets[0].options.headers.Authorization).toBe('Bearer tok_inbox');
+      sockets[0].onmessage({ data: '{"type":"channel.activity"}' });
+      expect(events).toEqual([{ type: 'resync' }]);
+
+      // It reconnects with backoff when the socket closes, and stops when aborted.
+      sockets[0].onclose();
+      expect(statuses).toEqual(['reconnecting']);
+      jest.advanceTimersByTime(1000);
+      expect(sockets).toHaveLength(2);
+      sub.abort();
+      expect(sockets[1].close).toHaveBeenCalled();
+      expect(FakeXhr.instances).toHaveLength(1);
+    } finally {
+      (globalThis as any).WebSocket = RealWebSocket;
+    }
+  });
+
+  test('stops quietly on a deployment without live updates (503)', () => {
+    const statuses: string[] = [];
+    client.subscribeLiveInbox(() => {}, s => statuses.push(s));
+    FakeXhr.instances[0].finish(503);
+    jest.advanceTimersByTime(60000);
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(statuses).toEqual(['closed']);
+  });
 });

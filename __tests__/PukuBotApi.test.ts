@@ -616,7 +616,9 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     const ok = (body: any, status = 200) => ({ ok: true, status, json: async () => body });
     (globalThis as any).fetch = jest
       .fn()
-      .mockResolvedValueOnce(ok({ connections: [{ id: 'github', service: 'GitHub', name: 'GitHub', connected: false }] }))
+      .mockResolvedValueOnce(
+        ok({ connections: [{ id: 'github', kind: 'oauth', name: 'GitHub', vendor: 'GitHub', summary: '', connected: false, connectedAt: null }] })
+      )
       .mockResolvedValueOnce(ok({ url: 'https://github.com/login/oauth/authorize?x=1' }))
       .mockResolvedValueOnce(ok({ ok: true }))
       .mockResolvedValueOnce(ok({}, 204));
@@ -626,7 +628,6 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
 
     const connectRes = await client.connectAccount('github');
     expect(connectRes.url).toBe('https://github.com/login/oauth/authorize?x=1');
-    expect(connectRes.redirectUri).toBeTruthy();
     const [connectUrl, connectInit] = (globalThis as any).fetch.mock.calls[1];
     expect(connectUrl).toContain('/connections/github/connect');
     expect(connectInit.method).toBe('POST');
@@ -710,6 +711,60 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(deleteInit.method).toBe('DELETE');
     expect(JSON.parse(deleteInit.body)).toEqual({ confirm: 'DELETE' });
     expect(client.isAuthenticated()).toBe(false);
+  });
+
+  // A bare 404 (no JSON error) is a server without the route; a JSON one names a missing thing.
+  const missingRoute = () => ({ ok: false, status: 404, text: async () => '404 Not Found', json: async () => null });
+  const notFound = (error: string) => ({
+    ok: false,
+    status: 404,
+    text: async () => JSON.stringify({ error }),
+    json: async () => ({ error }),
+  });
+
+  test('deleteAccount never reports success on a server without DELETE /me', async () => {
+    await client.setToken('tok_keep');
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce(missingRoute());
+    await expect(client.deleteAccount()).rejects.toThrow(/not available on this server yet. Nothing was deleted/);
+    expect(client.isAuthenticated()).toBe(true);
+  });
+
+  test('deleteAccount treats "already deleted" as done', async () => {
+    await client.setToken('tok_gone');
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(notFound('Account not found.'))
+      .mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
+    await expect(client.deleteAccount()).resolves.toBeUndefined();
+    expect(client.isAuthenticated()).toBe(false);
+  });
+
+  test('rebuild and connected accounts say plainly when the server lacks them', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValue(missingRoute());
+    await expect(client.rebuildComputer('general-assistant')).rejects.toThrow(/not available on this server yet/);
+    await expect(client.getConnections()).rejects.toThrow(/not available on this server yet/);
+  });
+
+  test('instructions and pin fall back to the web routes they wrap', async () => {
+    const ok = (body: any) => ({ ok: true, status: 200, json: async () => body });
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(missingRoute())
+      .mockResolvedValueOnce(ok({ instructions: 'Keep it short.' }))
+      .mockResolvedValueOnce(ok({ instructions: 'Shorter.' }))
+      .mockResolvedValueOnce(ok({ pinned: true }));
+
+    expect((await client.getPersonalInstructions()).instructions).toBe('Keep it short.');
+    await client.updatePersonalInstructions('Shorter.');
+    await client.pinConversation('channel_9', true);
+
+    const calls = (globalThis as any).fetch.mock.calls;
+    const origin = client.getWebOrigin();
+    expect(calls[1][0]).toBe(`${origin}/api/settings/instructions`);
+    expect([calls[2][0], calls[2][1].method]).toEqual([`${origin}/api/settings/instructions`, 'PUT']);
+    expect(JSON.parse(calls[2][1].body)).toEqual({ instructions: 'Shorter.' });
+    expect([calls[3][0], calls[3][1].method]).toEqual([`${origin}/api/channels/channel_9/pin`, 'PUT']);
+    expect(JSON.parse(calls[3][1].body)).toEqual({ pinned: true });
   });
 });
 

@@ -263,13 +263,16 @@ export interface PukuBotCapabilities {
   defaultBotId?: string;
 }
 
+/** A service a Bot reads as this person (GET /connections). */
 export interface PukuBotConnection {
   id: string;
-  service: string;
+  /** `oauth`: the person signs in themselves. `brokered`: through a broker, then confirmed. */
+  kind?: 'oauth' | 'brokered';
   name: string;
+  vendor?: string;
+  summary?: string;
   connected: boolean;
-  authUrl?: string;
-  iconUrl?: string;
+  connectedAt?: string | null;
 }
 
 export interface PukuBotInstructions {

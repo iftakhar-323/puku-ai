@@ -64,7 +64,12 @@ import {
   promptMediaAttachment,
 } from '../../services/nativeModules';
 import { formatActivityDate } from '../../utils/date';
-import { MAX_INSTRUCTIONS_LENGTH, pukuBotApi, toSkillSlug } from '../../services/pukuBotApi';
+import {
+  MAX_INSTRUCTIONS_LENGTH,
+  PukuBotUnavailableError,
+  pukuBotApi,
+  toSkillSlug,
+} from '../../services/pukuBotApi';
 import { PukuBotWorkspaceSheet, WorkspaceSheetPanel } from './PukuBotWorkspaceSheet';
 import { pukuBotOutbox, PukuBotOutboxEntry } from '../../services/pukuBotOutbox';
 import { isOnline, addConnectivityListener } from '../../utils/connectivity';
@@ -525,6 +530,8 @@ export function PukuBotScreen() {
   // Agents and Marketplace
   const [workspaceSheet, setWorkspaceSheet] = useState<WorkspaceSheetPanel | null>(null);
   const [connectionsList, setConnectionsList] = useState<PukuBotConnection[]>([]);
+  // Set when this server does not offer Connected accounts to the app yet.
+  const [connectionsNotice, setConnectionsNotice] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
@@ -733,7 +740,10 @@ export function PukuBotScreen() {
             pukuBotApi.getSkills().catch(() => []),
             pukuBotApi.getPersonalInstructions().catch(() => ({ instructions: '' })),
             pukuBotApi.getRoutines().catch(() => []),
-            pukuBotApi.getConnections().catch(() => []),
+            pukuBotApi.getConnections().catch((err: unknown) => {
+              if (err instanceof PukuBotUnavailableError) setConnectionsNotice(err.message);
+              return [];
+            }),
             pukuBotApi.getConversations(20).catch(() => ({ conversations: [], nextCursor: null })),
           ]);
           if (!isMounted) return;
@@ -1446,20 +1456,22 @@ export function PukuBotScreen() {
         if (!res.url) {
           throw new Error(t('pukuBot.connectNoUrl', { defaultValue: 'This account cannot be connected from the app yet.' }));
         }
-        // The provider's sign-in finishes by redirecting back to the app.
+        // The consent page returns to the deployment's own https link, not to
+        // the app, so the browser may be closed by hand: what it reports says
+        // nothing about whether the account was attached.
         const canAuth = await InAppBrowser.isAvailable().catch(() => false);
         if (canAuth) {
-          const result = await InAppBrowser.openAuth(res.url, res.redirectUri, {
+          await InAppBrowser.openAuth(res.url, ENV.PUKU_BOT_REDIRECT_URI || 'pukubot://auth/callback', {
             showTitle: false,
             enableDefaultShare: false,
             forceCloseOnRedirection: true,
-          });
-          if (result.type === 'success') {
-            // Brokered apps need a confirm; for the others it is a no-op.
-            await pukuBotApi.confirmConnection(conn.id).catch(ignore('PukuBotScreen'));
-          }
+          }).catch(ignore('PukuBotScreen'));
         } else {
           await Linking.openURL(res.url);
+        }
+        // A brokered app is attached only once the vendor confirms it; safe to ask again.
+        if (conn.kind === 'brokered') {
+          await pukuBotApi.confirmConnection(conn.id).catch(ignore('PukuBotScreen'));
         }
         // Show the server's state, not an assumed one.
         setConnectionsList(await pukuBotApi.getConnections());
@@ -2971,8 +2983,17 @@ export function PukuBotScreen() {
               {activeSettingsTab === 'connections' && (
                 <View>
                   <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8, fontFamily: monoFont }}>
-                    Connected accounts and OAuth integrations:
+                    Services a Bot reads as you, so it sees exactly what you can see:
                   </Text>
+                  {connectionsNotice ? (
+                    <Text style={{ color: theme.textMuted, fontSize: 12, fontStyle: 'italic', marginVertical: 12, fontFamily: monoFont }}>
+                      {connectionsNotice}
+                    </Text>
+                  ) : connectionsList.length === 0 ? (
+                    <Text style={{ color: theme.textMuted, fontSize: 12, fontStyle: 'italic', marginVertical: 12, fontFamily: monoFont }}>
+                      No services to connect yet. An administrator adds them on the web.
+                    </Text>
+                  ) : null}
                   {connectionsList.map(conn => (
                     <View
                       key={conn.id}
@@ -2987,10 +3008,15 @@ export function PukuBotScreen() {
                         justifyContent: 'space-between',
                         alignItems: 'center',
                       }}>
-                      <View>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
                         <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 13, fontFamily: monoFont }}>
-                          {conn.name || conn.service}
+                          {conn.name}
                         </Text>
+                        {conn.vendor || conn.summary ? (
+                          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 11, marginTop: 2, fontFamily: monoFont }}>
+                            {[conn.vendor, conn.summary].filter(Boolean).join(' · ')}
+                          </Text>
+                        ) : null}
                         <Text style={{ color: conn.connected ? '#22C55E' : theme.textMuted, fontSize: 11, marginTop: 2, fontFamily: monoFont }}>
                           {conn.connected ? '● Connected' : '○ Not connected'}
                         </Text>
