@@ -152,4 +152,36 @@ describe('Puku Bot Workspace', () => {
     expect(app!.botPick?.botId).toBe('research-desk');
     expect(app!.activeBotId).toBe('research-desk');
   });
+
+  test('tapping an agent card or a template card does what its button does', async () => {
+    jest.spyOn(pukuBotApi, 'getAgents').mockResolvedValue([agent({ id: 'mine-1', name: 'Nova', mine: true })]);
+    const onStartChat = jest.fn();
+    const tree = await render(
+      <PukuBotWorkspaceSheet visible panel="agents" onChangePanel={jest.fn()} onClose={jest.fn()} onStartChat={onStartChat} />
+    );
+    const card = tree.root.find(n => n.props.accessibilityHint === 'Starts a chat with this agent');
+    await ReactTestRenderer.act(async () => card.props.onPress());
+    expect(onStartChat).toHaveBeenCalledWith('mine-1');
+
+    jest.spyOn(pukuBotApi, 'getMarketplace').mockResolvedValue([
+      {
+        agentId: 't9',
+        name: 'Release Notes',
+        title: 't',
+        roleDescription: '',
+        avatarSeed: 't9',
+        category: 'product',
+        blurb: 'b',
+        authorName: null,
+        createdAt: '2026-10-01T00:00:00Z',
+      },
+    ]);
+    const alert = jest.spyOn(Alert, 'alert');
+    const market = await render(
+      <PukuBotWorkspaceSheet visible panel="marketplace" onChangePanel={jest.fn()} onClose={jest.fn()} onStartChat={jest.fn()} />
+    );
+    const tplCard = market.root.find(n => n.props.accessibilityHint === 'Installs this template');
+    await ReactTestRenderer.act(async () => tplCard.props.onPress());
+    expect(alert.mock.calls[0][0]).toBe('Install Release Notes?');
+  });
 });

@@ -215,6 +215,11 @@ export class PukuBotApiClient {
   // CONFIGURATION & AUTH STATE
   // ══════════════════════════════════════════════════════════════════════════
 
+  /** Whether the saved session has been read, so isAuthenticated() is the real answer. */
+  public isReady(): boolean {
+    return this.isInitialized;
+  }
+
   public getBaseUrl(): string {
     return this.baseUrl;
   }

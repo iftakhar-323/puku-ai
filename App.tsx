@@ -53,6 +53,9 @@ function MainNavigator(): React.JSX.Element {
       // Ignored
     }
 
+    // Read the saved Puku Bot session now, so the Bot screen opens already knowing it.
+    pukuBotApi.init().catch(ignore('App'));
+
     const handleDeepLink = async (url: string | null) => {
       if (!url) return;
       if (url.startsWith('pukubot://')) {

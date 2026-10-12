@@ -75,6 +75,7 @@ import { isOnline, addConnectivityListener } from '../../utils/connectivity';
 import { ignore } from '../../utils/devLog';
 import { useApp } from '../../store/AppContext';
 import { useRemoteSession } from '../../store/RemoteSessionContext';
+import { tokenManager } from '../../services/tokenManager';
 import {
   PukuBotAttachment,
   PukuBotConnection,
@@ -423,6 +424,14 @@ function toLocalMessages(list: PukuBotMessage[]): LocalChatMessage[] {
 /** How many conversations the home screen lists: the latest ones only. */
 export const HOME_RECENT_LIMIT = 3;
 
+/**
+ * Signing in to Puku AI does not sign in to Puku Bot: they are separate services, and Puku Bot has
+ * no way to take the app's Puku token. So the first time someone signed in to the app opens Puku Bot
+ * without a Puku Bot session, its sign-in starts on its own, once per launch. The browser already
+ * holds their Puku account from the app's sign-in, so it comes straight back.
+ */
+let autoSignInTried = false;
+
 export function PukuBotScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -463,7 +472,10 @@ export function PukuBotScreen() {
   const [outboxNotice, setOutboxNotice] = useState<string | null>(null);
 
   // Puku Bot API (v1) state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // From the client's memory, so a signed-in person never sees "Sign in" while the screen loads.
+  const [isAuthenticated, setIsAuthenticated] = useState(() => pukuBotApi.isAuthenticated());
+  const [authReady, setAuthReady] = useState(() => pukuBotApi.isReady());
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const [botUser, setBotUser] = useState<PukuBotUser | null>(null);
   const [availableBots, setAvailableBots] = useState<PukuBotItem[]>([]);
   const [selectedBotId, setSelectedBotId] = useState<string>('general-assistant');
@@ -709,6 +721,25 @@ export function PukuBotScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botPick]);
 
+  // Signed in to Puku AI but not to Puku Bot: start Puku Bot's sign-in once, without a tap.
+  useEffect(() => {
+    if (!authReady || isAuthenticated || autoSignInTried) return;
+    let cancelled = false;
+    tokenManager
+      .getAccessToken()
+      .then(appToken => {
+        if (cancelled || !appToken || autoSignInTried || pukuBotApi.isAuthenticated()) return;
+        autoSignInTried = true;
+        handleConnectAuth();
+      })
+      .catch(ignore('PukuBotScreen'));
+    return () => {
+      cancelled = true;
+    };
+    // handleConnectAuth only uses state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, isAuthenticated]);
+
   // Initialize Puku Bot API
   useEffect(() => {
     let isMounted = true;
@@ -719,6 +750,7 @@ export function PukuBotScreen() {
 
       const authed = pukuBotApi.isAuthenticated();
       setIsAuthenticated(authed);
+      setAuthReady(true);
       setBotUser(pukuBotApi.getUser());
       setCustomApiUrl(pukuBotApi.getBaseUrl());
 
@@ -752,8 +784,10 @@ export function PukuBotScreen() {
           setRoutinesList(routines);
           setConnectionsList(conns);
           applyConversationPage(convRes.conversations || [], convRes.nextCursor ?? null, false);
+          setConversationsLoaded(true);
         } catch (e) {
           console.warn('[PukuBotScreen] API load error:', e);
+          if (isMounted) setConversationsLoaded(true);
         }
       } else {
         // Offline / signed out: show whatever this device cached.
@@ -1356,6 +1390,13 @@ export function PukuBotScreen() {
     }
   };
 
+  /** From the Skills list: put `/slug ` in the message box, ready to send. */
+  const handleUseSkill = (slug: string) => {
+    setShowSettingsModal(false);
+    setInputVal(`/${slug} `);
+    setTimeout(() => inputRef.current?.focus(), Platform.OS === 'ios' ? 450 : 150);
+  };
+
   const handleDeleteSkill = async (slug: string) => {
     try {
       await pukuBotApi.deleteSkill(slug);
@@ -1685,7 +1726,11 @@ export function PukuBotScreen() {
             </Text>
             <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
 
-            {recentConversations.length === 0 && (
+            {recentConversations.length === 0 && (!authReady || (isAuthenticated && !conversationsLoaded)) && (
+              <ActivityIndicator size="small" color={theme.textMuted} style={{ marginTop: 18, alignSelf: 'flex-start' }} />
+            )}
+
+            {recentConversations.length === 0 && authReady && (!isAuthenticated || conversationsLoaded) && (
               <View>
                 <Text style={[styles.botRecentsEmpty, { color: theme.textMuted, fontFamily: monoFont }]}>
                   {isAuthenticated
@@ -2803,8 +2848,12 @@ export function PukuBotScreen() {
 
                   {(() => {
                     const renderSkill = (skill: PukuBotSkill, editable: boolean) => (
-                      <View
+                      <TouchableOpacity
                         key={skill.slug}
+                        accessibilityRole="button"
+                        accessibilityHint={`Puts /${skill.slug} in the message box`}
+                        activeOpacity={0.8}
+                        onPress={() => handleUseSkill(skill.slug)}
                         style={{
                           padding: 10,
                           borderRadius: 8,
@@ -2839,7 +2888,7 @@ export function PukuBotScreen() {
                             <TrashIcon size={14} color="#FF4D4F" />
                           </TouchableOpacity>
                         )}
-                      </View>
+                      </TouchableOpacity>
                     );
                     const mine = userSkillsList.filter(s => s.mine !== false && !s.deployment);
                     const workspace = userSkillsList.filter(s => s.deployment);

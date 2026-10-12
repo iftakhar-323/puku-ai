@@ -183,8 +183,12 @@ export function PukuBotWorkspaceSheet({
   );
 
   const renderAgent = (agent: PukuBotAgent) => (
-    <View
+    <TouchableOpacity
       key={agent.id}
+      accessibilityRole="button"
+      accessibilityHint="Starts a chat with this agent"
+      activeOpacity={0.8}
+      onPress={() => onStartChat(agent.id)}
       style={[styles.card, { borderColor: theme.border, backgroundColor: theme.secondaryBackground }]}>
       <View style={styles.cardRow}>
         {renderAvatar(agent.avatarSeed, agent.name)}
@@ -213,7 +217,7 @@ export function PukuBotWorkspaceSheet({
           {agent.roleDescription}
         </Text>
       ) : null}
-    </View>
+    </TouchableOpacity>
   );
 
   const renderSection = (title: string, list: PukuBotAgent[] | undefined, empty: string, failed: string) => (
@@ -322,8 +326,13 @@ export function PukuBotWorkspaceSheet({
         </View>
       ) : templates && templates.length > 0 ? (
         templates.map(tpl => (
-          <View
+          <TouchableOpacity
             key={tpl.agentId}
+            accessibilityRole="button"
+            accessibilityHint="Installs this template"
+            activeOpacity={0.8}
+            disabled={installingId !== null}
+            onPress={() => handleInstall(tpl)}
             style={[styles.card, { borderColor: theme.border, backgroundColor: theme.secondaryBackground }]}>
             <View style={styles.cardRow}>
               {renderAvatar(tpl.avatarSeed, tpl.name)}
@@ -357,7 +366,7 @@ export function PukuBotWorkspaceSheet({
               {(TEMPLATE_CATEGORIES.find(c => c.key === tpl.category)?.label || tpl.category) +
                 (tpl.authorName ? ` · by ${tpl.authorName}` : '')}
             </Text>
-          </View>
+          </TouchableOpacity>
         ))
       ) : (
         <Text style={[styles.empty, { color: theme.textMuted, fontFamily: monoFont }]}>
