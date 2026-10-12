@@ -9,21 +9,9 @@ describe('Puku Bot Dedicated World & State Contracts', () => {
     expect(botIds).toContain('computer-operator');
   });
 
-  test('INITIAL_BOT_CONVERSATIONS contains pre-populated bot sessions with messages', () => {
-    expect(INITIAL_BOT_CONVERSATIONS.length).toBeGreaterThanOrEqual(2);
-    INITIAL_BOT_CONVERSATIONS.forEach(conv => {
-      expect(conv.id).toBeDefined();
-      expect(conv.botId).toBeDefined();
-      expect(conv.title).toBeTruthy();
-      expect(Array.isArray(conv.messages)).toBe(true);
-      expect(conv.messages.length).toBeGreaterThan(0);
-    });
-  });
-
-  test('INITIAL_BOT_CONVERSATIONS includes autonomous computer monitor session', () => {
-    const monitorConv = INITIAL_BOT_CONVERSATIONS.find(c => c.botId === 'general-assistant');
-    expect(monitorConv).toBeDefined();
-    expect(monitorConv?.title).toBe('Autonomous System Monitor');
+  test('INITIAL_BOT_CONVERSATIONS has no seeded (fabricated) history', () => {
+    // The Bot home lists the person's real conversations only.
+    expect(INITIAL_BOT_CONVERSATIONS).toEqual([]);
   });
 
   test('parseBotContent correctly separates thought process tags from response text', () => {
@@ -65,7 +53,7 @@ describe('Puku Bot Dedicated World & State Contracts', () => {
       'completed',
       { ok: false, reason: 'Quota exceeded' }
     );
-    expect(t1.label).toBe('Wikipedia • Dhaka');
+    expect(t1.label).toBe('Checking Wikipedia • Dhaka');
     expect(t1.sourceUrl).toBe('https://en.wikipedia.org/wiki/Dhaka');
     expect(t1.cleanResult).toBeUndefined(); // ok:false error suppressed
 
@@ -76,7 +64,7 @@ describe('Puku Bot Dedicated World & State Contracts', () => {
       'completed',
       { output: 'Documentation loaded' }
     );
-    expect(t2.label).toBe('Browsing poridhi.io');
+    expect(t2.label).toBe('Opening poridhi.io');
     expect(t2.sourceUrl).toBe('https://poridhi.io/docs');
     expect(t2.cleanResult).toBe('Documentation loaded');
 
@@ -86,23 +74,46 @@ describe('Puku Bot Dedicated World & State Contracts', () => {
 
     // Case 4: Terminal command
     const t4 = formatToolDisplay('execute_command', { command: 'ls -la' });
-    expect(t4.label).toBe('Terminal command');
+    expect(t4.label).toBe('Running a command');
+
+    // Case 5: computer tools read as plain activity, never raw names or flags
+    expect(formatToolDisplay('computer_click', { x: 1, y: 2 }).label).toBe('Clicking');
+    expect(formatToolDisplay('computer_screenshot').label).toBe('Looking at the screen');
+    const t6 = formatToolDisplay('computer_navigate', {}, 'completed', false);
+    expect(t6.label).toBe('Opening a web page');
+    expect(t6.cleanResult).toBeUndefined();
   });
 
-  test('validates skill trigger extraction from input text', () => {
-    const extractSkillSlug = (text: string): string | undefined => {
-      if (text.startsWith('/')) {
-        const firstWord = text.slice(1).split(/\s+/)[0];
-        if (firstWord) return firstWord.toLowerCase();
-      }
-      return undefined;
-    };
+  test('splitSkillCommand only treats skills the Bot holds as skills', () => {
+    const { splitSkillCommand } = require('../src/features/puku_bot/PukuBotScreen');
+    const held = ['web-search', 'summarize'];
 
-    expect(extractSkillSlug('/web-search search query')).toBe('web-search');
-    expect(extractSkillSlug('/summarize')).toBe('summarize');
-    expect(extractSkillSlug('/code-review debug this bug')).toBe('code-review');
-    expect(extractSkillSlug('Just normal text with / in it')).toBeUndefined();
-    expect(extractSkillSlug('')).toBeUndefined();
+    expect(splitSkillCommand('/web-search Dhaka weather', held)).toEqual({
+      skill: 'web-search',
+      body: 'Dhaka weather',
+    });
+    expect(splitSkillCommand('/Summarize', held)).toEqual({ skill: 'summarize', body: '' });
+    // Unknown slug: sent as plain text, so the server never answers 400.
+    expect(splitSkillCommand('/code-review this', held)).toEqual({ body: '/code-review this' });
+    expect(splitSkillCommand('Just normal text with / in it', held)).toEqual({
+      body: 'Just normal text with / in it',
+    });
+  });
+
+  test('describeTurnFailure gives people a readable line, never internals', () => {
+    const { describeTurnFailure } = require('../src/features/puku_bot/PukuBotScreen');
+
+    expect(describeTurnFailure({ code: 'stopped' })).toBeNull();
+    expect(describeTurnFailure({ code: 'busy' })).toMatch(/still answering/);
+    expect(describeTurnFailure({ code: 'timeout' })).toMatch(/too long/);
+    // A server sentence is shown as is...
+    expect(describeTurnFailure({ code: 'error', message: 'Slow down — too many requests.' })).toBe(
+      'Slow down — too many requests.'
+    );
+    // ...but payloads, stack traces and flags are not.
+    for (const message of ['{"ok":false,"reason":"x"}', 'TypeError: undefined is not a function', 'false']) {
+      expect(describeTurnFailure({ code: 'error', message })).toMatch(/couldn't finish/);
+    }
   });
 
   test('PukuBotScreen exports and component initialization', () => {

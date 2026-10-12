@@ -91,7 +91,9 @@ interface AppContextValue {
   activeBotConversationId: string | null;
   activeBotId: string;
   availableBots: BotItem[];
-  selectBotConversation: (id: string) => void;
+  selectBotConversation: (id: string | null) => void;
+  /** Mirrors the server's conversation list (keeps any messages already loaded). */
+  replaceBotConversations: (convs: BotConversation[]) => void;
   createBotConversation: (botId?: string, title?: string) => BotConversation;
   deleteBotConversation: (id: string) => void;
   renameBotConversation: (id: string, title: string) => void;
@@ -111,46 +113,11 @@ export const DEFAULT_AVAILABLE_BOTS: BotItem[] = [
   { id: 'computer-operator', name: 'Computer Operator', description: 'Screen & system operator' },
 ];
 
-export const INITIAL_BOT_CONVERSATIONS: BotConversation[] = [
-  {
-    id: 'bot_conv_1',
-    botId: 'general-assistant',
-    title: 'Autonomous System Monitor',
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000).toISOString(),
-    messages: [
-      {
-        id: 'bm1',
-        role: 'user',
-        text: 'What are your computer control capabilities?',
-      },
-      {
-        id: 'bm2',
-        role: 'assistant',
-        text: 'I can run shell commands, interact with applications, automate web browsing, capture live screenshots, and perform tasks directly on your laptop or server environment! 🚀',
-      },
-    ],
-  },
-  {
-    id: 'bot_conv_2',
-    botId: 'coder-bot',
-    title: 'React Native & Bun API Setup',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000).toISOString(),
-    messages: [
-      {
-        id: 'bm3',
-        role: 'user',
-        text: 'How do I connect from mobile over local WiFi?',
-      },
-      {
-        id: 'bm4',
-        role: 'assistant',
-        text: "Start the Puku Bot server on your laptop (e.g. PORT 3001), find your laptop's local IP via `hostname -I` (like 192.168.0.108), and set the API Base URL in settings to `http://192.168.0.108:3001/api/v1`.",
-      },
-    ],
-  },
-];
+// No seeded history: the Bot screen shows the person's real conversations.
+export const INITIAL_BOT_CONVERSATIONS: BotConversation[] = [];
+
+// Ids of the sample conversations older builds seeded and persisted.
+const LEGACY_SEEDED_BOT_CONV_IDS = new Set(['bot_conv_1', 'bot_conv_2']);
 
 const initialProfile: UserProfile = {
   name: '',
@@ -208,7 +175,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [botConversations, setBotConversations] = useState<BotConversation[]>(INITIAL_BOT_CONVERSATIONS);
-  const [activeBotConversationId, setActiveBotConversationId] = useState<string | null>(INITIAL_BOT_CONVERSATIONS[0]?.id || null);
+  const [activeBotConversationId, setActiveBotConversationId] = useState<string | null>(null);
   const [activeBotId, setActiveBotId] = useState<string>('general-assistant');
   const [availableBots, _setAvailableBots] = useState<BotItem[]>(DEFAULT_AVAILABLE_BOTS);
   const logoutRef = useRef<() => void>(() => {});
@@ -234,7 +201,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           savedModelStr,
           savedProjectsStr,
           savedBotConvsStr,
-          savedActiveBotConvId,
         ] = await Promise.all([
           AsyncStorage.getItem('@puku_auth_token'),
           AsyncStorage.getItem('@puku_user_profile'),
@@ -246,19 +212,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem('@puku_selected_model'),
           AsyncStorage.getItem('@puku_projects'),
           AsyncStorage.getItem('@pukubot_local_conversations'),
-          AsyncStorage.getItem('@pukubot_active_bot_conv'),
         ]);
 
         if (savedBotConvsStr) {
           try {
             const parsed = JSON.parse(savedBotConvsStr);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setBotConversations(parsed);
-              if (savedActiveBotConvId && parsed.some(c => c.id === savedActiveBotConvId)) {
-                setActiveBotConversationId(savedActiveBotConvId);
-              } else {
-                setActiveBotConversationId(parsed[0].id);
-              }
+            if (Array.isArray(parsed)) {
+              // Drop the sample conversations older builds seeded. The Bot
+              // screen opens on its home (recent conversations), so the last
+              // active conversation is not reopened automatically.
+              setBotConversations(parsed.filter(c => !LEGACY_SEEDED_BOT_CONV_IDS.has(c?.id)));
             }
           } catch {}
         }
@@ -1428,13 +1391,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeBotConversationId, isRestoringSession]);
 
-  const selectBotConversation = useCallback((id: string) => {
+  const selectBotConversation = useCallback((id: string | null) => {
     setActiveBotConversationId(id);
-    const found = botConversations.find(c => c.id === id);
+    const found = id ? botConversations.find(c => c.id === id) : undefined;
     if (found?.botId) {
       setActiveBotId(found.botId);
     }
   }, [botConversations]);
+
+  const replaceBotConversations = useCallback((convs: BotConversation[]) => {
+    setBotConversations(prev => {
+      const loaded = new Map(prev.map(c => [c.id, c.messages]));
+      return convs.map(c => ({ ...c, messages: c.messages.length ? c.messages : loaded.get(c.id) || [] }));
+    });
+  }, []);
 
   const createBotConversation = useCallback((botId = activeBotId, title = 'New Bot Session') => {
     const newConv: BotConversation = {
@@ -1551,6 +1521,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeBotId,
         availableBots,
         selectBotConversation,
+        replaceBotConversations,
         createBotConversation,
         deleteBotConversation,
         renameBotConversation,

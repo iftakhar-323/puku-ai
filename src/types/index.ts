@@ -173,6 +173,10 @@ export interface PukuBotConversation {
   id: string;
   botId: string | null;
   botIds?: string[];
+  /** What to call the Bot in this conversation (named after its task). */
+  botName?: string;
+  /** Who chose the Bot when the conversation was created. */
+  routedBy?: 'person' | 'router' | 'default';
   title: string;
   lastMessage: string | null;
   lastMessageAt: string | null;
@@ -286,6 +290,8 @@ export type PukuBotTurnEventType =
 
 export interface PukuBotTurnEvent {
   type: PukuBotTurnEventType;
+  /** SSE `id:` of the event, used as Last-Event-ID when resuming. */
+  eventId?: string;
   turnId?: string;
   conversationId?: string;
   messageId?: string;

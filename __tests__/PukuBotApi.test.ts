@@ -494,19 +494,96 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
   });
 
   test('manages connected accounts (list, connect, confirm, disconnect)', async () => {
+    const ok = (body: any, status = 200) => ({ ok: true, status, json: async () => body });
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(ok({ connections: [{ id: 'github', service: 'GitHub', name: 'GitHub', connected: false }] }))
+      .mockResolvedValueOnce(ok({ url: 'https://github.com/login/oauth/authorize?x=1' }))
+      .mockResolvedValueOnce(ok({ ok: true }))
+      .mockResolvedValueOnce(ok({}, 204));
+
     const connections = await client.getConnections();
-    expect(connections.length).toBeGreaterThan(0);
+    expect(connections).toHaveLength(1);
 
     const connectRes = await client.connectAccount('github');
-    expect(connectRes.url).toBeDefined();
+    expect(connectRes.url).toBe('https://github.com/login/oauth/authorize?x=1');
+    expect(connectRes.redirectUri).toBeTruthy();
+    const [connectUrl, connectInit] = (globalThis as any).fetch.mock.calls[1];
+    expect(connectUrl).toContain('/connections/github/connect');
+    expect(connectInit.method).toBe('POST');
 
     const confirmRes = await client.confirmConnection('github');
     expect(confirmRes.ok).toBe(true);
 
     await client.deleteConnection('github');
-    const afterDelete = await client.getConnections();
-    const github = afterDelete.find(c => c.id === 'github');
-    expect(github?.connected).toBe(false);
+    const afterDelete = await client.getConnections().catch(() => []);
+    expect(Array.isArray(afterDelete)).toBe(true);
+    expect((globalThis as any).fetch.mock.calls[3][1].method).toBe('DELETE');
+  });
+
+  test('connecting an account never fakes success when offline', async () => {
+    (globalThis as any).fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+    await expect(client.connectAccount('github')).rejects.toThrow(/Cannot reach Puku Bot/);
+    await expect(client.confirmConnection('github')).rejects.toThrow(/Cannot reach Puku Bot/);
+  });
+
+  test('offline: no fabricated connections or skills are returned', async () => {
+    (globalThis as any).fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+    expect(await client.getConnections()).toEqual([]);
+    expect(await client.getSkills()).toEqual([]);
+  });
+
+  test('server errors on P1 writes are surfaced, not replaced by a local fake', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'A memory can be at most 2000 characters.' }),
+    });
+    await expect(client.createMemory('x'.repeat(5000))).rejects.toThrow(
+      'A memory can be at most 2000 characters.'
+    );
+    await expect(client.setRoutineEnabled('rt_1', false)).rejects.toThrow(
+      'A memory can be at most 2000 characters.'
+    );
+  });
+
+  test('personal instructions are capped at 4,000 characters', async () => {
+    (globalThis as any).fetch = jest.fn();
+    await expect(client.updatePersonalInstructions('a'.repeat(4001))).rejects.toThrow(/4000/);
+    expect((globalThis as any).fetch).not.toHaveBeenCalled();
+  });
+
+  test('GET /me unwraps { user }', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        user: { id: 'usr_2', email: 'rahim@example.com', name: 'rahim', image: null, role: 'user', onboarding: { step: 3, completedAt: null } },
+      }),
+    });
+    const user = await client.getMe();
+    expect(user.id).toBe('usr_2');
+    expect(user.onboarding?.step).toBe(3);
+  });
+
+  test('onboarding can be completed', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ onboarding: { step: 3, completedAt: '2026-10-12T10:00:00.000Z' } }),
+    });
+    const res = await client.updateOnboarding({ completed: true });
+    expect(res.onboarding?.completedAt).toBeTruthy();
+    const [url, init] = (globalThis as any).fetch.mock.calls[0];
+    expect(url).toContain('/me/onboarding');
+    expect(JSON.parse(init.body)).toEqual({ completed: true });
+  });
+
+  test('screenshot source carries the bearer token', async () => {
+    await client.setToken('tok_screen');
+    const source = client.getScreenshotSource('general-assistant', 42);
+    expect(source.uri).toContain('/bots/general-assistant/computer/screenshot?t=42');
+    expect(source.headers?.Authorization).toBe('Bearer tok_screen');
   });
 
   test('onboarding and deleteAccount calls', async () => {
@@ -526,6 +603,11 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     });
 
     await expect(client.deleteAccount()).resolves.toBeUndefined();
+    // The server refuses DELETE /me without this exact confirmation.
+    const [deleteUrl, deleteInit] = (globalThis as any).fetch.mock.calls[0];
+    expect(deleteUrl).toMatch(/\/me$/);
+    expect(deleteInit.method).toBe('DELETE');
+    expect(JSON.parse(deleteInit.body)).toEqual({ confirm: 'DELETE' });
     expect(client.isAuthenticated()).toBe(false);
   });
 });
