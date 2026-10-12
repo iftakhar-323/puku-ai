@@ -141,6 +141,42 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(bots[1].id).toBe('research-desk');
   });
 
+  test('fetches single Bot profile via /bots/:id', async () => {
+    const mockBot = {
+      id: 'general-assistant',
+      name: 'General Assistant',
+      title: 'General Assistant',
+      description: 'Direct AI assistant',
+      avatarSeed: 'general-assistant',
+      skills: [{ slug: 'web-search', name: 'Web Search', prompt: 'Search' }],
+    };
+
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ bot: mockBot }),
+    });
+
+    const bot = await client.getBot('general-assistant');
+    expect(bot.id).toBe('general-assistant');
+    expect(bot.skills).toHaveLength(1);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/bots/general-assistant'),
+      expect.anything()
+    );
+  });
+
+  test('generates correct file download and WebSocket URLs', () => {
+    const downloadUrl = client.getTaskFileDownloadUrl('general-assistant', 'reports/summary.md');
+    expect(downloadUrl).toContain('/bots/general-assistant/files/download?path=reports%2Fsummary.md');
+
+    const streamWs = client.getComputerStreamWsUrl('general-assistant');
+    expect(streamWs).toMatch(/^wss?:\/\/.*\/api\/computers\/general-assistant\/stream$/);
+
+    const desktopWs = client.getComputerDesktopWsUrl('general-assistant');
+    expect(desktopWs).toMatch(/^wss?:\/\/.*\/api\/computers\/general-assistant\/desktop$/);
+  });
+
   test('fetches user profile via /me', async () => {
     const mockUser = { id: 'usr_1', email: 'test@puku.sh', name: 'Tester', image: null };
     (globalThis as any).fetch = jest.fn().mockResolvedValue({
