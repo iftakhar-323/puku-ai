@@ -737,6 +737,19 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(urls.some((u: string) => u.includes('/auth/sign-out'))).toBe(false);
   });
 
+  test('adding an agent to a chat answers the conversation with every Bot in it', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ conversation: { id: 'channel_5', botId: 'general-assistant', botIds: ['general-assistant', 'nova'] } }),
+    });
+    const conv = await client.addBotToConversation('channel_5', 'nova');
+    expect(conv?.botIds).toEqual(['general-assistant', 'nova']);
+    const [url, init] = (globalThis as any).fetch.mock.calls[0];
+    expect(url).toContain('/conversations/channel_5/bots');
+    expect(JSON.parse(init.body)).toEqual({ botId: 'nova' });
+  });
+
   test('a server that needs a botId gets one: the router, else the default Bot', async () => {
     const res = (status: number, body: any) => ({ ok: status < 300, status, json: async () => body });
     const conversation = { id: 'channel_1', botId: 'research-desk', title: 'x' };

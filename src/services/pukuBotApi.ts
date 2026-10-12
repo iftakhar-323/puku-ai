@@ -818,17 +818,24 @@ export class PukuBotApiClient {
     }
   }
 
-  public async addBotToConversation(conversationId: string, botId: string): Promise<void> {
+  /** Brings another Bot into the conversation; answers the conversation with every Bot in it. */
+  public async addBotToConversation(
+    conversationId: string,
+    botId: string
+  ): Promise<PukuBotConversation | null> {
     await this.init();
     const res = await fetch(`${this.baseUrl}/conversations/${encodeURIComponent(conversationId)}/bots`, {
       method: 'POST',
       headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ botId }),
     });
+    if (res.status === 401) throw await this.unauthorizedError();
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to add bot to conversation.');
     }
+    const data = await res.json().catch(() => null);
+    return data?.conversation ?? null;
   }
 
   public async getConversation(conversationId: string): Promise<PukuBotConversation> {

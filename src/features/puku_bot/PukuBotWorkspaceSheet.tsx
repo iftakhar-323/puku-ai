@@ -2,10 +2,11 @@
  * Agents and Marketplace, the two Workspace panels the web has beside Skills and Memory.
  *
  * Agents lists the Bots this person made and the ones shared with them, and makes a new one from a
- * role description. Marketplace lists every published template and installs one as a private Bot
- * the person owns. Either can hand a Bot to the chat screen to start talking to it.
+ * role description. Marketplace lists every published template and installs one, on a tap, as a
+ * private Bot the person owns. Either hands a Bot to the chat, the way a skill goes into the message
+ * box: into the conversation that is open, or to start one.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +26,17 @@ import { CloseIcon, PlusIcon } from '../../components/common/Icons';
 import { PukuBotAgent, PukuBotTemplate, PukuBotTemplateCategory } from '../../types';
 
 export type WorkspaceSheetPanel = 'agents' | 'marketplace';
+
+type InstallState = {
+  status: 'installing' | 'done' | 'error';
+  /** 0–100. Held short of the end until the server answers. */
+  progress: number;
+  installed?: PukuBotAgent;
+  error?: string;
+};
+
+/** Where the install bar waits until the server says the install is done. */
+const INSTALL_HOLD_AT = 90;
 
 const ACCENT = '#35D6B4';
 
@@ -50,14 +62,14 @@ export function PukuBotWorkspaceSheet({
   panel,
   onChangePanel,
   onClose,
-  onStartChat,
+  onUseAgent,
 }: {
   visible: boolean;
   panel: WorkspaceSheetPanel;
   onChangePanel: (panel: WorkspaceSheetPanel) => void;
   onClose: () => void;
-  /** Start a conversation with this Bot. The roster may have changed, so the screen refetches it. */
-  onStartChat: (botId: string) => void;
+  /** Put this Bot to work in the chat: the open conversation, or a new one. */
+  onUseAgent: (agent: { id: string; name: string }) => void;
 }) {
   const { theme, isDark } = useApp();
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
@@ -67,7 +79,12 @@ export function PukuBotWorkspaceSheet({
   const [templates, setTemplates] = useState<PukuBotTemplate[] | null>(null);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [category, setCategory] = useState<PukuBotTemplateCategory | null>(null);
-  const [installingId, setInstallingId] = useState<string | null>(null);
+  const [installs, setInstalls] = useState<Record<string, InstallState>>({});
+  const installTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  useEffect(() => {
+    const timers = installTimers.current;
+    return () => Object.values(timers).forEach(clearInterval);
+  }, []);
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
@@ -126,33 +143,41 @@ export function PukuBotWorkspaceSheet({
     }
   };
 
-  // A template is a copy, so installing asks first, as the web does.
-  const handleInstall = (template: PukuBotTemplate) => {
-    Alert.alert(
-      `Install ${template.name}?`,
-      'This adds a private copy to your agents. You can rename, reprompt or delete it.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Install',
-          onPress: async () => {
-            setInstallingId(template.agentId);
-            try {
-              const installed = await pukuBotApi.installTemplate(template.agentId);
-              setAgents(prev => (prev ? [installed, ...prev] : prev));
-              Alert.alert(`${installed.name} installed`, 'It is in your agents now.', [
-                { text: 'Later', style: 'cancel' },
-                { text: 'Chat now', onPress: () => onStartChat(installed.id) },
-              ]);
-            } catch (err: any) {
-              Alert.alert('Install', err?.message || 'This template could not be installed.');
-            } finally {
-              setInstallingId(null);
-            }
-          },
-        },
-      ]
-    );
+  /**
+   * A tap installs straight away. The server does it in one request, so the bar moves on its own
+   * while that request runs, holds short of the end, and fills only when the server says it is done.
+   * Once installed, the same tap puts the new Bot to work in the chat.
+   */
+  const handleInstall = async (template: PukuBotTemplate) => {
+    const id = template.agentId;
+    const current = installs[id];
+    if (current?.status === 'installing') return;
+    if (current?.status === 'done' && current.installed) {
+      onUseAgent(current.installed);
+      return;
+    }
+    setInstalls(prev => ({ ...prev, [id]: { status: 'installing', progress: 5 } }));
+    installTimers.current[id] = setInterval(() => {
+      setInstalls(prev => {
+        const state = prev[id];
+        if (!state || state.status !== 'installing') return prev;
+        const progress = Math.min(INSTALL_HOLD_AT, state.progress + Math.max(1, (INSTALL_HOLD_AT - state.progress) * 0.12));
+        return { ...prev, [id]: { ...state, progress } };
+      });
+    }, 150);
+    try {
+      const installed = await pukuBotApi.installTemplate(id);
+      setAgents(prev => (prev ? [installed, ...prev.filter(a => a.id !== installed.id)] : prev));
+      setInstalls(prev => ({ ...prev, [id]: { status: 'done', progress: 100, installed } }));
+    } catch (err: any) {
+      setInstalls(prev => ({
+        ...prev,
+        [id]: { status: 'error', progress: 0, error: err?.message || 'This template could not be installed.' },
+      }));
+    } finally {
+      clearInterval(installTimers.current[id]);
+      delete installTimers.current[id];
+    }
   };
 
   const chip = (active: boolean) => ({
@@ -186,9 +211,9 @@ export function PukuBotWorkspaceSheet({
     <TouchableOpacity
       key={agent.id}
       accessibilityRole="button"
-      accessibilityHint="Starts a chat with this agent"
+      accessibilityHint="Adds this agent to your chat"
       activeOpacity={0.8}
-      onPress={() => onStartChat(agent.id)}
+      onPress={() => onUseAgent(agent)}
       style={[styles.card, { borderColor: theme.border, backgroundColor: theme.secondaryBackground }]}>
       <View style={styles.cardRow}>
         {renderAvatar(agent.avatarSeed, agent.name)}
@@ -204,11 +229,11 @@ export function PukuBotWorkspaceSheet({
         </View>
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel={`Chat with ${agent.name}`}
-          onPress={() => onStartChat(agent.id)}
+          accessibilityLabel={`Use ${agent.name} in chat`}
+          onPress={() => onUseAgent(agent)}
           style={[styles.smallBtn, { backgroundColor: isDark ? ACCENT : '#1A1D18' }]}>
           <Text style={{ color: isDark ? '#141613' : '#FFF', fontSize: 11, fontWeight: '700', fontFamily: monoFont }}>
-            Chat
+            Use in chat
           </Text>
         </TouchableOpacity>
       </View>
@@ -325,13 +350,15 @@ export function PukuBotWorkspaceSheet({
           </TouchableOpacity>
         </View>
       ) : templates && templates.length > 0 ? (
-        templates.map(tpl => (
+        templates.map(tpl => {
+          const install = installs[tpl.agentId];
+          return (
           <TouchableOpacity
             key={tpl.agentId}
             accessibilityRole="button"
-            accessibilityHint="Installs this template"
+            accessibilityHint={install?.status === 'done' ? 'Adds this agent to your chat' : 'Installs this template'}
             activeOpacity={0.8}
-            disabled={installingId !== null}
+            disabled={install?.status === 'installing'}
             onPress={() => handleInstall(tpl)}
             style={[styles.card, { borderColor: theme.border, backgroundColor: theme.secondaryBackground }]}>
             <View style={styles.cardRow}>
@@ -346,17 +373,19 @@ export function PukuBotWorkspaceSheet({
               </View>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`Install ${tpl.name}`}
-                disabled={installingId !== null}
+                accessibilityLabel={install?.status === 'done' ? `Use ${tpl.name} in chat` : `Install ${tpl.name}`}
+                disabled={install?.status === 'installing'}
                 onPress={() => handleInstall(tpl)}
-                style={[styles.smallBtn, { backgroundColor: isDark ? ACCENT : '#1A1D18', opacity: installingId && installingId !== tpl.agentId ? 0.5 : 1 }]}>
-                {installingId === tpl.agentId ? (
-                  <ActivityIndicator size="small" color={isDark ? '#141613' : '#FFF'} />
-                ) : (
-                  <Text style={{ color: isDark ? '#141613' : '#FFF', fontSize: 11, fontWeight: '700', fontFamily: monoFont }}>
-                    Install
-                  </Text>
-                )}
+                style={[styles.smallBtn, { backgroundColor: isDark ? ACCENT : '#1A1D18' }]}>
+                <Text style={{ color: isDark ? '#141613' : '#FFF', fontSize: 11, fontWeight: '700', fontFamily: monoFont }}>
+                  {install?.status === 'installing'
+                    ? `${Math.round(install.progress)}%`
+                    : install?.status === 'done'
+                      ? 'Use in chat'
+                      : install?.status === 'error'
+                        ? 'Retry'
+                        : 'Install'}
+                </Text>
               </TouchableOpacity>
             </View>
             <Text numberOfLines={3} style={{ color: theme.textSecondary, fontSize: 12, marginTop: 8, fontFamily: monoFont }}>
@@ -366,8 +395,27 @@ export function PukuBotWorkspaceSheet({
               {(TEMPLATE_CATEGORIES.find(c => c.key === tpl.category)?.label || tpl.category) +
                 (tpl.authorName ? ` · by ${tpl.authorName}` : '')}
             </Text>
+            {install && install.status !== 'error' ? (
+              <View style={{ marginTop: 10 }}>
+                <View style={[styles.progressTrack, { backgroundColor: isDark ? '#232924' : '#EAECE6' }]}>
+                  <View
+                    accessibilityRole="progressbar"
+                    accessibilityValue={{ min: 0, max: 100, now: Math.round(install.progress) }}
+                    style={[styles.progressFill, { width: `${install.progress}%` }]}
+                  />
+                </View>
+                <Text style={{ color: install.status === 'done' ? ACCENT : theme.textMuted, fontSize: 11, marginTop: 4, fontFamily: monoFont }}>
+                  {install.status === 'done'
+                    ? 'Installed · added to your agents. Tap to use it in chat.'
+                    : `Installing… ${Math.round(install.progress)}%`}
+                </Text>
+              </View>
+            ) : install?.status === 'error' ? (
+              <Text style={{ color: '#FF6B6B', fontSize: 11, marginTop: 8, fontFamily: monoFont }}>{install.error}</Text>
+            ) : null}
           </TouchableOpacity>
-        ))
+          );
+        })
       ) : (
         <Text style={[styles.empty, { color: theme.textMuted, fontFamily: monoFont }]}>
           {category ? 'Nothing published in this category yet.' : 'Nothing has been published yet.'}
@@ -435,4 +483,6 @@ const styles = StyleSheet.create({
   primaryBtn: { height: 36, borderRadius: 8, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
   input: { minHeight: 38, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, marginBottom: 8, fontSize: 12 },
   empty: { fontSize: 12, fontStyle: 'italic', marginVertical: 12 },
+  progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: 6, borderRadius: 3, backgroundColor: ACCENT },
 });

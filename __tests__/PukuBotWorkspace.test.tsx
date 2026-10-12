@@ -1,5 +1,4 @@
 import React from 'react';
-import { Alert } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { AppProvider, useApp } from '../src/store/AppContext';
 import { pukuBotApi } from '../src/services/pukuBotApi';
@@ -47,9 +46,9 @@ describe('Puku Bot Workspace', () => {
       agent({ id: 'mine-1', name: 'Bug Reproducer (copy)', mine: true }),
       agent({ id: 'pub-1', name: 'General Assistant', visibility: 'public' }),
     ]);
-    const onStartChat = jest.fn();
+    const onUseAgent = jest.fn();
     const tree = await render(
-      <PukuBotWorkspaceSheet visible panel="agents" onChangePanel={jest.fn()} onClose={jest.fn()} onStartChat={onStartChat} />
+      <PukuBotWorkspaceSheet visible panel="agents" onChangePanel={jest.fn()} onClose={jest.fn()} onUseAgent={onUseAgent} />
     );
     const shown = texts(tree.root);
     expect(shown).toContain('Your agents');
@@ -57,20 +56,20 @@ describe('Puku Bot Workspace', () => {
     expect(shown).toContain('Explore agents');
     expect(shown).toContain('General Assistant');
 
-    const chat = tree.root.find(n => n.props.accessibilityLabel === 'Chat with General Assistant');
-    await ReactTestRenderer.act(async () => chat.props.onPress());
-    expect(onStartChat).toHaveBeenCalledWith('pub-1');
+    const use = tree.root.find(n => n.props.accessibilityLabel === 'Use General Assistant in chat');
+    await ReactTestRenderer.act(async () => use.props.onPress());
+    expect(onUseAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'pub-1', name: 'General Assistant' }));
   });
 
   test('Agents says so when it could not load, instead of claiming there are none', async () => {
     jest.spyOn(pukuBotApi, 'getAgents').mockRejectedValue(new Error('down'));
     const tree = await render(
-      <PukuBotWorkspaceSheet visible panel="agents" onChangePanel={jest.fn()} onClose={jest.fn()} onStartChat={jest.fn()} />
+      <PukuBotWorkspaceSheet visible panel="agents" onChangePanel={jest.fn()} onClose={jest.fn()} onUseAgent={jest.fn()} />
     );
     expect(texts(tree.root)).toContain("Your agents couldn't be loaded.");
   });
 
-  test('Marketplace lists templates, filters by category and installs after confirming', async () => {
+  test('Marketplace lists templates, filters by category, installs on a tap with progress', async () => {
     const getMarketplace = jest.spyOn(pukuBotApi, 'getMarketplace').mockResolvedValue([
       {
         agentId: 't1',
@@ -84,13 +83,14 @@ describe('Puku Bot Workspace', () => {
         createdAt: '2026-10-01T00:00:00Z',
       },
     ]);
+    let finishInstall!: (a: PukuBotAgent) => void;
     const install = jest
       .spyOn(pukuBotApi, 'installTemplate')
-      .mockResolvedValue(agent({ id: 'installed-1', name: 'PR Reviewer', mine: true }));
-    const alert = jest.spyOn(Alert, 'alert');
+      .mockImplementation(() => new Promise<PukuBotAgent>(resolve => (finishInstall = resolve)));
+    const onUseAgent = jest.fn();
 
     const tree = await render(
-      <PukuBotWorkspaceSheet visible panel="marketplace" onChangePanel={jest.fn()} onClose={jest.fn()} onStartChat={jest.fn()} />
+      <PukuBotWorkspaceSheet visible panel="marketplace" onChangePanel={jest.fn()} onClose={jest.fn()} onUseAgent={onUseAgent} />
     );
     expect(texts(tree.root)).toContain('PR Reviewer');
     expect(texts(tree.root)).toContain('Engineering');
@@ -102,16 +102,25 @@ describe('Puku Bot Workspace', () => {
     await ReactTestRenderer.act(async () => sales.props.onPress());
     expect(getMarketplace).toHaveBeenLastCalledWith('sales');
 
-    // Installing asks first; only the confirmation installs.
+    // A tap installs straight away and shows how far it has got.
     await ReactTestRenderer.act(async () => {
       tree.root.find(n => n.props.accessibilityLabel === 'Install PR Reviewer').props.onPress();
     });
-    expect(install).not.toHaveBeenCalled();
-    const buttons = alert.mock.calls[0][2] as Array<{ text: string; onPress?: () => Promise<void> }>;
-    await ReactTestRenderer.act(async () => {
-      await buttons.find(b => b.text === 'Install')!.onPress!();
-    });
     expect(install).toHaveBeenCalledWith('t1');
+    expect(texts(tree.root)).toMatch(/Installing… \d+%/);
+    const bar = tree.root.find(n => n.props.accessibilityRole === 'progressbar');
+    expect(bar.props.accessibilityValue.now).toBeLessThan(100);
+
+    await ReactTestRenderer.act(async () => finishInstall(agent({ id: 'installed-1', name: 'PR Reviewer', mine: true })));
+    expect(texts(tree.root)).toContain('Installed · added to your agents. Tap to use it in chat.');
+    expect(tree.root.find(n => n.props.accessibilityRole === 'progressbar').props.accessibilityValue.now).toBe(100);
+
+    // Then the same card puts the new Bot to work in the chat.
+    await ReactTestRenderer.act(async () => {
+      tree.root.find(n => n.props.accessibilityLabel === 'Use PR Reviewer in chat').props.onPress();
+    });
+    expect(onUseAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'installed-1' }));
+    expect(install).toHaveBeenCalledTimes(1);
   });
 
   test('the drawer asks the Bot screen to open a Workspace panel', async () => {
@@ -155,13 +164,13 @@ describe('Puku Bot Workspace', () => {
 
   test('tapping an agent card or a template card does what its button does', async () => {
     jest.spyOn(pukuBotApi, 'getAgents').mockResolvedValue([agent({ id: 'mine-1', name: 'Nova', mine: true })]);
-    const onStartChat = jest.fn();
+    const onUseAgent = jest.fn();
     const tree = await render(
-      <PukuBotWorkspaceSheet visible panel="agents" onChangePanel={jest.fn()} onClose={jest.fn()} onStartChat={onStartChat} />
+      <PukuBotWorkspaceSheet visible panel="agents" onChangePanel={jest.fn()} onClose={jest.fn()} onUseAgent={onUseAgent} />
     );
-    const card = tree.root.find(n => n.props.accessibilityHint === 'Starts a chat with this agent');
+    const card = tree.root.find(n => n.props.accessibilityHint === 'Adds this agent to your chat');
     await ReactTestRenderer.act(async () => card.props.onPress());
-    expect(onStartChat).toHaveBeenCalledWith('mine-1');
+    expect(onUseAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'mine-1' }));
 
     jest.spyOn(pukuBotApi, 'getMarketplace').mockResolvedValue([
       {
@@ -176,12 +185,12 @@ describe('Puku Bot Workspace', () => {
         createdAt: '2026-10-01T00:00:00Z',
       },
     ]);
-    const alert = jest.spyOn(Alert, 'alert');
+    const install = jest.spyOn(pukuBotApi, 'installTemplate').mockResolvedValue(agent({ id: 'n1', mine: true }));
     const market = await render(
-      <PukuBotWorkspaceSheet visible panel="marketplace" onChangePanel={jest.fn()} onClose={jest.fn()} onStartChat={jest.fn()} />
+      <PukuBotWorkspaceSheet visible panel="marketplace" onChangePanel={jest.fn()} onClose={jest.fn()} onUseAgent={jest.fn()} />
     );
     const tplCard = market.root.find(n => n.props.accessibilityHint === 'Installs this template');
     await ReactTestRenderer.act(async () => tplCard.props.onPress());
-    expect(alert.mock.calls[0][0]).toBe('Install Release Notes?');
+    expect(install).toHaveBeenCalledWith('t9');
   });
 });

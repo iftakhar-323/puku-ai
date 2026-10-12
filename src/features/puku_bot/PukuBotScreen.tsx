@@ -692,13 +692,46 @@ export function PukuBotScreen() {
   }, [botWorkspaceRequest, isDrawerOpen]);
 
   /** From Agents or Marketplace: refresh the roster (it may have just grown) and talk to that Bot. */
-  const handleStartChatWith = async (botId: string) => {
+  /**
+   * From Agents or Marketplace, the way a skill goes into the message box: in an open conversation
+   * the Bot joins it and `@Name ` is put in the message box, so the next message is its to answer
+   * (the server routes a message to the member it names). With no conversation open, it is the Bot
+   * the next one starts with. The roster may have just grown (an install), so it is refetched.
+   */
+  const insertedMentionRef = useRef<string | null>(null);
+  const handleUseAgent = async (agent: { id: string; name: string }) => {
     setWorkspaceSheet(null);
     const bots = await pukuBotApi.getBots().catch(() => null);
     if (bots && bots.length > 0) setAvailableBots(bots);
-    setSelectedBotId(botId);
+    setSelectedBotId(agent.id);
     setBotPickedByUser(true);
-    handleNewConversation();
+
+    const conv = activeConversation;
+    if (conv) {
+      const members = conv.botIds && conv.botIds.length > 0 ? conv.botIds : conv.botId ? [conv.botId] : [];
+      if (!members.includes(agent.id)) {
+        try {
+          const joined = await pukuBotApi.addBotToConversation(conv.id, agent.id);
+          setActiveConversation(prev =>
+            prev && prev.id === conv.id
+              ? { ...prev, botIds: joined?.botIds?.length ? joined.botIds : [...members, agent.id] }
+              : prev
+          );
+        } catch (err: any) {
+          Alert.alert(t('pukuBot.errorTitle'), err?.message || `Could not add ${agent.name} to this chat.`);
+          return;
+        }
+      }
+      // Swap a mention this put in earlier for the new one; keep whatever was typed after it.
+      const mention = `@${agent.name} `;
+      setInputVal(prev => {
+        const last = insertedMentionRef.current;
+        const rest = last && prev.startsWith(last) ? prev.slice(last.length) : prev;
+        return mention + rest.trimStart();
+      });
+      insertedMentionRef.current = mention;
+    }
+    setTimeout(() => inputRef.current?.focus(), Platform.OS === 'ios' ? 450 : 150);
   };
 
   // The drawer shows the real roster, not placeholders.
@@ -2314,7 +2347,7 @@ export function PukuBotScreen() {
         panel={workspaceSheet ?? 'agents'}
         onChangePanel={setWorkspaceSheet}
         onClose={() => setWorkspaceSheet(null)}
-        onStartChat={handleStartChatWith}
+        onUseAgent={handleUseAgent}
       />
 
       {/* Settings Modal with Multi-Tab Navigation */}
