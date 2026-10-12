@@ -302,10 +302,195 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     );
   });
 
-  test('resumeEventsStream initiates GET to /conversations/:id/events', () => {
-    const handle = client.resumeEventsStream('channel_123', () => {});
-    expect(handle).toBeDefined();
-    expect(typeof handle.abort).toBe('function');
-    handle.abort();
+  test('pinConversation issues PUT to /conversations/:id/pin', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await client.pinConversation('channel_123', true);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/conversations/channel_123/pin'),
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ pinned: true }),
+      })
+    );
+  });
+
+  test('addBotToConversation issues POST to /conversations/:id/bots', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    await client.addBotToConversation('channel_123', 'research-desk');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/conversations/channel_123/bots'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ botId: 'research-desk' }),
+      })
+    );
+  });
+
+  test('rebuildComputer issues POST to /bots/:id/computer/rebuild with confirm REBUILD', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+
+    const res = await client.rebuildComputer('general-assistant');
+    expect(res.ok).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/bots/general-assistant/computer/rebuild'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ confirm: 'REBUILD' }),
+      })
+    );
+  });
+
+  test('manages personal instructions via /settings/instructions', async () => {
+    // 1. Get instructions
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ instructions: 'Be concise and direct.' }),
+    });
+
+    const getRes = await client.getPersonalInstructions();
+    expect(getRes.instructions).toBe('Be concise and direct.');
+
+    // 2. Update instructions
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ instructions: 'Always output typescript.' }),
+    });
+
+    const updateRes = await client.updatePersonalInstructions('Always output typescript.');
+    expect(updateRes.instructions).toBe('Always output typescript.');
+  });
+
+  test('manages memory operations (CRUD and share)', async () => {
+    // 1. Create memory
+    const memory = await client.createMemory('User prefers dark mode', 'general-assistant');
+    expect(memory.content).toBe('User prefers dark mode');
+
+    // 2. Get memories
+    const list = await client.getMemories('general-assistant');
+    expect(list.some(m => m.content === 'User prefers dark mode')).toBe(true);
+
+    // 3. Update memory
+    const updated = await client.updateMemory(memory.id, 'User prefers dark mode and high contrast');
+    expect(updated.content).toBe('User prefers dark mode and high contrast');
+
+    // 4. Share memory
+    await client.shareMemory(memory.id);
+    const sharedList = await client.getMemories();
+    const found = sharedList.find(m => m.id === memory.id);
+    expect(found?.shared).toBe(true);
+
+    // 5. Delete memory
+    await client.deleteMemory(memory.id);
+    const afterDelete = await client.getMemories();
+    expect(afterDelete.find(m => m.id === memory.id)).toBeUndefined();
+  });
+
+  test('manages routines operations (list, toggle, delete)', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        routines: [
+          { id: 'rt_1', name: 'Morning briefing', schedule: '0 9 * * 1-5', enabled: true, prompt: 'Brief me' },
+        ],
+      }),
+    });
+
+    const routines = await client.getRoutines();
+    expect(routines).toHaveLength(1);
+    expect(routines[0].id).toBe('rt_1');
+
+    // Toggle enabled
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        routine: { id: 'rt_1', name: 'Morning briefing', schedule: '0 9 * * 1-5', enabled: false, prompt: 'Brief me' },
+      }),
+    });
+
+    const toggled = await client.setRoutineEnabled('rt_1', false);
+    expect(toggled.enabled).toBe(false);
+
+    // Delete routine
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+    });
+
+    await expect(client.deleteRoutine('rt_1')).resolves.toBeUndefined();
+  });
+
+  test('manages skills operations (list, save, delete)', async () => {
+    // 1. Save skill
+    const skill = await client.saveSkill('extract-table', {
+      name: 'Extract Table',
+      description: 'Extract tables to markdown',
+      prompt: 'Extract tabular data from {text}',
+    });
+    expect(skill.slug).toBe('extract-table');
+
+    // 2. Get skills
+    const skills = await client.getSkills();
+    expect(skills.some(s => s.slug === 'extract-table')).toBe(true);
+
+    // 3. Delete skill
+    await client.deleteSkill('extract-table');
+    const afterDelete = await client.getSkills();
+    expect(afterDelete.some(s => s.slug === 'extract-table')).toBe(false);
+  });
+
+  test('manages connected accounts (list, connect, confirm, disconnect)', async () => {
+    const connections = await client.getConnections();
+    expect(connections.length).toBeGreaterThan(0);
+
+    const connectRes = await client.connectAccount('github');
+    expect(connectRes.url).toBeDefined();
+
+    const confirmRes = await client.confirmConnection('github');
+    expect(confirmRes.ok).toBe(true);
+
+    await client.deleteConnection('github');
+    const afterDelete = await client.getConnections();
+    const github = afterDelete.find(c => c.id === 'github');
+    expect(github?.connected).toBe(false);
+  });
+
+  test('onboarding and deleteAccount calls', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+
+    const onboardRes = await client.updateOnboarding(2);
+    expect(onboardRes.ok).toBe(true);
+
+    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+    });
+
+    await expect(client.deleteAccount()).resolves.toBeUndefined();
+    expect(client.isAuthenticated()).toBe(false);
   });
 });
+

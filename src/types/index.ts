@@ -152,17 +152,27 @@ export interface PukuBotUser {
   onboarding?: { step: number; completedAt: string | null } | null;
 }
 
+export interface PukuBotSkill {
+  slug: string;
+  name: string;
+  description?: string;
+  prompt: string;
+}
+
 export interface PukuBotItem {
   id: string;
   name: string;
   title: string;
   description: string;
   avatarSeed: string;
+  default?: boolean;
+  skills?: PukuBotSkill[];
 }
 
 export interface PukuBotConversation {
   id: string;
   botId: string | null;
+  botIds?: string[];
   title: string;
   lastMessage: string | null;
   lastMessageAt: string | null;
@@ -170,6 +180,52 @@ export interface PukuBotConversation {
   createdAt: string | null;
   lastReadAt: string | null;
   unread: boolean;
+}
+
+export interface PukuBotMemory {
+  id: string;
+  botId?: string | null;
+  content: string;
+  shared?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PukuBotRoutine {
+  id: string;
+  name: string;
+  schedule: string;
+  enabled: boolean;
+  prompt: string;
+  botId?: string | null;
+  lastRunAt?: string | null;
+  createdAt?: string;
+}
+
+export interface PukuBotConnection {
+  id: string;
+  service: string;
+  name: string;
+  connected: boolean;
+  authUrl?: string;
+  iconUrl?: string;
+}
+
+export interface PukuBotInstructions {
+  instructions: string;
+  updatedAt?: string;
+}
+
+export interface PukuBotCreateConversationParams {
+  botId?: string;
+  botIds?: string[];
+  text?: string;
+}
+
+export interface PukuBotSendMessageOptions {
+  attachments?: PukuBotAttachment[];
+  botId?: string;
+  skills?: string[];
 }
 
 export interface PukuBotAttachment {

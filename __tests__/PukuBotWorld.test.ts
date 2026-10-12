@@ -88,4 +88,26 @@ describe('Puku Bot Dedicated World & State Contracts', () => {
     const t4 = formatToolDisplay('execute_command', { command: 'ls -la' });
     expect(t4.label).toBe('Terminal command');
   });
+
+  test('validates skill trigger extraction from input text', () => {
+    const extractSkillSlug = (text: string): string | undefined => {
+      if (text.startsWith('/')) {
+        const firstWord = text.slice(1).split(/\s+/)[0];
+        if (firstWord) return firstWord.toLowerCase();
+      }
+      return undefined;
+    };
+
+    expect(extractSkillSlug('/web-search search query')).toBe('web-search');
+    expect(extractSkillSlug('/summarize')).toBe('summarize');
+    expect(extractSkillSlug('/code-review debug this bug')).toBe('code-review');
+    expect(extractSkillSlug('Just normal text with / in it')).toBeUndefined();
+    expect(extractSkillSlug('')).toBeUndefined();
+  });
+
+  test('PukuBotScreen exports and component initialization', () => {
+    const { PukuBotScreen } = require('../src/features/puku_bot/PukuBotScreen');
+    expect(PukuBotScreen).toBeDefined();
+    expect(typeof PukuBotScreen).toBe('function');
+  });
 });

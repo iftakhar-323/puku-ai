@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -25,12 +26,14 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   CloseIcon,
+  ConnectIcon,
   CopyIcon,
   EyeIcon,
   EyeOffIcon,
   MoonIcon,
   PaperclipIcon,
   PencilIcon,
+  PinIcon,
   PlusIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
@@ -39,8 +42,10 @@ import {
   RemoteIcon,
   SettingsIcon,
   SidebarToggleIcon,
+  SparkleIcon,
   SunIcon,
   TerminalPromptIcon,
+  TrashIcon,
   UpArrowIcon,
 } from '../../components/common/Icons';
 import { MediaPickerModal } from '../../components/common/MediaPickerModal';
@@ -61,8 +66,12 @@ import { useApp } from '../../store/AppContext';
 import { useRemoteSession } from '../../store/RemoteSessionContext';
 import {
   PukuBotComputerInfo,
+  PukuBotConnection,
   PukuBotConversation,
   PukuBotItem,
+  PukuBotMemory,
+  PukuBotRoutine,
+  PukuBotSkill,
   PukuBotToolCall,
   PukuBotTurnEvent,
   PukuBotUser,
@@ -502,6 +511,28 @@ export function PukuBotScreen() {
   const [showBotModal, setShowBotModal] = useState(false);
   const [expandedToolCallIds, setExpandedToolCallIds] = useState<Record<string, boolean>>({});
 
+  // Pinned conversations state
+  const [pinnedConvIds, setPinnedConvIds] = useState<Record<string, boolean>>({});
+
+  // Skills menu state
+  const [skillsList, setSkillsList] = useState<PukuBotSkill[]>([]);
+  const [showSkillsMenu, setShowSkillsMenu] = useState(false);
+
+  // Settings multi-tab state
+  type SettingsTab = 'profile' | 'instructions' | 'memory' | 'routines' | 'skills' | 'connections';
+  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>('profile');
+  const [instructionsText, setInstructionsText] = useState('');
+  const [isSavingInstructions, setIsSavingInstructions] = useState(false);
+  const [memoriesList, setMemoriesList] = useState<PukuBotMemory[]>([]);
+  const [newMemoryInput, setNewMemoryInput] = useState('');
+  const [routinesList, setRoutinesList] = useState<PukuBotRoutine[]>([]);
+  const [userSkillsList, setUserSkillsList] = useState<PukuBotSkill[]>([]);
+  const [newSkillSlug, setNewSkillSlug] = useState('');
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillPrompt, setNewSkillPrompt] = useState('');
+  const [showAddSkillForm, setShowAddSkillForm] = useState(false);
+  const [connectionsList, setConnectionsList] = useState<PukuBotConnection[]>([]);
+
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
   const activeStreamAbortRef = useRef<(() => void) | null>(null);
@@ -554,9 +585,15 @@ export function PukuBotScreen() {
 
       if (authed) {
         try {
-          const [bots, me] = await Promise.all([
+          const [bots, me, skills, instructions, memories, routines, conns, convRes] = await Promise.all([
             pukuBotApi.getBots().catch(() => []),
             pukuBotApi.getMe().catch(() => null),
+            pukuBotApi.getSkills().catch(() => []),
+            pukuBotApi.getPersonalInstructions().catch(() => ({ instructions: '' })),
+            pukuBotApi.getMemories().catch(() => []),
+            pukuBotApi.getRoutines().catch(() => []),
+            pukuBotApi.getConnections().catch(() => []),
+            pukuBotApi.getConversations(20).catch(() => ({ conversations: [] })),
           ]);
           if (!isMounted) return;
 
@@ -567,6 +604,29 @@ export function PukuBotScreen() {
           if (me) {
             setBotUser(me);
           }
+          if (skills) {
+            setSkillsList(skills);
+            setUserSkillsList(skills);
+          }
+          if (instructions?.instructions) {
+            setInstructionsText(instructions.instructions);
+          }
+          if (memories) {
+            setMemoriesList(memories);
+          }
+          if (routines) {
+            setRoutinesList(routines);
+          }
+          if (conns) {
+            setConnectionsList(conns);
+          }
+          if (convRes?.conversations) {
+            const pinMap: Record<string, boolean> = {};
+            convRes.conversations.forEach((c: any) => {
+              if (c.pinned) pinMap[c.id] = true;
+            });
+            setPinnedConvIds(pinMap);
+          }
 
           // Do not auto-load messages if no conversation was actively selected,
           // allowing the initial dashboard page to be shown first!
@@ -576,6 +636,14 @@ export function PukuBotScreen() {
         } catch (e) {
           console.warn('[PukuBotScreen] API load error:', e);
         }
+      } else {
+        // Load offline cached skills
+        pukuBotApi.getSkills().then(s => {
+          if (isMounted && s) {
+            setSkillsList(s);
+            setUserSkillsList(s);
+          }
+        }).catch(() => {});
       }
     }
 
@@ -795,6 +863,12 @@ export function PukuBotScreen() {
             await pukuBotApi.uploadAttachment(currentConv.id, currentAttachment).catch(() => {});
           }
 
+          let detectedSkill: string | undefined;
+          if (query.startsWith('/')) {
+            const firstWord = query.slice(1).split(/\s+/)[0];
+            if (firstWord) detectedSkill = firstWord.toLowerCase();
+          }
+
           const streamPromise = new Promise<boolean>((resolve) => {
             const streamHandle = pukuBotApi.sendMessageStream(
               currentConv.id,
@@ -876,6 +950,10 @@ export function PukuBotScreen() {
                     resolve(false);
                     break;
                 }
+              },
+              {
+                botId: serverBotId || selectedBotId,
+                skills: detectedSkill ? [detectedSkill] : undefined,
               }
             );
             activeStreamAbortRef.current = streamHandle.abort;
@@ -1039,6 +1117,214 @@ export function PukuBotScreen() {
     setMessages([]);
     setActiveConversation(null);
     setShowSettingsModal(false);
+  };
+
+  const handleTogglePin = async (convId: string) => {
+    const isPinned = !!pinnedConvIds[convId];
+    const nextVal = !isPinned;
+    setPinnedConvIds(prev => ({ ...prev, [convId]: nextVal }));
+    await pukuBotApi.pinConversation(convId, nextVal).catch(() => {});
+  };
+
+  const handleDeleteConversation = (convId: string) => {
+    Alert.alert(
+      t('pukuBot.deleteConvTitle', { defaultValue: 'Delete Conversation?' }),
+      t('pukuBot.deleteConvConfirm', { defaultValue: 'This will remove the conversation and all messages.' }),
+      [
+        { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+        {
+          text: t('common.delete', { defaultValue: 'Delete' }),
+          style: 'destructive',
+          onPress: async () => {
+            await pukuBotApi.deleteConversation(convId).catch(() => {});
+            if (activeConversation?.id === convId) {
+              setActiveConversation(null);
+              setMessages([]);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRebuildComputer = async () => {
+    if (!selectedBotId) return;
+    Alert.alert(
+      t('pukuBot.rebuildConfirmTitle', { defaultValue: 'Rebuild Computer?' }),
+      t('pukuBot.rebuildConfirmDesc', {
+        defaultValue: 'This will terminate the VM and provision a fresh computer environment. Any unsaved temporary files will be wiped.',
+      }),
+      [
+        { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+        {
+          text: t('pukuBot.rebuildAction', { defaultValue: 'Rebuild' }),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoadingComputer(true);
+              await pukuBotApi.rebuildComputer(selectedBotId);
+              Alert.alert(
+                t('pukuBot.rebuildStarted', { defaultValue: 'Rebuild Started' }),
+                t('pukuBot.rebuildStartedDesc', { defaultValue: 'Computer rebuild has been initiated.' })
+              );
+              const info = await pukuBotApi.getComputer(selectedBotId);
+              setComputerInfo(info);
+            } catch (err: any) {
+              Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to rebuild computer.');
+            } finally {
+              setIsLoadingComputer(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveInstructions = async () => {
+    setIsSavingInstructions(true);
+    try {
+      await pukuBotApi.updatePersonalInstructions(instructionsText);
+      Alert.alert(t('common.success', { defaultValue: 'Saved' }), t('pukuBot.instructionsSaved', { defaultValue: 'Personal instructions saved successfully.' }));
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to save instructions.');
+    } finally {
+      setIsSavingInstructions(false);
+    }
+  };
+
+  const handleAddMemory = async () => {
+    if (!newMemoryInput.trim()) return;
+    try {
+      const created = await pukuBotApi.createMemory(newMemoryInput.trim(), selectedBotId);
+      setMemoriesList(prev => [created, ...prev]);
+      setNewMemoryInput('');
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to add memory.');
+    }
+  };
+
+  const handleDeleteMemory = async (id: string) => {
+    try {
+      await pukuBotApi.deleteMemory(id);
+      setMemoriesList(prev => prev.filter(m => m.id !== id));
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to delete memory.');
+    }
+  };
+
+  const handleToggleMemoryShare = async (id: string, currentlyShared?: boolean) => {
+    try {
+      if (currentlyShared) {
+        await pukuBotApi.unshareMemory(id);
+      } else {
+        await pukuBotApi.shareMemory(id);
+      }
+      setMemoriesList(prev =>
+        prev.map(m => (m.id === id ? { ...m, shared: !currentlyShared } : m))
+      );
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to update memory.');
+    }
+  };
+
+  const handleToggleRoutine = async (id: string, currentEnabled: boolean) => {
+    try {
+      const updated = await pukuBotApi.setRoutineEnabled(id, !currentEnabled);
+      setRoutinesList(prev => prev.map(r => (r.id === id ? updated : r)));
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to update routine.');
+    }
+  };
+
+  const handleDeleteRoutine = async (id: string) => {
+    try {
+      await pukuBotApi.deleteRoutine(id);
+      setRoutinesList(prev => prev.filter(r => r.id !== id));
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to delete routine.');
+    }
+  };
+
+  const handleSaveSkill = async () => {
+    if (!newSkillSlug.trim() || !newSkillName.trim()) {
+      Alert.alert(t('pukuBot.errorTitle'), 'Please enter a slug and title.');
+      return;
+    }
+    try {
+      const saved = await pukuBotApi.saveSkill(newSkillSlug.trim(), {
+        name: newSkillName.trim(),
+        prompt: newSkillPrompt.trim() || `Run ${newSkillName.trim()}`,
+      });
+      setUserSkillsList(prev => prev.filter(s => s.slug !== saved.slug).concat(saved));
+      setSkillsList(prev => prev.filter(s => s.slug !== saved.slug).concat(saved));
+      setNewSkillSlug('');
+      setNewSkillName('');
+      setNewSkillPrompt('');
+      setShowAddSkillForm(false);
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to save skill.');
+    }
+  };
+
+  const handleDeleteSkill = async (slug: string) => {
+    try {
+      await pukuBotApi.deleteSkill(slug);
+      setUserSkillsList(prev => prev.filter(s => s.slug !== slug));
+      setSkillsList(prev => prev.filter(s => s.slug !== slug));
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to delete skill.');
+    }
+  };
+
+  const handleToggleConnection = async (conn: PukuBotConnection) => {
+    try {
+      if (conn.connected) {
+        await pukuBotApi.deleteConnection(conn.id);
+        setConnectionsList(prev =>
+          prev.map(c => (c.id === conn.id ? { ...c, connected: false } : c))
+        );
+      } else {
+        const res = await pukuBotApi.connectAccount(conn.id);
+        if (res.url) {
+          await Linking.openURL(res.url).catch(() => {});
+        }
+        await pukuBotApi.confirmConnection(conn.id);
+        setConnectionsList(prev =>
+          prev.map(c => (c.id === conn.id ? { ...c, connected: true } : c))
+        );
+      }
+    } catch (err: any) {
+      Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to update connection.');
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      t('pukuBot.deleteAccountTitle', { defaultValue: 'Delete Account?' }),
+      t('pukuBot.deleteAccountConfirm', {
+        defaultValue: 'This will permanently delete your account, personal data, and conversations. This cannot be undone.',
+      }),
+      [
+        { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+        {
+          text: t('common.delete', { defaultValue: 'Delete' }),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await pukuBotApi.deleteAccount();
+              setIsAuthenticated(false);
+              setBotUser(null);
+              setMessages([]);
+              setActiveConversation(null);
+              setShowSettingsModal(false);
+              Alert.alert(t('common.success', { defaultValue: 'Account deleted' }), t('pukuBot.accountDeleted', { defaultValue: 'Your account has been deleted.' }));
+            } catch (err: any) {
+              Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to delete account.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -1248,28 +1534,59 @@ export function PukuBotScreen() {
             </Text>
             <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
 
-            {displayBotConversations.map(conv => (
-              <View key={conv.id}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => handleSelectRecentConv(conv.id)}
-                  style={styles.botRecentItemRow}>
-                  <Text
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                    style={[styles.botRecentItemTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                    {conv.title}
-                  </Text>
-                  <View style={styles.botRecentRightWrap}>
-                    <Text style={[styles.botRecentItemTime, { color: theme.textMuted, fontFamily: monoFont }]}>
-                      {conv.time}
-                    </Text>
-                    <ArrowUpRightIcon size={14} color={theme.textMuted} />
-                  </View>
-                </TouchableOpacity>
-                <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
-              </View>
-            ))}
+            {[...displayBotConversations]
+              .sort((a, b) => {
+                const aPin = pinnedConvIds[a.id] ? 1 : 0;
+                const bPin = pinnedConvIds[b.id] ? 1 : 0;
+                return bPin - aPin;
+              })
+              .map(conv => (
+                <View key={conv.id}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectRecentConv(conv.id)}
+                    style={styles.botRecentItemRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8, gap: 6 }}>
+                      {pinnedConvIds[conv.id] && (
+                        <PinIcon size={14} color="#35D6B4" />
+                      )}
+                      <Text
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={[styles.botRecentItemTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                        {conv.title}
+                      </Text>
+                    </View>
+                    <View style={styles.botRecentRightWrap}>
+                      <Text style={[styles.botRecentItemTime, { color: theme.textMuted, fontFamily: monoFont }]}>
+                        {conv.time}
+                      </Text>
+                      {conv.isReal && (
+                        <>
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Pin conversation"
+                            onPress={() => handleTogglePin(conv.id)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={{ padding: 4 }}>
+                            <PinIcon size={14} color={pinnedConvIds[conv.id] ? '#35D6B4' : theme.textMuted} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Delete conversation"
+                            onPress={() => handleDeleteConversation(conv.id)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={{ padding: 4 }}>
+                            <TrashIcon size={14} color="#FF4D4F" />
+                          </TouchableOpacity>
+                        </>
+                      )}
+                      <ArrowUpRightIcon size={14} color={theme.textMuted} />
+                    </View>
+                  </TouchableOpacity>
+                  <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
+                </View>
+              ))}
           </View>
         </ScrollView>
       ) : (
@@ -1544,6 +1861,44 @@ export function PukuBotScreen() {
           </View>
         )}
 
+        {/* / Skills Autocomplete Menu */}
+        {(showSkillsMenu || (inputVal.startsWith('/') && !inputVal.includes(' '))) && skillsList.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 8 }}
+            contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+            {skillsList.map(skill => (
+              <TouchableOpacity
+                key={skill.slug}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setInputVal(`/${skill.slug} `);
+                  setShowSkillsMenu(false);
+                  inputRef.current?.focus();
+                }}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? '#232924' : '#EAECE6',
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#35D6B4', fontFamily: monoFont }}>
+                  /{skill.slug}
+                </Text>
+                <Text style={{ fontSize: 10.5, color: theme.textMuted, fontFamily: monoFont }}>
+                  {skill.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
         <TextInput
           ref={inputRef}
           value={inputVal}
@@ -1561,6 +1916,20 @@ export function PukuBotScreen() {
               onPress={handleOpenPicker}
               style={[styles.composerIconBtn, { borderColor: theme.border }]}>
               <PaperclipIcon size={17} color={theme.textSecondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Skills menu"
+              activeOpacity={0.7}
+              onPress={() => setShowSkillsMenu(prev => !prev)}
+              style={[
+                styles.composerIconBtn,
+                {
+                  marginLeft: 8,
+                  borderColor: showSkillsMenu ? '#35D6B4' : theme.border,
+                  backgroundColor: showSkillsMenu ? (isDark ? '#1C271E' : '#E0F3E5') : 'transparent',
+                },
+              ]}>
+              <SparkleIcon size={16} color={showSkillsMenu ? '#35D6B4' : theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -1595,14 +1964,14 @@ export function PukuBotScreen() {
 
 
 
-      {/* Settings / Connection Modal */}
+      {/* Settings Modal with Multi-Tab Navigation */}
       <Modal
         visible={showSettingsModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowSettingsModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.border, maxHeight: '88%' }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
                 {t('pukuBot.settingsTitle')}
@@ -1612,93 +1981,593 @@ export function PukuBotScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={{ paddingVertical: 14 }}>
-              <Text style={[styles.sectionLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
-                {t('pukuBot.apiBaseUrlLabel')}
-              </Text>
+            {/* Segmented Tab Navigation */}
+            <View style={{ paddingTop: 10, paddingBottom: 6 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {(
+                  [
+                    { key: 'profile', label: 'General' },
+                    { key: 'instructions', label: 'Instructions' },
+                    { key: 'memory', label: 'Memory' },
+                    { key: 'routines', label: 'Routines' },
+                    { key: 'skills', label: 'Skills' },
+                    { key: 'connections', label: 'Accounts' },
+                  ] as Array<{ key: SettingsTab; label: string }>
+                ).map(tab => {
+                  const isActive = activeSettingsTab === tab.key;
+                  return (
+                    <TouchableOpacity
+                      key={tab.key}
+                      onPress={() => setActiveSettingsTab(tab.key)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 14,
+                        backgroundColor: isActive
+                          ? (isDark ? '#35D6B4' : '#1A1D18')
+                          : (isDark ? '#232924' : '#EAECE6'),
+                        borderWidth: 1,
+                        borderColor: isActive ? '#35D6B4' : theme.border,
+                      }}>
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: isActive ? '700' : '500',
+                          color: isActive ? (isDark ? '#141613' : '#FFFFFF') : theme.textSecondary,
+                          fontFamily: monoFont,
+                        }}>
+                        {tab.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
 
-              <TextInput
-                value={__DEV__ ? customApiUrl : ENV.PUKU_BOT_API_BASE_URL}
-                onChangeText={__DEV__ ? setCustomApiUrl : undefined}
-                editable={__DEV__}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="https://app.bot.puku.sh/api/v1"
-                placeholderTextColor={theme.placeholderText}
-                style={[
-                  styles.settingsInput,
-                  {
-                    color: __DEV__ ? theme.textPrimary : theme.textMuted,
-                    borderColor: theme.border,
-                    fontFamily: monoFont,
-                  },
-                ]}
-              />
+            <ScrollView style={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
+              {/* TAB 1: Profile & General */}
+              {activeSettingsTab === 'profile' && (
+                <View>
+                  <Text style={[styles.sectionLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
+                    {t('pukuBot.apiBaseUrlLabel')}
+                  </Text>
+                  <TextInput
+                    value={__DEV__ ? customApiUrl : ENV.PUKU_BOT_API_BASE_URL}
+                    onChangeText={__DEV__ ? setCustomApiUrl : undefined}
+                    editable={__DEV__}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    placeholder="https://app.bot.puku.sh/api/v1"
+                    placeholderTextColor={theme.placeholderText}
+                    style={[
+                      styles.settingsInput,
+                      {
+                        color: __DEV__ ? theme.textPrimary : theme.textMuted,
+                        borderColor: theme.border,
+                        fontFamily: monoFont,
+                      },
+                    ]}
+                  />
 
-              {__DEV__ && (
-                <View style={styles.quickEnvRow}>
-                  <TouchableOpacity
-                    onPress={() => setCustomApiUrl(ENV.PUKU_BOT_API_BASE_URL)}
-                    style={[styles.quickEnvPill, { borderColor: theme.border }]}>
-                    <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                      {t('pukuBot.envCloudProd')}
-                    </Text>
-                  </TouchableOpacity>
+                  {__DEV__ && (
+                    <View style={styles.quickEnvRow}>
+                      <TouchableOpacity
+                        onPress={() => setCustomApiUrl(ENV.PUKU_BOT_API_BASE_URL)}
+                        style={[styles.quickEnvPill, { borderColor: theme.border }]}>
+                        <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
+                          {t('pukuBot.envCloudProd')}
+                        </Text>
+                      </TouchableOpacity>
 
-                  <TouchableOpacity
-                    onPress={() => setCustomApiUrl(ENV.PUKU_BOT_LOCAL_BASE_URL)}
-                    style={[styles.quickEnvPill, { borderColor: theme.border }]}>
-                    <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                      {t('pukuBot.envLocal')}
-                    </Text>
-                  </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setCustomApiUrl(ENV.PUKU_BOT_LOCAL_BASE_URL)}
+                        style={[styles.quickEnvPill, { borderColor: theme.border }]}>
+                        <Text style={[styles.quickEnvText, { color: theme.textMuted, fontFamily: monoFont }]}>
+                          {t('pukuBot.envLocal')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Account Status Box */}
+                  <View style={[styles.accountBox, { borderColor: theme.border }]}>
+                    {isAuthenticated ? (
+                      <View>
+                        <Text style={[styles.accountTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                          {t('pukuBot.signedInAs')}
+                        </Text>
+                        <Text style={[styles.accountEmail, { color: theme.textSecondary, fontFamily: monoFont }]}>
+                          {botUser?.email || t('pukuBot.defaultUserFallback')}
+                        </Text>
+
+                        <TouchableOpacity
+                          onPress={handleSignOut}
+                          style={[styles.signOutBtn, { borderColor: '#FF4D4F', marginBottom: 12 }]}>
+                          <Text style={[styles.signOutText, { color: '#FF4D4F', fontFamily: monoFont }]}>
+                            {t('pukuBot.signOut')}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {/* Danger Zone: Account Deletion */}
+                        <TouchableOpacity
+                          onPress={handleDeleteAccount}
+                          style={[styles.signOutBtn, { borderColor: 'rgba(255, 77, 79, 0.4)', backgroundColor: 'rgba(255, 77, 79, 0.08)' }]}>
+                          <Text style={[styles.signOutText, { color: '#FF4D4F', fontFamily: monoFont, fontSize: 11 }]}>
+                            Delete Account & Data
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View>
+                        <Text style={[styles.accountTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                          {t('pukuBot.connectTitle')}
+                        </Text>
+                        <Text style={[styles.accountDesc, { color: theme.textMuted, fontFamily: monoFont }]}>
+                          {t('pukuBot.connectDescription')}
+                        </Text>
+
+                        <TouchableOpacity
+                          disabled={isConnectingAuth}
+                          onPress={handleConnectAuth}
+                          style={[styles.signInBtn, { backgroundColor: isDark ? '#35D6B4' : '#1A1D18' }]}>
+                          {isConnectingAuth ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={[styles.signInBtnText, { color: isDark ? '#141613' : '#FFFFFF', fontFamily: monoFont }]}>
+                              {t('pukuBot.signInButton')}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 </View>
               )}
 
-              {/* Account Status */}
-              <View style={[styles.accountBox, { borderColor: theme.border }]}>
-                {isAuthenticated ? (
-                  <View>
-                    <Text style={[styles.accountTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                      {t('pukuBot.signedInAs')}
+              {/* TAB 2: Personal Instructions */}
+              {activeSettingsTab === 'instructions' && (
+                <View>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8, fontFamily: monoFont }}>
+                    Personal instructions on how your Bots should talk to you (tone, brevity, formatting):
+                  </Text>
+                  <TextInput
+                    value={instructionsText}
+                    onChangeText={setInstructionsText}
+                    maxLength={4000}
+                    multiline
+                    numberOfLines={6}
+                    placeholder="e.g. Always be concise. Format code in clean TypeScript. Do not explain basics."
+                    placeholderTextColor={theme.placeholderText}
+                    style={{
+                      minHeight: 120,
+                      maxHeight: 180,
+                      padding: 10,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      backgroundColor: theme.secondaryBackground,
+                      color: theme.textPrimary,
+                      fontFamily: monoFont,
+                      fontSize: 12.5,
+                      textAlignVertical: 'top',
+                    }}
+                  />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                    <Text style={{ fontSize: 11, color: theme.textMuted, fontFamily: monoFont }}>
+                      {instructionsText.length}/4000 chars
                     </Text>
-                    <Text style={[styles.accountEmail, { color: theme.textSecondary, fontFamily: monoFont }]}>
-                      {botUser?.email || t('pukuBot.defaultUserFallback')}
-                    </Text>
-
                     <TouchableOpacity
-                      onPress={handleSignOut}
-                      style={[styles.signOutBtn, { borderColor: '#FF4D4F' }]}>
-                      <Text style={[styles.signOutText, { color: '#FF4D4F', fontFamily: monoFont }]}>
-                        {t('pukuBot.signOut')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View>
-                    <Text style={[styles.accountTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                      {t('pukuBot.connectTitle')}
-                    </Text>
-                    <Text style={[styles.accountDesc, { color: theme.textMuted, fontFamily: monoFont }]}>
-                      {t('pukuBot.connectDescription')}
-                    </Text>
-
-                    <TouchableOpacity
-                      disabled={isConnectingAuth}
-                      onPress={handleConnectAuth}
-                      style={[styles.signInBtn, { backgroundColor: isDark ? '#35D6B4' : '#1A1D18' }]}>
-                      {isConnectingAuth ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      disabled={isSavingInstructions}
+                      onPress={handleSaveInstructions}
+                      style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        backgroundColor: isDark ? '#35D6B4' : '#1A1D18',
+                      }}>
+                      {isSavingInstructions ? (
+                        <ActivityIndicator size="small" color="#FFF" />
                       ) : (
-                        <Text style={[styles.signInBtnText, { color: isDark ? '#141613' : '#FFFFFF', fontFamily: monoFont }]}>
-                          {t('pukuBot.signInButton')}
+                        <Text style={{ color: isDark ? '#141613' : '#FFF', fontWeight: '700', fontSize: 12, fontFamily: monoFont }}>
+                          Save Instructions
                         </Text>
                       )}
                     </TouchableOpacity>
                   </View>
+                </View>
+              )}
+
+              {/* TAB 3: Memories */}
+              {activeSettingsTab === 'memory' && (
+                <View>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8, fontFamily: monoFont }}>
+                    Context and facts your bot remembers:
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                    <TextInput
+                      value={newMemoryInput}
+                      onChangeText={setNewMemoryInput}
+                      placeholder="Add a new memory..."
+                      placeholderTextColor={theme.placeholderText}
+                      style={{
+                        flex: 1,
+                        height: 38,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: theme.border,
+                        paddingHorizontal: 10,
+                        color: theme.textPrimary,
+                        fontSize: 12,
+                        fontFamily: monoFont,
+                      }}
+                    />
+                    <TouchableOpacity
+                      onPress={handleAddMemory}
+                      style={{
+                        height: 38,
+                        paddingHorizontal: 14,
+                        borderRadius: 8,
+                        backgroundColor: isDark ? '#35D6B4' : '#1A1D18',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Text style={{ color: isDark ? '#141613' : '#FFF', fontWeight: '700', fontSize: 12, fontFamily: monoFont }}>
+                        Add
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {memoriesList.length === 0 ? (
+                    <Text style={{ color: theme.textMuted, fontSize: 12, fontStyle: 'italic', marginVertical: 12, fontFamily: monoFont }}>
+                      No memories stored yet.
+                    </Text>
+                  ) : (
+                    memoriesList.map(mem => (
+                      <View
+                        key={mem.id}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: theme.border,
+                          backgroundColor: theme.secondaryBackground,
+                          marginBottom: 8,
+                        }}>
+                        <Text style={{ color: theme.textPrimary, fontSize: 12.5, fontFamily: monoFont }}>
+                          {mem.content}
+                        </Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                          <TouchableOpacity
+                            onPress={() => handleToggleMemoryShare(mem.id, mem.shared)}
+                            style={{
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                              backgroundColor: mem.shared ? 'rgba(53, 214, 180, 0.15)' : 'transparent',
+                              borderWidth: 1,
+                              borderColor: mem.shared ? '#35D6B4' : theme.border,
+                            }}>
+                            <Text style={{ fontSize: 10.5, color: mem.shared ? '#35D6B4' : theme.textMuted, fontFamily: monoFont }}>
+                              {mem.shared ? 'Shared with all Bots' : 'Private to Bot'}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleDeleteMemory(mem.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                            <TrashIcon size={14} color="#FF4D4F" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
+
+              {/* TAB 4: Routines */}
+              {activeSettingsTab === 'routines' && (
+                <View>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8, fontFamily: monoFont }}>
+                    Scheduled work and automated tasks:
+                  </Text>
+                  {routinesList.length === 0 ? (
+                    <Text style={{ color: theme.textMuted, fontSize: 12, fontStyle: 'italic', marginVertical: 12, fontFamily: monoFont }}>
+                      No active routines. You can create one via chat (e.g. &quot;Every weekday at 9am, summarize GitHub PRs&quot;).
+                    </Text>
+                  ) : (
+                    routinesList.map(rt => (
+                      <View
+                        key={rt.id}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: theme.border,
+                          backgroundColor: theme.secondaryBackground,
+                          marginBottom: 8,
+                        }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 13, fontFamily: monoFont }}>
+                            {rt.name}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => handleToggleRoutine(rt.id, rt.enabled)}
+                            style={{
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                              backgroundColor: rt.enabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 77, 79, 0.15)',
+                            }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: rt.enabled ? '#22C55E' : '#FF4D4F', fontFamily: monoFont }}>
+                              {rt.enabled ? 'Enabled' : 'Paused'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={{ color: theme.textMuted, fontSize: 11, marginTop: 4, fontFamily: monoFont }}>
+                          Schedule: {rt.schedule}
+                        </Text>
+                        <Text numberOfLines={2} style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4, fontFamily: monoFont }}>
+                          {rt.prompt}
+                        </Text>
+                        <View style={{ alignItems: 'flex-end', marginTop: 6 }}>
+                          <TouchableOpacity onPress={() => handleDeleteRoutine(rt.id)}>
+                            <TrashIcon size={14} color="#FF4D4F" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
+
+              {/* TAB 5: Skills */}
+              {activeSettingsTab === 'skills' && (
+                <View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 12, color: theme.textSecondary, fontFamily: monoFont }}>
+                      Custom / skills available in chat:
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowAddSkillForm(prev => !prev)}
+                      style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: isDark ? '#35D6B4' : '#1A1D18' }}>
+                      <Text style={{ color: isDark ? '#141613' : '#FFF', fontSize: 11, fontWeight: '700', fontFamily: monoFont }}>
+                        {showAddSkillForm ? 'Cancel' : '+ New Skill'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {showAddSkillForm && (
+                    <View style={{ padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#35D6B4', marginBottom: 12, backgroundColor: theme.secondaryBackground }}>
+                      <TextInput
+                        value={newSkillSlug}
+                        onChangeText={setNewSkillSlug}
+                        placeholder="slug (e.g. translate-french)"
+                        placeholderTextColor={theme.placeholderText}
+                        style={{ height: 36, borderWidth: 1, borderColor: theme.border, borderRadius: 6, paddingHorizontal: 8, marginBottom: 6, color: theme.textPrimary, fontSize: 12, fontFamily: monoFont }}
+                      />
+                      <TextInput
+                        value={newSkillName}
+                        onChangeText={setNewSkillName}
+                        placeholder="Skill Name (e.g. Translate to French)"
+                        placeholderTextColor={theme.placeholderText}
+                        style={{ height: 36, borderWidth: 1, borderColor: theme.border, borderRadius: 6, paddingHorizontal: 8, marginBottom: 6, color: theme.textPrimary, fontSize: 12, fontFamily: monoFont }}
+                      />
+                      <TextInput
+                        value={newSkillPrompt}
+                        onChangeText={setNewSkillPrompt}
+                        placeholder="Prompt template"
+                        placeholderTextColor={theme.placeholderText}
+                        style={{ height: 36, borderWidth: 1, borderColor: theme.border, borderRadius: 6, paddingHorizontal: 8, marginBottom: 8, color: theme.textPrimary, fontSize: 12, fontFamily: monoFont }}
+                      />
+                      <TouchableOpacity
+                        onPress={handleSaveSkill}
+                        style={{ height: 34, borderRadius: 6, backgroundColor: '#35D6B4', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: '#141613', fontWeight: '700', fontSize: 12, fontFamily: monoFont }}>
+                          Save Skill
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {userSkillsList.map(skill => (
+                    <View
+                      key={skill.slug}
+                      style={{
+                        padding: 10,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: theme.border,
+                        backgroundColor: theme.secondaryBackground,
+                        marginBottom: 8,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ color: '#35D6B4', fontWeight: '700', fontSize: 12.5, fontFamily: monoFont }}>
+                          /{skill.slug}
+                        </Text>
+                        <Text style={{ color: theme.textPrimary, fontSize: 12, marginTop: 2, fontFamily: monoFont }}>
+                          {skill.name}
+                        </Text>
+                        {skill.description ? (
+                          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 11, marginTop: 2, fontFamily: monoFont }}>
+                            {skill.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <TouchableOpacity onPress={() => handleDeleteSkill(skill.slug)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <TrashIcon size={14} color="#FF4D4F" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* TAB 6: Connected Accounts */}
+              {activeSettingsTab === 'connections' && (
+                <View>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8, fontFamily: monoFont }}>
+                    Connected accounts and OAuth integrations:
+                  </Text>
+                  {connectionsList.map(conn => (
+                    <View
+                      key={conn.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: theme.border,
+                        backgroundColor: theme.secondaryBackground,
+                        marginBottom: 8,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}>
+                      <View>
+                        <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 13, fontFamily: monoFont }}>
+                          {conn.name || conn.service}
+                        </Text>
+                        <Text style={{ color: conn.connected ? '#22C55E' : theme.textMuted, fontSize: 11, marginTop: 2, fontFamily: monoFont }}>
+                          {conn.connected ? '● Connected' : '○ Not connected'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleToggleConnection(conn)}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          backgroundColor: conn.connected ? 'rgba(255, 77, 79, 0.12)' : isDark ? '#35D6B4' : '#1A1D18',
+                          borderWidth: conn.connected ? 1 : 0,
+                          borderColor: '#FF4D4F',
+                        }}>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: conn.connected ? '#FF4D4F' : isDark ? '#141613' : '#FFFFFF',
+                            fontFamily: monoFont,
+                          }}>
+                          {conn.connected ? 'Disconnect' : 'Connect'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Computer Screen & Rebuild Modal */}
+      <Modal
+        visible={showComputerModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowComputerModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ComputerMonitorIcon size={18} color="#35D6B4" />
+                <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                  {t('pukuBot.computerTitle', { defaultValue: "Bot's Computer" })}
+                </Text>
+              </View>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowComputerModal(false)}>
+                <CloseIcon size={20} color={theme.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ paddingVertical: 14 }}>
+              {/* Status bar */}
+              <View style={[styles.computerStatusBar, { borderColor: theme.border }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      {
+                        backgroundColor:
+                          computerInfo?.status?.state === 'ready'
+                            ? '#22C55E'
+                            : computerInfo?.status?.state === 'starting'
+                            ? '#F59E0B'
+                            : '#EF4444',
+                      },
+                    ]}
+                  />
+                  <Text style={[styles.statusText, { color: theme.textPrimary, fontFamily: monoFont }]}>
+                    State: {computerInfo?.status?.state || 'absent'}
+                  </Text>
+                </View>
+                <Text style={[styles.statusText, { color: theme.textMuted, fontFamily: monoFont }]}>
+                  Control: {computerInfo?.control?.holder === 'human' ? 'You' : 'Bot'}
+                </Text>
+              </View>
+
+              {/* Screen preview */}
+              <View style={[styles.screenFrame, { borderColor: theme.border, backgroundColor: '#000000' }]}>
+                {isLoadingComputer ? (
+                  <View style={styles.screenLoader}>
+                    <ActivityIndicator size="small" color="#35D6B4" />
+                    <Text style={{ color: '#888', fontSize: 11, marginTop: 6, fontFamily: monoFont }}>
+                      Connecting to display...
+                    </Text>
+                  </View>
+                ) : (
+                  <Image
+                    source={{ uri: `${pukuBotApi.getScreenshotUrl(selectedBotId)}?t=${screenshotTimestamp}` }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="contain"
+                  />
                 )}
               </View>
-            </View>
+
+              {/* Action buttons */}
+              <View style={styles.computerActionRow}>
+                <TouchableOpacity
+                  disabled={isTakingControl}
+                  onPress={handleToggleControl}
+                  style={[
+                    styles.primaryActionBtn,
+                    {
+                      backgroundColor:
+                        computerInfo?.control?.holder === 'human' ? '#EF4444' : isDark ? '#35D6B4' : '#1A1D18',
+                      borderColor: theme.border,
+                    },
+                  ]}>
+                  {isTakingControl ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.actionBtnText,
+                        {
+                          color:
+                            computerInfo?.control?.holder === 'human'
+                              ? '#FFF'
+                              : isDark
+                              ? '#141613'
+                              : '#FFF',
+                          fontFamily: monoFont,
+                        },
+                      ]}>
+                      {computerInfo?.control?.holder === 'human'
+                        ? t('pukuBot.releaseControl', { defaultValue: 'Hand Back Control' })
+                        : t('pukuBot.takeControl', { defaultValue: 'Take Control' })}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleRebuildComputer}
+                  style={[styles.secondaryActionBtn, { borderColor: '#EF4444' }]}>
+                  <RefreshIcon size={14} color="#EF4444" />
+                  <Text style={[styles.secondaryBtnText, { color: '#EF4444', fontFamily: monoFont, fontWeight: '700' }]}>
+                    {t('pukuBot.rebuild', { defaultValue: 'Rebuild' })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
