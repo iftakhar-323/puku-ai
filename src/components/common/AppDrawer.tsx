@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -12,12 +13,20 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useApp } from '../../store/AppContext';
+import { BotWorkspacePanel, useApp } from '../../store/AppContext';
+import { pukuBotApi } from '../../services/pukuBotApi';
 import { useRemoteSession } from '../../store/RemoteSessionContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 import {
   ArchiveBoxIcon,
+  BoltIcon,
+  BookIcon,
   BotIcon,
+  BoxIcon,
+  BrainIcon,
+  CloudIcon,
+  ExternalLinkIcon,
+  ShoppingBagIcon,
   ChatBubbleOutlineIcon,
   CheckmarkIcon,
   ChevronDownIcon,
@@ -70,6 +79,7 @@ export function AppDrawer() {
     deleteBotConversation,
     renameBotConversation,
     selectBot,
+    openBotWorkspace,
   } = useApp();
   const {
     isActive: isRemoteActive,
@@ -82,6 +92,86 @@ export function AppDrawer() {
   const isBotMode = activeRoute === 'pukuBot';
   const isRemoteMode = activeRoute === 'code' || activeRoute === 'remoteSession';
   const isChatMode = !isBotMode && !isRemoteMode;
+
+  // Workspace, as on the web's sidebar
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(true);
+  const [agentCloudUrl, setAgentCloudUrl] = useState<string | null>(null);
+
+  // Where Agent Cloud links is the deployment's to say; until it does, the entry stays inert.
+  useEffect(() => {
+    if (!isDrawerOpen || activeRoute !== 'pukuBot') return;
+    pukuBotApi
+      .getCapabilities()
+      .then(c => setAgentCloudUrl(c.agentCloudUrl))
+      .catch(ignore('AppDrawer'));
+  }, [isDrawerOpen, activeRoute]);
+
+  const openWorkspacePanel = (panel: BotWorkspacePanel) => {
+    setDrawerOpen(false);
+    navigate('pukuBot');
+    openBotWorkspace(panel);
+  };
+
+  const openExternal = (url: string) => {
+    setDrawerOpen(false);
+    Linking.openURL(url).catch(() => Alert.alert('Puku Bot', `Could not open ${url}`));
+  };
+
+  const renderWorkspaceSection = () => {
+    const rowColor = theme.textPrimary;
+    const iconColor = theme.textSecondary;
+    const items: Array<{ key: string; label: string; Icon: typeof BoxIcon; onPress: () => void }> = [
+      { key: 'skills', label: 'Skills', Icon: BoxIcon, onPress: () => openWorkspacePanel('skills') },
+      { key: 'agents', label: 'Agents', Icon: BoltIcon, onPress: () => openWorkspacePanel('agents') },
+      { key: 'memory', label: 'Memory', Icon: BrainIcon, onPress: () => openWorkspacePanel('memory') },
+      { key: 'marketplace', label: 'Marketplace', Icon: ShoppingBagIcon, onPress: () => openWorkspacePanel('marketplace') },
+      { key: 'docs', label: 'Docs', Icon: BookIcon, onPress: () => openExternal(pukuBotApi.getDocsUrl()) },
+    ];
+    return (
+      <View style={{ marginBottom: 10 }}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={isWorkspaceOpen ? 'Collapse Workspace' : 'Expand Workspace'}
+          activeOpacity={0.7}
+          onPress={() => setIsWorkspaceOpen(prev => !prev)}
+          style={styles.recentSectionHeader}>
+          <Text style={[styles.recentHeaderText, { color: theme.textSecondary }]}>Workspace</Text>
+          <View style={{ transform: [{ rotate: isWorkspaceOpen ? '0deg' : '-90deg' }] }}>
+            <ChevronDownIcon size={14} color={theme.textSecondary} />
+          </View>
+        </TouchableOpacity>
+        {isWorkspaceOpen && (
+          <>
+            {items.map(({ key, label, Icon, onPress }) => (
+              <TouchableOpacity
+                key={key}
+                accessibilityRole="button"
+                activeOpacity={0.7}
+                onPress={onPress}
+                style={styles.convItem}>
+                <Icon size={15} color={iconColor} />
+                <Text style={[styles.convTitle, { color: rowColor }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !agentCloudUrl }}
+              activeOpacity={0.7}
+              onPress={() =>
+                agentCloudUrl
+                  ? openExternal(agentCloudUrl)
+                  : Alert.alert('Agent Cloud', "Agent Cloud's address is not set for this deployment yet.")
+              }
+              style={[styles.convItem, !agentCloudUrl && { opacity: 0.5 }]}>
+              <CloudIcon size={15} color={iconColor} />
+              <Text style={[styles.convTitle, { color: rowColor }]}>Agent Cloud</Text>
+              {agentCloudUrl ? <ExternalLinkIcon size={12} color={theme.textMuted} /> : null}
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  };
 
   // Bot-specific drawer state
   const [botSearchQuery, setBotSearchQuery] = useState('');
@@ -468,6 +558,8 @@ export function AppDrawer() {
                   <PlusIcon size={18} color={theme.textPrimary} />
                 </TouchableOpacity>
               </View>
+
+              {renderWorkspaceSection()}
 
               {/* Recent Section Header */}
               <View style={styles.recentSectionHeader}>

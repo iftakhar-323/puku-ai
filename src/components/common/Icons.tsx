@@ -1291,3 +1291,57 @@ export function SparkleIcon({ size = 18, color = '#ECEEEC' }: IconProps) {
 
 
 
+
+// ── Puku Bot Workspace (the web sidebar's Tabler icons) ──
+
+function TablerStroke({ size = 20, color = '#FFFFFF', d }: IconProps & { d: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d={d} stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function BoxIcon(props: IconProps) {
+  return <TablerStroke {...props} d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3M12 12l8-4.5M12 12v9M12 12L4 7.5" />;
+}
+
+export function BoltIcon(props: IconProps) {
+  return <TablerStroke {...props} d="M13 3v7h6l-8 11v-7H5l8-11" />;
+}
+
+export function BrainIcon(props: IconProps) {
+  return (
+    <TablerStroke
+      {...props}
+      d="M15.5 13a3.5 3.5 0 0 0-3.5 3.5v1a3.5 3.5 0 0 0 7 0v-1.8M8.5 13a3.5 3.5 0 0 1 3.5 3.5v1a3.5 3.5 0 0 1-7 0v-1.8M17.5 16a3.5 3.5 0 0 0 0-7H17M19 9.3V6.5a3.5 3.5 0 0 0-7 0M6.5 16a3.5 3.5 0 0 1 0-7H7M5 9.3V6.5a3.5 3.5 0 0 1 7 0v10"
+    />
+  );
+}
+
+export function ShoppingBagIcon(props: IconProps) {
+  return (
+    <TablerStroke
+      {...props}
+      d="M6.331 8H17.67a2 2 0 0 1 1.977 2.304l-1.255 8.152A3 3 0 0 1 15.426 21H8.574a3 3 0 0 1-2.965-2.544l-1.255-8.152A2 2 0 0 1 6.331 8zM9 11V6a3 3 0 0 1 6 0v5"
+    />
+  );
+}
+
+export function BookIcon(props: IconProps) {
+  return (
+    <TablerStroke
+      {...props}
+      d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13M12 6v13M21 6v13"
+    />
+  );
+}
+
+export function CloudIcon(props: IconProps) {
+  return (
+    <TablerStroke
+      {...props}
+      d="M6.657 18C4.085 18 2 15.993 2 13.517c0-2.475 2.085-4.482 4.657-4.482c.393-1.762 1.794-3.2 3.675-3.773c1.88-.572 3.956-.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927-1.551 3.487-3.465 3.487H6.657"
+    />
+  );
+}

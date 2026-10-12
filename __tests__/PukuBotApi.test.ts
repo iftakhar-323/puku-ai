@@ -22,6 +22,7 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     await AsyncStorage.clear();
     client = PukuBotApiClient.getInstance();
     await client.init();
+    (client as any).v1Resources = null;
     jest.clearAllMocks();
   });
 
@@ -148,7 +149,7 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
       title: 'General Assistant',
       description: 'Direct AI assistant',
       avatarSeed: 'general-assistant',
-      skills: [{ slug: 'web-search', name: 'Web Search', prompt: 'Search' }],
+      skills: [{ slug: 'web-search', title: 'Web Search', summary: 'Search the web' }],
     };
 
     (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
@@ -160,6 +161,7 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     const bot = await client.getBot('general-assistant');
     expect(bot.id).toBe('general-assistant');
     expect(bot.skills).toHaveLength(1);
+    expect(bot.skills?.[0].title).toBe('Web Search');
     expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/bots/general-assistant'),
       expect.anything()
@@ -412,29 +414,62 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(updateRes.instructions).toBe('Always output typescript.');
   });
 
-  test('manages memory operations (CRUD and share)', async () => {
-    // 1. Create memory
+  test('manages memory offline (create, list, update, delete) and queues the writes', async () => {
+    (globalThis as any).fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
     const memory = await client.createMemory('User prefers dark mode', 'general-assistant');
     expect(memory.content).toBe('User prefers dark mode');
+    expect(memory.kind).toBe('fact');
 
-    // 2. Get memories
     const list = await client.getMemories('general-assistant');
     expect(list.some(m => m.content === 'User prefers dark mode')).toBe(true);
+    // Memory is per Bot.
+    expect(await client.getMemories('research-desk')).toEqual([]);
 
-    // 3. Update memory
     const updated = await client.updateMemory(memory.id, 'User prefers dark mode and high contrast');
     expect(updated.content).toBe('User prefers dark mode and high contrast');
 
-    // 4. Share memory
-    await client.shareMemory(memory.id);
-    const sharedList = await client.getMemories();
-    const found = sharedList.find(m => m.id === memory.id);
-    expect(found?.shared).toBe(true);
-
-    // 5. Delete memory
     await client.deleteMemory(memory.id);
-    const afterDelete = await client.getMemories();
+    const afterDelete = await client.getMemories('general-assistant');
     expect(afterDelete.find(m => m.id === memory.id)).toBeUndefined();
+  });
+
+  test('memory uses the v1 field names: botId, kind, and a target Bot to share with', async () => {
+    const ok = (body: any, status = 200) => ({ ok: true, status, json: async () => body });
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(ok({ memory: { id: 'm1', botId: 'general-assistant', kind: 'fact', content: 'x' } }))
+      .mockResolvedValueOnce(ok({ memory: { id: 'm1', botId: 'general-assistant', kind: 'fact', content: 'x' } }));
+    await client.createMemory('x', 'general-assistant');
+    await client.shareMemory('m1', 'research-desk');
+    const calls = (globalThis as any).fetch.mock.calls;
+    expect(JSON.parse(calls[0][1].body)).toEqual({ botId: 'general-assistant', kind: 'fact', content: 'x' });
+    expect(calls[1][0]).toContain('/api/v1/memory/m1/share');
+    expect(JSON.parse(calls[1][1].body)).toEqual({ botId: 'research-desk' });
+  });
+
+  test('a server whose v1 API lacks memory falls back to the web route it wraps', async () => {
+    const res = (status: number, body: any) => ({ ok: status < 300, status, json: async () => body });
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(res(404, { error: 'Not found' }))
+      .mockResolvedValueOnce(
+        res(200, { memories: [{ id: 'm1', agentId: 'general-assistant', kind: 'preference', content: 'Tea', accessCount: 3 }] })
+      )
+      .mockResolvedValueOnce(res(200, { memory: { id: 'm2', agentId: 'general-assistant', kind: 'fact', content: 'Dhaka' } }));
+
+    const list = await client.getMemories('general-assistant');
+    expect(list).toEqual([
+      expect.objectContaining({ id: 'm1', botId: 'general-assistant', kind: 'preference', useCount: 3 }),
+    ]);
+    const calls = (globalThis as any).fetch.mock.calls;
+    expect(calls[1][0]).toMatch(/\/api\/memory\?agentId=general-assistant$/);
+    expect(calls[1][0]).not.toContain('/api/v1/');
+
+    // Now known: writes go straight to the web route, in its field names.
+    const created = await client.createMemory('Dhaka', 'general-assistant');
+    expect(created.botId).toBe('general-assistant');
+    expect(calls[2][0]).toMatch(/\/api\/memory$/);
+    expect(JSON.parse(calls[2][1].body)).toEqual({ agentId: 'general-assistant', kind: 'fact', content: 'Dhaka' });
   });
 
   test('manages routines operations (list, toggle, delete)', async () => {
@@ -443,7 +478,7 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
       status: 200,
       json: async () => ({
         routines: [
-          { id: 'rt_1', name: 'Morning briefing', schedule: '0 9 * * 1-5', enabled: true, prompt: 'Brief me' },
+          { id: 'rt_1', agentId: 'general-assistant', instruction: 'Brief me', schedule: 'Weekdays at 09:00', enabled: true },
         ],
       }),
     });
@@ -451,13 +486,14 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     const routines = await client.getRoutines();
     expect(routines).toHaveLength(1);
     expect(routines[0].id).toBe('rt_1');
+    expect(routines[0].instruction).toBe('Brief me');
 
     // Toggle enabled
     (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({
-        routine: { id: 'rt_1', name: 'Morning briefing', schedule: '0 9 * * 1-5', enabled: false, prompt: 'Brief me' },
+        routine: { id: 'rt_1', instruction: 'Brief me', schedule: 'Weekdays at 09:00', enabled: false },
       }),
     });
 
@@ -474,23 +510,106 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     await expect(client.deleteRoutine('rt_1')).resolves.toBeUndefined();
   });
 
-  test('manages skills operations (list, save, delete)', async () => {
-    // 1. Save skill
-    const skill = await client.saveSkill('extract-table', {
-      name: 'Extract Table',
-      description: 'Extract tables to markdown',
-      prompt: 'Extract tabular data from {text}',
+  test('manages skills offline (save, list, delete)', async () => {
+    (globalThis as any).fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+    const skill = await client.saveSkill('Extract Table', {
+      title: 'Extract Table',
+      instructions: 'Extract tabular data as markdown.',
     });
     expect(skill.slug).toBe('extract-table');
+    expect(skill.mine).toBe(true);
 
-    // 2. Get skills
     const skills = await client.getSkills();
     expect(skills.some(s => s.slug === 'extract-table')).toBe(true);
 
-    // 3. Delete skill
     await client.deleteSkill('extract-table');
     const afterDelete = await client.getSkills();
     expect(afterDelete.some(s => s.slug === 'extract-table')).toBe(false);
+  });
+
+  test('saving a skill sends title and instructions, and refuses a slug the server would', async () => {
+    (globalThis as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ skill: { slug: 'tldr', title: 'TL;DR', summary: '', instructions: 'Summarise.', mine: true, deployment: false } }),
+    });
+    await client.saveSkill('tldr', { title: 'TL;DR', instructions: 'Summarise.' });
+    const [url, init] = (globalThis as any).fetch.mock.calls[0];
+    expect(url).toContain('/api/v1/skills/tldr');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body)).toEqual({ title: 'TL;DR', instructions: 'Summarise.' });
+
+    await expect(client.saveSkill('x', { title: 'X', instructions: 'y' })).rejects.toThrow(/slug/);
+  });
+
+  test('skills fall back to the web route and split into own and workspace skills', async () => {
+    (client as any).user = { id: 'u1' };
+    const res = (status: number, body: any) => ({ ok: status < 300, status, json: async () => body });
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(res(404, {}))
+      .mockResolvedValueOnce(
+        res(200, {
+          skills: [
+            { slug: 'mine-one', title: 'Mine', instructions: 'a', ownerUserId: 'u1' },
+            { slug: 'check-a-claim', title: 'Check a claim', instructions: 'b', ownerUserId: null },
+          ],
+          servers: [],
+        })
+      )
+      .mockResolvedValueOnce(res(200, { skills: [{ slug: 'new-one', title: 'New', instructions: 'c', ownerUserId: 'u1' }] }));
+
+    const skills = await client.getSkills();
+    expect(skills.find(s => s.slug === 'mine-one')).toEqual(expect.objectContaining({ mine: true, deployment: false }));
+    expect(skills.find(s => s.slug === 'check-a-claim')).toEqual(expect.objectContaining({ mine: false, deployment: true }));
+    const calls = (globalThis as any).fetch.mock.calls;
+    expect(calls[1][0]).toMatch(/\/api\/plugins$/);
+
+    const saved = await client.saveSkill('new-one', { title: 'New', instructions: 'c' });
+    expect(saved.mine).toBe(true);
+    expect(calls[2][0]).toMatch(/\/api\/plugins\/skills$/);
+    expect(calls[2][1].method).toBe('POST');
+    expect(JSON.parse(calls[2][1].body)).toEqual({ title: 'New', instructions: 'c', slug: 'new-one', global: false });
+
+    // A workspace skill is read-only from the app.
+    await expect(client.saveSkill('check-a-claim', { title: 'x', instructions: 'y' })).rejects.toThrow(/deployment/);
+  });
+
+  test('Agents, Marketplace and capabilities use the web routes', async () => {
+    const ok = (body: any) => ({ ok: true, status: 200, json: async () => body });
+    const agent = { id: 'a1', name: 'Nova', title: 'Research', roleDescription: 'r', avatarSeed: 'a1', visibility: 'private', mine: true };
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(ok({ agents: [agent] }))
+      .mockResolvedValueOnce(ok({ agent }))
+      .mockResolvedValueOnce(ok({ marketplace: { templates: [{ agentId: 't1', name: 'PR Reviewer', category: 'engineering' }] } }))
+      .mockResolvedValueOnce(ok({ agent: { ...agent, id: 'a2' } }))
+      .mockResolvedValueOnce(ok({ agentCloudUrl: null, defaultBotId: 'general-assistant' }));
+
+    expect(await client.getAgents()).toHaveLength(1);
+    await client.createAgent({ name: 'Nova', title: 'Research', roleDescription: 'r' });
+    const templates = await client.getMarketplace('engineering');
+    expect(templates[0].agentId).toBe('t1');
+    const installed = await client.installTemplate('t1');
+    expect(installed.id).toBe('a2');
+    expect((await client.getCapabilities()).agentCloudUrl).toBeNull();
+
+    const calls = (globalThis as any).fetch.mock.calls.map((c: any[]) => [c[0], c[1]?.method]);
+    const origin = client.getWebOrigin();
+    expect(calls).toEqual([
+      [`${origin}/api/agents`, undefined],
+      [`${origin}/api/agents`, 'POST'],
+      [`${origin}/api/agents/marketplace?category=engineering`, undefined],
+      [`${origin}/api/agents/marketplace/t1/install`, 'POST'],
+      [`${origin}/api/capabilities`, undefined],
+    ]);
+    expect(JSON.parse((globalThis as any).fetch.mock.calls[1][1].body)).toEqual({
+      visibility: 'private',
+      name: 'Nova',
+      title: 'Research',
+      roleDescription: 'r',
+    });
+    expect(client.getDocsUrl()).toBe(`${origin}/docs`);
   });
 
   test('manages connected accounts (list, connect, confirm, disconnect)', async () => {
@@ -539,7 +658,7 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
       status: 400,
       json: async () => ({ error: 'A memory can be at most 2000 characters.' }),
     });
-    await expect(client.createMemory('x'.repeat(5000))).rejects.toThrow(
+    await expect(client.createMemory('x'.repeat(5000), 'general-assistant')).rejects.toThrow(
       'A memory can be at most 2000 characters.'
     );
     await expect(client.setRoutineEnabled('rt_1', false)).rejects.toThrow(

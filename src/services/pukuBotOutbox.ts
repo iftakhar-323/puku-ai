@@ -184,6 +184,8 @@ class PukuBotOutboxManager {
     getAuthHeaders: (extra?: Record<string, string>) => Record<string, string>;
     signOut: () => Promise<void>;
     updateCachedMemoryId: (tempId: string, realMemory: any) => Promise<void>;
+    /** Sends one entry, routing it where this server serves it. Throws when the network fails. */
+    send?: (entry: PukuBotOutboxEntry) => Promise<Response>;
   }): Promise<{ replayed: number; failed: boolean }> {
     if (this.isReplaying) return { replayed: 0, failed: false };
     this.isReplaying = true;
@@ -201,13 +203,15 @@ class PukuBotOutboxManager {
       while (entries.length > 0) {
         const entry = entries[0];
         try {
-          const res = await fetch(`${baseUrl}${entry.path}`, {
-            method: entry.method,
-            headers: client.getAuthHeaders(
-              entry.body ? { 'Content-Type': 'application/json' } : undefined
-            ),
-            body: entry.body ? JSON.stringify(entry.body) : undefined,
-          });
+          const res = client.send
+            ? await client.send(entry)
+            : await fetch(`${baseUrl}${entry.path}`, {
+                method: entry.method,
+                headers: client.getAuthHeaders(
+                  entry.body ? { 'Content-Type': 'application/json' } : undefined
+                ),
+                body: entry.body ? JSON.stringify(entry.body) : undefined,
+              });
 
           if (res.ok) {
             // 2xx Success: update cache and remap tempId if applicable

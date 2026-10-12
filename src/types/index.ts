@@ -152,11 +152,17 @@ export interface PukuBotUser {
   onboarding?: { step: number; completedAt: string | null } | null;
 }
 
+/** A `/` skill. A Bot's skills carry slug, title and summary; the person's own list carries the rest. */
 export interface PukuBotSkill {
   slug: string;
-  name: string;
-  description?: string;
-  prompt: string;
+  title: string;
+  summary?: string;
+  instructions?: string;
+  tools?: string[];
+  /** The person's own, so theirs to edit and delete. */
+  mine?: boolean;
+  /** The deployment's, read-only from the app. */
+  deployment?: boolean;
 }
 
 export interface PukuBotItem {
@@ -186,24 +192,75 @@ export interface PukuBotConversation {
   unread: boolean;
 }
 
+export type PukuBotMemoryKind = 'fact' | 'preference' | 'entity' | 'task';
+
+/** One thing a Bot remembers. Memory is per Bot. */
 export interface PukuBotMemory {
   id: string;
   botId?: string | null;
+  kind?: PukuBotMemoryKind;
   content: string;
-  shared?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
+  useCount?: number;
+  lastUsedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface PukuBotRoutine {
   id: string;
-  name: string;
-  schedule: string;
-  enabled: boolean;
-  prompt: string;
   botId?: string | null;
-  lastRunAt?: string | null;
-  createdAt?: string;
+  instruction: string;
+  /** Prose such as "Weekdays at 09:00" where it can be, else a cron expression. Show, never parse. */
+  schedule: string;
+  timezone?: string;
+  enabled: boolean;
+  nextRunAt?: string | null;
+}
+
+export type PukuBotTemplateCategory =
+  | 'engineering'
+  | 'sales'
+  | 'marketing'
+  | 'design'
+  | 'personal'
+  | 'recruiting'
+  | 'product'
+  | 'operations';
+
+/** A coworker as the web's Agents page lists it (GET /api/agents). */
+export interface PukuBotAgent {
+  id: string;
+  name: string;
+  title: string;
+  roleDescription: string;
+  avatarSeed: string;
+  visibility: 'public' | 'private';
+  builtIn?: boolean;
+  hidden?: boolean;
+  systemOwned?: boolean;
+  canManage?: boolean;
+  mine?: boolean;
+  isTemplate?: boolean;
+  templateCategory?: PukuBotTemplateCategory | null;
+}
+
+/** One Marketplace card (GET /api/agents/marketplace). */
+export interface PukuBotTemplate {
+  agentId: string;
+  name: string;
+  title: string;
+  roleDescription: string;
+  avatarSeed: string;
+  category: PukuBotTemplateCategory;
+  blurb: string;
+  authorName: string | null;
+  createdAt: string;
+}
+
+/** The deployment facts the app reads from GET /api/capabilities. */
+export interface PukuBotCapabilities {
+  agentCloudUrl: string | null;
+  defaultBotId?: string;
 }
 
 export interface PukuBotConnection {

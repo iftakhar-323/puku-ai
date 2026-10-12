@@ -98,6 +98,9 @@ interface AppContextValue {
   deleteBotConversation: (id: string) => void;
   renameBotConversation: (id: string, title: string) => void;
   selectBot: (botId: string) => void;
+  /** The Workspace panel the drawer last asked the Bot screen to open; `at` tells repeat taps apart. */
+  botWorkspaceRequest: { panel: BotWorkspacePanel; at: number } | null;
+  openBotWorkspace: (panel: BotWorkspacePanel) => void;
   addBotMessage: (convId: string, message: { role: 'user' | 'assistant'; text: string; toolCalls?: any[] }) => void;
   // Profile & Settings
   profile: UserProfile;
@@ -106,6 +109,9 @@ interface AppContextValue {
   updateSettings: (updates: Partial<AppSettings>) => void;
   logout: () => void;
 }
+
+/** The Puku Bot Workspace panels that open inside the Bot screen, as on the web's sidebar. */
+export type BotWorkspacePanel = 'skills' | 'agents' | 'memory' | 'marketplace';
 
 export const DEFAULT_AVAILABLE_BOTS: BotItem[] = [
   { id: 'general-assistant', name: 'General Assistant', description: 'Autonomous agent' },
@@ -1440,6 +1446,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveBotId(botId);
   }, []);
 
+  const [botWorkspaceRequest, setBotWorkspaceRequest] =
+    useState<{ panel: BotWorkspacePanel; at: number } | null>(null);
+  const openBotWorkspace = useCallback((panel: BotWorkspacePanel) => {
+    setBotWorkspaceRequest({ panel, at: Date.now() });
+  }, []);
+
   const addBotMessage = useCallback(
     (convId: string, message: { role: 'user' | 'assistant'; text: string; toolCalls?: any[] }) => {
       setBotConversations(prev => {
@@ -1526,6 +1538,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteBotConversation,
         renameBotConversation,
         selectBot,
+        botWorkspaceRequest,
+        openBotWorkspace,
         addBotMessage,
         profile,
         settings,

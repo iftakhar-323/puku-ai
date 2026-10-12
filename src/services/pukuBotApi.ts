@@ -15,7 +15,9 @@ import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { Linking } from 'react-native';
 import { ENV } from '../config/env';
 import {
+  PukuBotAgent,
   PukuBotAttachment,
+  PukuBotCapabilities,
   PukuBotComputerInfo,
   PukuBotConnection,
   PukuBotControlState,
@@ -24,9 +26,12 @@ import {
   PukuBotInstructions,
   PukuBotItem,
   PukuBotMemory,
+  PukuBotMemoryKind,
   PukuBotMessage,
   PukuBotRoutine,
   PukuBotSkill,
+  PukuBotTemplate,
+  PukuBotTemplateCategory,
   PukuBotTurnEvent,
   PukuBotUser,
 } from '../types';
@@ -111,6 +116,20 @@ export function createSseParser(onMessage: (msg: SseMessage) => void) {
   };
 }
 
+/** What the server accepts as a skill's slug. */
+export const SKILL_SLUG = /^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/;
+
+/** A typed name as a slug: "Translate to French" becomes "translate-to-french". */
+export function toSkillSlug(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '');
+}
+
 /** PUT /settings/instructions accepts at most this many characters. */
 export const MAX_INSTRUCTIONS_LENGTH = 4000;
 
@@ -181,6 +200,7 @@ export class PukuBotApiClient {
     if (!__DEV__) return;
     const cleaned = url.trim().replace(/\/+$/, '');
     this.baseUrl = cleaned;
+    this.v1Resources = null;
     await AsyncStorage.setItem(STORAGE_KEYS.BASE_URL, cleaned);
   }
 
@@ -581,6 +601,11 @@ export class PukuBotApiClient {
     const res = await fetch(`${this.baseUrl}/bots/${encodeURIComponent(botId)}`, {
       headers: this.getAuthHeaders(),
     });
+    // A server whose v1 API predates Bot profiles: read the web routes it wraps.
+    if (res.status === 404 && this.v1Resources !== true) {
+      const fromWeb = await this.getBotFromWeb(botId);
+      if (fromWeb) return fromWeb;
+    }
     if (res.status === 401) {
       await this.signOut();
       throw new Error('Session expired.');
@@ -590,7 +615,32 @@ export class PukuBotApiClient {
       throw new Error(err.error || 'Failed to get bot profile.');
     }
     const data = await res.json();
-    return data.bot || data;
+    const bot = data.bot || data;
+    return {
+      ...bot,
+      skills: Array.isArray(bot.skills) ? bot.skills.map((s: any) => this.toSkill(s)) : [],
+    };
+  }
+
+  /** GET /api/agents/:id and the skills granted to it, in the v1 Bot shape. Null when not found. */
+  private async getBotFromWeb(botId: string): Promise<PukuBotItem | null> {
+    const id = encodeURIComponent(botId);
+    const [agentRes, pluginsRes] = await Promise.all([
+      this.tryFetchUrl(`${this.getWebOrigin()}/api/agents/${id}`),
+      this.tryFetchUrl(`${this.getWebOrigin()}/api/plugins/for/${id}`),
+    ]);
+    if (!agentRes?.ok) return null;
+    const agent = (await agentRes.json().catch(() => null))?.agent;
+    if (!agent?.id) return null;
+    const granted = pluginsRes?.ok ? await pluginsRes.json().catch(() => null) : null;
+    return {
+      id: agent.id,
+      name: agent.name,
+      title: agent.title ?? '',
+      description: agent.roleDescription ?? '',
+      avatarSeed: agent.avatarSeed ?? agent.id,
+      skills: (granted?.skills ?? []).map((s: any) => this.toSkill(s)),
+    };
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1288,12 +1338,29 @@ export class PukuBotApiClient {
   // Offline resiliency: when the server cannot be reached, reads come from
   // the AsyncStorage cache and edits are kept on this device. When the server
   // answers with an error, that error is surfaced instead of a fake success.
+  //
+  // Each v1 route here is a thin shape over a web route, and a server whose
+  // v1 API predates them answers a bare 404. Then the same call goes to the
+  // web route it wraps (the bearer token is accepted there too), so Memory,
+  // Skills and Routines work on either server.
   // ══════════════════════════════════════════════════════════════════════════
+
+  /** Whether this server's v1 API serves memory, skills and routines. Null until a read says. */
+  private v1Resources: boolean | null = null;
+
+  /** The deployment's origin, for the web routes outside `/api/v1`. */
+  public getWebOrigin(): string {
+    return this.baseUrl.replace(/\/api\/v1\/?$/, '');
+  }
 
   /** fetch that resolves to null when the network (not the server) fails. */
   private async tryFetch(path: string, init?: RequestInit): Promise<Response | null> {
+    return this.tryFetchUrl(`${this.baseUrl}${path}`, init);
+  }
+
+  private async tryFetchUrl(url: string, init?: RequestInit): Promise<Response | null> {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(url, {
         ...init,
         headers: this.getAuthHeaders(
           init?.body ? { 'Content-Type': 'application/json' } : undefined
@@ -1303,6 +1370,82 @@ export class PukuBotApiClient {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * The web route a v1 resource call wraps, with its body in the web's field
+   * names. Null for a path that has no web twin.
+   */
+  private toWebRequest(
+    method: string,
+    path: string,
+    body?: any
+  ): { url: string; method: string; body?: any } | null {
+    const web = `${this.getWebOrigin()}/api`;
+    const [route, query = ''] = path.split('?');
+    const params = new URLSearchParams(query);
+    let m: RegExpMatchArray | null;
+
+    if (route === '/memory' && method === 'GET') {
+      return { url: `${web}/memory?agentId=${encodeURIComponent(params.get('botId') || '')}`, method };
+    }
+    if (route === '/memory' && method === 'POST') {
+      return {
+        url: `${web}/memory`,
+        method,
+        body: { agentId: body?.botId, kind: body?.kind, content: body?.content },
+      };
+    }
+    if ((m = route.match(/^\/memory\/([^/]+)\/(share|unshare)$/))) {
+      return { url: `${web}/memory/${m[1]}/${m[2]}`, method, body: { targetAgentId: body?.botId } };
+    }
+    if ((m = route.match(/^\/memory\/([^/]+)$/))) {
+      return { url: `${web}/memory/${m[1]}`, method, body };
+    }
+    if (route.startsWith('/routines')) {
+      return { url: `${web}${route}`, method, body };
+    }
+    if (route === '/skills' && method === 'GET') {
+      return { url: `${web}/plugins`, method };
+    }
+    if ((m = route.match(/^\/skills\/([^/]+)$/))) {
+      if (method === 'DELETE') return { url: `${web}/plugins/skills/${m[1]}`, method };
+      return {
+        url: `${web}/plugins/skills`,
+        method: 'POST',
+        body: { ...body, slug: decodeURIComponent(m[1]), global: false },
+      };
+    }
+    return null;
+  }
+
+  /**
+   * A v1 resource call, or its web twin on a server whose v1 API lacks it.
+   * Resolves to null when the network fails.
+   */
+  private async resourceFetch(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    body?: any
+  ): Promise<Response | null> {
+    const web = this.toWebRequest(method, path, body);
+    const sendWeb = () =>
+      this.tryFetchUrl(web!.url, {
+        method: web!.method,
+        ...(web!.body !== undefined ? { body: JSON.stringify(web!.body) } : {}),
+      });
+    if (web && this.v1Resources === false) return sendWeb();
+
+    const res = await this.tryFetch(path, {
+      method,
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    if (!res) return null;
+    // A list read never 404s where the route exists, so it alone decides.
+    if (method === 'GET' && res.status !== 404) this.v1Resources = true;
+    if (res.status !== 404 || !web || this.v1Resources === true) return res;
+    if (method === 'GET') this.v1Resources = false;
+    return sendWeb();
   }
 
   private async readCache<T>(key: string): Promise<T[]> {
@@ -1320,46 +1463,94 @@ export class PukuBotApiClient {
     await AsyncStorage.setItem(key, JSON.stringify(list)).catch(ignore('pukuBotApi'));
   }
 
-  public async getMemories(botId?: string): Promise<PukuBotMemory[]> {
+  /** A memory in the v1 shape, from either the v1 or the web answer. */
+  private toMemory(raw: any): PukuBotMemory {
+    return {
+      id: raw?.id,
+      botId: raw?.botId ?? raw?.agentId ?? null,
+      kind: raw?.kind,
+      content: raw?.content ?? '',
+      useCount: raw?.useCount ?? raw?.accessCount ?? 0,
+      lastUsedAt: raw?.lastUsedAt ?? raw?.lastAccessedAt ?? null,
+      createdAt: raw?.createdAt ?? null,
+      updatedAt: raw?.updatedAt ?? null,
+    };
+  }
+
+  /** A skill in the v1 shape, from either the v1 or the web answer. */
+  private toSkill(raw: any): PukuBotSkill {
+    const owner = raw?.ownerUserId;
+    return {
+      slug: raw?.slug,
+      title: raw?.title ?? raw?.name ?? raw?.slug,
+      summary: raw?.summary ?? raw?.description ?? '',
+      instructions: raw?.instructions,
+      tools: raw?.tools ?? [],
+      mine: raw?.mine ?? (owner !== undefined && owner === this.user?.id),
+      deployment: raw?.deployment ?? owner === null,
+    };
+  }
+
+  /** A routine in the v1 shape, from either the v1 or the web answer. */
+  private toRoutine(raw: any): PukuBotRoutine {
+    return {
+      id: raw?.id,
+      botId: raw?.botId ?? raw?.agentId ?? null,
+      instruction: raw?.instruction ?? '',
+      schedule: raw?.schedule ?? '',
+      timezone: raw?.timezone,
+      enabled: !!raw?.enabled,
+      nextRunAt: raw?.nextRunAt ?? null,
+    };
+  }
+
+  /** One Bot's memories. Memory is per Bot, so the Bot is required. */
+  public async getMemories(botId: string): Promise<PukuBotMemory[]> {
     await this.init();
-    const res = await this.tryFetch(
-      botId ? `/memory?botId=${encodeURIComponent(botId)}` : '/memory'
-    );
+    const res = await this.resourceFetch('GET', `/memory?botId=${encodeURIComponent(botId)}`);
+    const cached = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
     if (res) {
       if (!res.ok) throw await this.errorFrom(res, 'Failed to load memories.');
       const data = await res.json();
-      const list = Array.isArray(data.memories) ? data.memories : Array.isArray(data) ? data : [];
-      await this.writeCache(STORAGE_KEYS.MEMORIES, list);
+      const list: PukuBotMemory[] = (
+        Array.isArray(data.memories) ? data.memories : Array.isArray(data) ? data : []
+      ).map((m: any) => this.toMemory(m));
+      // The cache holds every Bot's memories; replace only this Bot's.
+      await this.writeCache(STORAGE_KEYS.MEMORIES, [
+        ...list,
+        ...cached.filter(m => m.botId && m.botId !== botId),
+      ]);
       return list;
     }
-    const list = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
-    return botId ? list.filter(m => !m.botId || m.botId === botId) : list;
+    return cached.filter(m => !m.botId || m.botId === botId);
   }
 
-  public async createMemory(content: string, botId?: string): Promise<PukuBotMemory> {
+  public async createMemory(
+    content: string,
+    botId: string,
+    kind: PukuBotMemoryKind = 'fact'
+  ): Promise<PukuBotMemory> {
     await this.init();
-    const res = await this.tryFetch('/memory', {
-      method: 'POST',
-      body: JSON.stringify({ content, botId }),
-    });
+    const body = { botId, kind, content };
+    const res = await this.resourceFetch('POST', '/memory', body);
     const current = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
     let created: PukuBotMemory;
     if (res) {
       if (!res.ok) throw await this.errorFrom(res, 'Failed to add memory.');
       const data = await res.json();
-      created = data.memory || data;
+      created = this.toMemory(data.memory || data);
     } else {
       created = {
         id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        botId: botId || null,
+        botId,
+        kind,
         content,
-        shared: false,
         createdAt: new Date().toISOString(),
       };
       await pukuBotOutbox.enqueue({
         method: 'POST',
         path: '/memory',
-        body: { content, botId },
+        body,
         tempId: created.id,
         userId: this.user?.id,
       });
@@ -1370,17 +1561,15 @@ export class PukuBotApiClient {
 
   public async updateMemory(id: string, content: string): Promise<PukuBotMemory> {
     await this.init();
-    const res = await this.tryFetch(`/memory/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify({ content }),
-    });
+    const res = await this.resourceFetch('PUT', `/memory/${encodeURIComponent(id)}`, { content });
     if (res && !res.ok) throw await this.errorFrom(res, 'Failed to update memory.');
     const current = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
     const local = current.find(m => m.id === id);
     let updated: PukuBotMemory | undefined;
     if (res) {
       const data = await res.json().catch(() => null);
-      updated = data?.memory || (data?.id ? data : undefined);
+      const raw = data?.memory || (data?.id ? data : undefined);
+      updated = raw ? this.toMemory(raw) : undefined;
     } else {
       await pukuBotOutbox.enqueue({
         method: 'PUT',
@@ -1400,7 +1589,7 @@ export class PukuBotApiClient {
 
   public async deleteMemory(id: string): Promise<void> {
     await this.init();
-    const res = await this.tryFetch(`/memory/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await this.resourceFetch('DELETE', `/memory/${encodeURIComponent(id)}`);
     if (res && !res.ok && res.status !== 404) {
       throw await this.errorFrom(res, 'Failed to delete memory.');
     }
@@ -1415,42 +1604,35 @@ export class PukuBotApiClient {
     await this.writeCache(STORAGE_KEYS.MEMORIES, current.filter(m => m.id !== id));
   }
 
-  public async shareMemory(id: string): Promise<void> {
-    await this.setMemoryShared(id, true);
+  /** Let another Bot of theirs remember it too. */
+  public async shareMemory(id: string, botId: string): Promise<void> {
+    await this.setMemoryShared(id, botId, true);
   }
 
-  public async unshareMemory(id: string): Promise<void> {
-    await this.setMemoryShared(id, false);
+  /** Take it back from a Bot it was shared with. */
+  public async unshareMemory(id: string, botId: string): Promise<void> {
+    await this.setMemoryShared(id, botId, false);
   }
 
-  private async setMemoryShared(id: string, shared: boolean): Promise<void> {
+  private async setMemoryShared(id: string, botId: string, shared: boolean): Promise<void> {
     await this.init();
-    const res = await this.tryFetch(
-      `/memory/${encodeURIComponent(id)}/${shared ? 'share' : 'unshare'}`,
-      { method: 'POST' }
-    );
+    const path = `/memory/${encodeURIComponent(id)}/${shared ? 'share' : 'unshare'}`;
+    const res = await this.resourceFetch('POST', path, { botId });
     if (res && !res.ok) throw await this.errorFrom(res, 'Failed to update memory.');
     if (!res) {
-      await pukuBotOutbox.enqueue({
-        method: 'POST',
-        path: `/memory/${encodeURIComponent(id)}/${shared ? 'share' : 'unshare'}`,
-        userId: this.user?.id,
-      });
+      await pukuBotOutbox.enqueue({ method: 'POST', path, body: { botId }, userId: this.user?.id });
     }
-    const current = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
-    await this.writeCache(
-      STORAGE_KEYS.MEMORIES,
-      current.map(m => (m.id === id ? { ...m, shared } : m))
-    );
   }
 
   public async getRoutines(): Promise<PukuBotRoutine[]> {
     await this.init();
-    const res = await this.tryFetch('/routines');
+    const res = await this.resourceFetch('GET', '/routines');
     if (res) {
       if (!res.ok) throw await this.errorFrom(res, 'Failed to load routines.');
       const data = await res.json();
-      const list = Array.isArray(data.routines) ? data.routines : Array.isArray(data) ? data : [];
+      const list: PukuBotRoutine[] = (
+        Array.isArray(data.routines) ? data.routines : Array.isArray(data) ? data : []
+      ).map((r: any) => this.toRoutine(r));
       await this.writeCache(STORAGE_KEYS.ROUTINES, list);
       return list;
     }
@@ -1459,23 +1641,17 @@ export class PukuBotApiClient {
 
   public async setRoutineEnabled(id: string, enabled: boolean): Promise<PukuBotRoutine> {
     await this.init();
-    const res = await this.tryFetch(`/routines/${encodeURIComponent(id)}/enabled`, {
-      method: 'PUT',
-      body: JSON.stringify({ enabled }),
-    });
+    const path = `/routines/${encodeURIComponent(id)}/enabled`;
+    const res = await this.resourceFetch('PUT', path, { enabled });
     if (res && !res.ok) throw await this.errorFrom(res, 'Failed to update routine.');
     const current = await this.readCache<PukuBotRoutine>(STORAGE_KEYS.ROUTINES);
     let updated: PukuBotRoutine | undefined;
     if (res) {
       const data = await res.json().catch(() => null);
-      updated = data?.routine || (data?.id ? data : undefined);
+      const raw = data?.routine || (data?.id ? data : undefined);
+      updated = raw ? this.toRoutine(raw) : undefined;
     } else {
-      await pukuBotOutbox.enqueue({
-        method: 'PUT',
-        path: `/routines/${encodeURIComponent(id)}/enabled`,
-        body: { enabled },
-        userId: this.user?.id,
-      });
+      await pukuBotOutbox.enqueue({ method: 'PUT', path, body: { enabled }, userId: this.user?.id });
     }
     const local = current.find(r => r.id === id);
     updated = updated || (local ? { ...local, enabled } : undefined);
@@ -1489,7 +1665,7 @@ export class PukuBotApiClient {
 
   public async deleteRoutine(id: string): Promise<void> {
     await this.init();
-    const res = await this.tryFetch(`/routines/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await this.resourceFetch('DELETE', `/routines/${encodeURIComponent(id)}`);
     if (res && !res.ok && res.status !== 404) {
       throw await this.errorFrom(res, 'Failed to delete routine.');
     }
@@ -1504,42 +1680,60 @@ export class PukuBotApiClient {
     await this.writeCache(STORAGE_KEYS.ROUTINES, current.filter(r => r.id !== id));
   }
 
-  /** The person's own `/` skills (GET /skills). A Bot's skills come from getBot(). */
+  /** Every `/` skill this person can use: their own and the deployment's. */
   public async getSkills(): Promise<PukuBotSkill[]> {
     await this.init();
-    const res = await this.tryFetch('/skills');
+    const res = await this.resourceFetch('GET', '/skills');
     if (res) {
       if (!res.ok) throw await this.errorFrom(res, 'Failed to load skills.');
       const data = await res.json();
-      const list = Array.isArray(data.skills) ? data.skills : Array.isArray(data) ? data : [];
+      const list: PukuBotSkill[] = (
+        Array.isArray(data.skills) ? data.skills : Array.isArray(data) ? data : []
+      ).map((s: any) => this.toSkill(s));
       await this.writeCache(STORAGE_KEYS.SKILLS, list);
       return list;
     }
     return this.readCache<PukuBotSkill>(STORAGE_KEYS.SKILLS);
   }
 
+  /** Create or replace one of this person's own skills. */
   public async saveSkill(
     slug: string,
-    skill: { name: string; description?: string; prompt: string }
+    skill: { title: string; instructions: string; summary?: string }
   ): Promise<PukuBotSkill> {
     await this.init();
-    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
-    const res = await this.tryFetch(`/skills/${encodeURIComponent(cleanSlug)}`, {
-      method: 'PUT',
-      body: JSON.stringify(skill),
-    });
+    const cleanSlug = toSkillSlug(slug);
+    if (!SKILL_SLUG.test(cleanSlug)) {
+      throw new Error('A slug is 2–40 lower-case letters, numbers and hyphens.');
+    }
+    const existing = (await this.readCache<PukuBotSkill>(STORAGE_KEYS.SKILLS)).find(
+      s => s.slug === cleanSlug
+    );
+    if (existing && existing.mine === false) {
+      throw new Error(
+        existing.deployment
+          ? `/${cleanSlug} belongs to this deployment. Change it on the web.`
+          : `/${cleanSlug} is somebody else's skill.`
+      );
+    }
+    const body = {
+      title: skill.title,
+      instructions: skill.instructions,
+      ...(skill.summary ? { summary: skill.summary } : {}),
+    };
+    const path = `/skills/${encodeURIComponent(cleanSlug)}`;
+    const res = await this.resourceFetch('PUT', path, body);
     if (res && !res.ok) throw await this.errorFrom(res, 'Failed to save skill.');
-    let saved: PukuBotSkill = { slug: cleanSlug, ...skill };
+    let saved: PukuBotSkill = { slug: cleanSlug, ...body, mine: true, deployment: false };
     if (res) {
       const data = await res.json().catch(() => null);
-      saved = data?.skill || saved;
+      // v1 answers { skill }; the web answers the whole list.
+      const raw =
+        data?.skill ||
+        (Array.isArray(data?.skills) ? data.skills.find((s: any) => s.slug === cleanSlug) : null);
+      if (raw) saved = this.toSkill(raw);
     } else {
-      await pukuBotOutbox.enqueue({
-        method: 'PUT',
-        path: `/skills/${encodeURIComponent(cleanSlug)}`,
-        body: skill,
-        userId: this.user?.id,
-      });
+      await pukuBotOutbox.enqueue({ method: 'PUT', path, body, userId: this.user?.id });
     }
     const current = await this.readCache<PukuBotSkill>(STORAGE_KEYS.SKILLS);
     await this.writeCache(
@@ -1551,7 +1745,7 @@ export class PukuBotApiClient {
 
   public async deleteSkill(slug: string): Promise<void> {
     await this.init();
-    const res = await this.tryFetch(`/skills/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+    const res = await this.resourceFetch('DELETE', `/skills/${encodeURIComponent(slug)}`);
     if (res && !res.ok && res.status !== 404) {
       throw await this.errorFrom(res, 'Failed to delete skill.');
     }
@@ -1565,10 +1759,10 @@ export class PukuBotApiClient {
     const current = await this.readCache<PukuBotSkill>(STORAGE_KEYS.SKILLS);
     await this.writeCache(STORAGE_KEYS.SKILLS, current.filter(s => s.slug !== slug));
   }
-
   public async updateCachedMemoryId(tempId: string, realMemory: PukuBotMemory): Promise<void> {
     const current = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
-    const updated = current.map(m => (m.id === tempId ? { ...m, ...realMemory } : m));
+    const real = this.toMemory(realMemory);
+    const updated = current.map(m => (m.id === tempId ? { ...m, ...real } : m));
     await this.writeCache(STORAGE_KEYS.MEMORIES, updated);
   }
 
@@ -1581,6 +1775,11 @@ export class PukuBotApiClient {
       signOut: () => this.signOut(),
       updateCachedMemoryId: (tempId: string, realMemory: any) =>
         this.updateCachedMemoryId(tempId, realMemory),
+      send: async entry => {
+        const res = await this.resourceFetch(entry.method, entry.path, entry.body);
+        if (!res) throw new Error('Network failure');
+        return res;
+      },
     });
   }
 
@@ -1641,6 +1840,82 @@ export class PukuBotApiClient {
       STORAGE_KEYS.CONNECTIONS,
       current.map(c => (c.id === id ? { ...c, connected: false } : c))
     );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WORKSPACE: AGENTS, MARKETPLACE, DOCS, AGENT CLOUD
+  //
+  // The v1 API has no routes for these yet, so they use the web's own routes,
+  // which accept the same bearer token and apply the same permission checks.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /** A web route's JSON, or a readable error. Needs the network. */
+  private async webJson<T = any>(path: string, init?: RequestInit, fallback = 'Request failed.'): Promise<T> {
+    await this.init();
+    const res = await this.tryFetchUrl(`${this.getWebOrigin()}${path}`, init);
+    if (!res) throw new Error('Cannot reach Puku Bot. Check your connection and try again.');
+    if (!res.ok) throw await this.errorFrom(res, fallback);
+    return res.json();
+  }
+
+  /** The Bots this person made and the ones shared with them, as the web's Agents page lists them. */
+  public async getAgents(): Promise<PukuBotAgent[]> {
+    const data = await this.webJson<{ agents?: PukuBotAgent[] }>('/api/agents', undefined, 'Failed to load agents.');
+    return Array.isArray(data.agents) ? data.agents : [];
+  }
+
+  /** A new private coworker that runs on this deployment's Bot, from its role description. */
+  public async createAgent(input: {
+    name: string;
+    title: string;
+    roleDescription: string;
+    visibility?: 'public' | 'private';
+  }): Promise<PukuBotAgent> {
+    const data = await this.webJson<{ agent: PukuBotAgent }>(
+      '/api/agents',
+      {
+        method: 'POST',
+        body: JSON.stringify({ visibility: 'private', ...input }),
+      },
+      'Failed to create the agent.'
+    );
+    return data.agent;
+  }
+
+  /** Every published template, newest first, optionally in one category. */
+  public async getMarketplace(category?: PukuBotTemplateCategory): Promise<PukuBotTemplate[]> {
+    const data = await this.webJson<{ marketplace?: { templates?: PukuBotTemplate[] } }>(
+      category
+        ? `/api/agents/marketplace?category=${encodeURIComponent(category)}`
+        : '/api/agents/marketplace',
+      undefined,
+      'Failed to load the Marketplace.'
+    );
+    return data.marketplace?.templates ?? [];
+  }
+
+  /** Copies a template into this person's roster as a private Bot they own. */
+  public async installTemplate(templateAgentId: string): Promise<PukuBotAgent> {
+    const data = await this.webJson<{ agent: PukuBotAgent }>(
+      `/api/agents/marketplace/${encodeURIComponent(templateAgentId)}/install`,
+      { method: 'POST' },
+      'Failed to install this template.'
+    );
+    return data.agent;
+  }
+
+  /** Deployment facts, such as where the Agent Cloud entry links. Public. */
+  public async getCapabilities(): Promise<PukuBotCapabilities> {
+    const data = await this.webJson<any>('/api/capabilities', undefined, 'Failed to load settings.');
+    return {
+      agentCloudUrl: typeof data?.agentCloudUrl === 'string' ? data.agentCloudUrl : null,
+      defaultBotId: data?.defaultBotId,
+    };
+  }
+
+  /** The deployment's Docs, a public page on the web. */
+  public getDocsUrl(): string {
+    return `${this.getWebOrigin()}/docs`;
   }
 }
 

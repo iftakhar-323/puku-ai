@@ -64,7 +64,8 @@ import {
   promptMediaAttachment,
 } from '../../services/nativeModules';
 import { formatActivityDate } from '../../utils/date';
-import { MAX_INSTRUCTIONS_LENGTH, pukuBotApi } from '../../services/pukuBotApi';
+import { MAX_INSTRUCTIONS_LENGTH, pukuBotApi, toSkillSlug } from '../../services/pukuBotApi';
+import { PukuBotWorkspaceSheet, WorkspaceSheetPanel } from './PukuBotWorkspaceSheet';
 import { pukuBotOutbox, PukuBotOutboxEntry } from '../../services/pukuBotOutbox';
 import { isOnline, addConnectivityListener } from '../../utils/connectivity';
 import { ignore } from '../../utils/devLog';
@@ -440,6 +441,7 @@ export function PukuBotScreen() {
     selectBotConversation,
     replaceBotConversations,
     profile,
+    botWorkspaceRequest,
   } = useApp();
   const { isActive: isRemoteActive, liveRelaySessions } = useRemoteSession();
   const isTerminalLive = isRemoteActive || liveRelaySessions.length > 0;
@@ -514,6 +516,12 @@ export function PukuBotScreen() {
   const [newSkillName, setNewSkillName] = useState('');
   const [newSkillPrompt, setNewSkillPrompt] = useState('');
   const [showAddSkillForm, setShowAddSkillForm] = useState(false);
+  // Memory is per Bot: the Bot whose memories the Memory tab shows, as on the web.
+  const [memoryBotId, setMemoryBotId] = useState<string | null>(null);
+  const [isLoadingMemories, setIsLoadingMemories] = useState(false);
+  const [sharingMemoryId, setSharingMemoryId] = useState<string | null>(null);
+  // Agents and Marketplace
+  const [workspaceSheet, setWorkspaceSheet] = useState<WorkspaceSheetPanel | null>(null);
   const [connectionsList, setConnectionsList] = useState<PukuBotConnection[]>([]);
 
   const flatListRef = useRef<FlatList>(null);
@@ -640,6 +648,55 @@ export function PukuBotScreen() {
     };
   }, [isAuthenticated, availableBots, selectedBotId]);
 
+  // The Memory tab's Bot: the one in use until the person picks another.
+  const shownMemoryBotId = memoryBotId || selectedBotId;
+  useEffect(() => {
+    if (!isAuthenticated || !shownMemoryBotId) return;
+    let cancelled = false;
+    setIsLoadingMemories(true);
+    pukuBotApi
+      .getMemories(shownMemoryBotId)
+      .then(list => {
+        if (!cancelled) setMemoriesList(list);
+      })
+      .catch(() => {
+        if (!cancelled) setMemoriesList([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingMemories(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, shownMemoryBotId]);
+
+  // The drawer's Workspace entries: Skills and Memory are tabs of the settings
+  // sheet; Agents and Marketplace have a sheet of their own.
+  useEffect(() => {
+    if (!botWorkspaceRequest) return;
+    const { panel } = botWorkspaceRequest;
+    if (panel === 'skills' || panel === 'memory') {
+      setWorkspaceSheet(null);
+      setActiveSettingsTab(panel);
+      setShowSettingsModal(true);
+      if (pukuBotApi.isAuthenticated()) {
+        if (panel === 'skills') pukuBotApi.getSkills().then(setUserSkillsList).catch(ignore('PukuBotScreen'));
+      }
+    } else {
+      setShowSettingsModal(false);
+      setWorkspaceSheet(panel);
+    }
+  }, [botWorkspaceRequest]);
+
+  /** From Agents or Marketplace: refresh the roster (it may have just grown) and talk to that Bot. */
+  const handleStartChatWith = async (botId: string) => {
+    setWorkspaceSheet(null);
+    const bots = await pukuBotApi.getBots().catch(() => null);
+    if (bots && bots.length > 0) setAvailableBots(bots);
+    setSelectedBotId(botId);
+    handleNewConversation();
+  };
+
   // Initialize Puku Bot API
   useEffect(() => {
     let isMounted = true;
@@ -655,12 +712,11 @@ export function PukuBotScreen() {
 
       if (authed) {
         try {
-          const [bots, me, skills, instructions, memories, routines, conns, convRes] = await Promise.all([
+          const [bots, me, skills, instructions, routines, conns, convRes] = await Promise.all([
             pukuBotApi.getBots().catch(() => []),
             pukuBotApi.getMe().catch(() => null),
             pukuBotApi.getSkills().catch(() => []),
             pukuBotApi.getPersonalInstructions().catch(() => ({ instructions: '' })),
-            pukuBotApi.getMemories().catch(() => []),
             pukuBotApi.getRoutines().catch(() => []),
             pukuBotApi.getConnections().catch(() => []),
             pukuBotApi.getConversations(20).catch(() => ({ conversations: [], nextCursor: null })),
@@ -678,7 +734,6 @@ export function PukuBotScreen() {
           if (instructions?.instructions) {
             setInstructionsText(instructions.instructions);
           }
-          setMemoriesList(memories);
           setRoutinesList(routines);
           setConnectionsList(conns);
           applyConversationPage(convRes.conversations || [], convRes.nextCursor ?? null, false);
@@ -1288,7 +1343,7 @@ export function PukuBotScreen() {
   const handleAddMemory = async () => {
     if (!newMemoryInput.trim()) return;
     try {
-      const created = await pukuBotApi.createMemory(newMemoryInput.trim(), selectedBotId);
+      const created = await pukuBotApi.createMemory(newMemoryInput.trim(), shownMemoryBotId);
       setMemoriesList(prev => [created, ...prev]);
       setNewMemoryInput('');
     } catch (err: any) {
@@ -1305,16 +1360,13 @@ export function PukuBotScreen() {
     }
   };
 
-  const handleToggleMemoryShare = async (id: string, currentlyShared?: boolean) => {
+  /** Let another of their Bots remember it too. */
+  const handleShareMemory = async (id: string, botId: string) => {
     try {
-      if (currentlyShared) {
-        await pukuBotApi.unshareMemory(id);
-      } else {
-        await pukuBotApi.shareMemory(id);
-      }
-      setMemoriesList(prev =>
-        prev.map(m => (m.id === id ? { ...m, shared: !currentlyShared } : m))
-      );
+      await pukuBotApi.shareMemory(id, botId);
+      setSharingMemoryId(null);
+      const bot = availableBots.find(b => b.id === botId);
+      Alert.alert('Shared', `${bot?.name || 'That Bot'} remembers this too now.`);
     } catch (err: any) {
       Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to update memory.');
     }
@@ -1339,14 +1391,14 @@ export function PukuBotScreen() {
   };
 
   const handleSaveSkill = async () => {
-    if (!newSkillSlug.trim() || !newSkillName.trim()) {
-      Alert.alert(t('pukuBot.errorTitle'), 'Please enter a slug and title.');
+    if (!newSkillName.trim() || !newSkillPrompt.trim()) {
+      Alert.alert(t('pukuBot.errorTitle'), 'A skill needs a title and instructions.');
       return;
     }
     try {
-      const saved = await pukuBotApi.saveSkill(newSkillSlug.trim(), {
-        name: newSkillName.trim(),
-        prompt: newSkillPrompt.trim() || `Run ${newSkillName.trim()}`,
+      const saved = await pukuBotApi.saveSkill(newSkillSlug.trim() || toSkillSlug(newSkillName), {
+        title: newSkillName.trim(),
+        instructions: newSkillPrompt.trim(),
       });
       setUserSkillsList(prev => prev.filter(s => s.slug !== saved.slug).concat(saved));
       setNewSkillSlug('');
@@ -1473,7 +1525,7 @@ export function PukuBotScreen() {
     if (!showSkillsMenu && !match) return [];
     const prefix = (match?.[1] || '').toLowerCase();
     return botSkills.filter(
-      s => !prefix || s.slug.toLowerCase().startsWith(prefix) || s.name.toLowerCase().includes(prefix)
+      s => !prefix || s.slug.toLowerCase().startsWith(prefix) || (s.title || '').toLowerCase().includes(prefix)
     );
   })();
 
@@ -2213,7 +2265,7 @@ export function PukuBotScreen() {
                   /{skill.slug}
                 </Text>
                 <Text style={{ fontSize: 10.5, color: theme.textMuted, fontFamily: monoFont }}>
-                  {skill.name}
+                  {skill.title}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -2291,6 +2343,15 @@ export function PukuBotScreen() {
       </View>
 
 
+
+      {/* Agents and Marketplace (drawer → Workspace) */}
+      <PukuBotWorkspaceSheet
+        visible={workspaceSheet !== null}
+        panel={workspaceSheet ?? 'agents'}
+        onChangePanel={setWorkspaceSheet}
+        onClose={() => setWorkspaceSheet(null)}
+        onStartChat={handleStartChatWith}
+      />
 
       {/* Settings Modal with Multi-Tab Navigation */}
       <Modal
@@ -2561,13 +2622,41 @@ export function PukuBotScreen() {
               {activeSettingsTab === 'memory' && (
                 <View>
                   <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8, fontFamily: monoFont }}>
-                    Context and facts your bot remembers:
+                    What your Bots remember about you and your work. The Bot reads these at the top of every turn.
                   </Text>
+                  {/* Memory is per Bot: pick whose */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 10 }}>
+                    {availableBots.map(bot => {
+                      const isActive = bot.id === shownMemoryBotId;
+                      return (
+                        <TouchableOpacity
+                          key={bot.id}
+                          accessibilityRole="button"
+                          onPress={() => {
+                            setMemoryBotId(bot.id);
+                            setSharingMemoryId(null);
+                          }}
+                          style={{
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            borderRadius: 14,
+                            borderWidth: 1,
+                            borderColor: isActive ? '#35D6B4' : theme.border,
+                            backgroundColor: isActive ? 'rgba(53, 214, 180, 0.15)' : 'transparent',
+                          }}>
+                          <Text style={{ fontSize: 11.5, color: isActive ? '#35D6B4' : theme.textSecondary, fontFamily: monoFont }}>
+                            {bot.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
                   <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                     <TextInput
                       value={newMemoryInput}
                       onChangeText={setNewMemoryInput}
-                      placeholder="Add a new memory..."
+                      maxLength={1000}
+                      placeholder="A fact the Bot should know..."
                       placeholderTextColor={theme.placeholderText}
                       style={{
                         flex: 1,
@@ -2592,14 +2681,16 @@ export function PukuBotScreen() {
                         justifyContent: 'center',
                       }}>
                       <Text style={{ color: isDark ? '#141613' : '#FFF', fontWeight: '700', fontSize: 12, fontFamily: monoFont }}>
-                        Add
+                        Remember
                       </Text>
                     </TouchableOpacity>
                   </View>
 
-                  {memoriesList.length === 0 ? (
+                  {isLoadingMemories && memoriesList.length === 0 ? (
+                    <ActivityIndicator color="#35D6B4" style={{ marginVertical: 12 }} />
+                  ) : memoriesList.length === 0 ? (
                     <Text style={{ color: theme.textMuted, fontSize: 12, fontStyle: 'italic', marginVertical: 12, fontFamily: monoFont }}>
-                      No memories stored yet.
+                      Nothing remembered yet. Add a fact the Bot should know.
                     </Text>
                   ) : (
                     memoriesList.map(mem => (
@@ -2622,24 +2713,47 @@ export function PukuBotScreen() {
                           </View>
                         )}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                          <TouchableOpacity
-                            onPress={() => handleToggleMemoryShare(mem.id, mem.shared)}
-                            style={{
-                              paddingHorizontal: 8,
-                              paddingVertical: 3,
-                              borderRadius: 6,
-                              backgroundColor: mem.shared ? 'rgba(53, 214, 180, 0.15)' : 'transparent',
-                              borderWidth: 1,
-                              borderColor: mem.shared ? '#35D6B4' : theme.border,
-                            }}>
-                            <Text style={{ fontSize: 10.5, color: mem.shared ? '#35D6B4' : theme.textMuted, fontFamily: monoFont }}>
-                              {mem.shared ? 'Shared with all Bots' : 'Private to Bot'}
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleDeleteMemory(mem.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                            <TrashIcon size={14} color="#FF4D4F" />
-                          </TouchableOpacity>
+                          <Text style={{ fontSize: 10.5, color: theme.textMuted, fontFamily: monoFont }}>
+                            {mem.kind || 'fact'}
+                            {mem.useCount ? ` · used ${mem.useCount}×` : ''}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            {availableBots.length > 1 && !mem.id.startsWith('mem_') && (
+                              <TouchableOpacity
+                                accessibilityRole="button"
+                                onPress={() => setSharingMemoryId(prev => (prev === mem.id ? null : mem.id))}
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 3,
+                                  borderRadius: 6,
+                                  borderWidth: 1,
+                                  borderColor: sharingMemoryId === mem.id ? '#35D6B4' : theme.border,
+                                }}>
+                                <Text style={{ fontSize: 10.5, color: sharingMemoryId === mem.id ? '#35D6B4' : theme.textMuted, fontFamily: monoFont }}>
+                                  Share with…
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Forget" onPress={() => handleDeleteMemory(mem.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                              <TrashIcon size={14} color="#FF4D4F" />
+                            </TouchableOpacity>
+                          </View>
                         </View>
+                        {sharingMemoryId === mem.id && (
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                            {availableBots
+                              .filter(b => b.id !== shownMemoryBotId)
+                              .map(b => (
+                                <TouchableOpacity
+                                  key={b.id}
+                                  accessibilityRole="button"
+                                  onPress={() => handleShareMemory(mem.id, b.id)}
+                                  style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+                                  <Text style={{ fontSize: 11, color: theme.textPrimary, fontFamily: monoFont }}>{b.name}</Text>
+                                </TouchableOpacity>
+                              ))}
+                          </View>
+                        )}
                       </View>
                     ))
                   )}
@@ -2671,7 +2785,7 @@ export function PukuBotScreen() {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <View style={{ flex: 1, paddingRight: 8 }}>
                             <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 13, fontFamily: monoFont }}>
-                              {rt.name}
+                              {rt.instruction}
                             </Text>
                             {outboxEntries.some(e => e.path.includes(rt.id)) && (
                               <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#3D3418' : '#FEF3C7', alignSelf: 'flex-start', marginTop: 2 }}>
@@ -2693,11 +2807,13 @@ export function PukuBotScreen() {
                           </TouchableOpacity>
                         </View>
                         <Text style={{ color: theme.textMuted, fontSize: 11, marginTop: 4, fontFamily: monoFont }}>
-                          Schedule: {rt.schedule}
+                          Schedule: {rt.schedule}{rt.timezone ? ` (${rt.timezone})` : ''}
                         </Text>
-                        <Text numberOfLines={2} style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4, fontFamily: monoFont }}>
-                          {rt.prompt}
-                        </Text>
+                        {rt.nextRunAt ? (
+                          <Text style={{ color: theme.textMuted, fontSize: 11, marginTop: 2, fontFamily: monoFont }}>
+                            Next run: {new Date(rt.nextRunAt).toLocaleString()}
+                          </Text>
+                        ) : null}
                         <View style={{ alignItems: 'flex-end', marginTop: 6 }}>
                           <TouchableOpacity onPress={() => handleDeleteRoutine(rt.id)}>
                             <TrashIcon size={14} color="#FF4D4F" />
@@ -2712,15 +2828,18 @@ export function PukuBotScreen() {
               {/* TAB 5: Skills */}
               {activeSettingsTab === 'skills' && (
                 <View>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 10, fontFamily: monoFont }}>
+                    A skill is a named instruction you invoke with / and a Bot follows. Yours are yours alone, and go on the Bots you own.
+                  </Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ fontSize: 12, color: theme.textSecondary, fontFamily: monoFont }}>
-                      Custom / skills available in chat:
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontFamily: monoFont }}>
+                      Your skills
                     </Text>
                     <TouchableOpacity
                       onPress={() => setShowAddSkillForm(prev => !prev)}
                       style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: isDark ? '#35D6B4' : '#1A1D18' }}>
                       <Text style={{ color: isDark ? '#141613' : '#FFF', fontSize: 11, fontWeight: '700', fontFamily: monoFont }}>
-                        {showAddSkillForm ? 'Cancel' : '+ New Skill'}
+                        {showAddSkillForm ? 'Cancel' : '+ New skill'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -2728,73 +2847,108 @@ export function PukuBotScreen() {
                   {showAddSkillForm && (
                     <View style={{ padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#35D6B4', marginBottom: 12, backgroundColor: theme.secondaryBackground }}>
                       <TextInput
-                        value={newSkillSlug}
-                        onChangeText={setNewSkillSlug}
-                        placeholder="slug (e.g. translate-french)"
+                        value={newSkillName}
+                        onChangeText={setNewSkillName}
+                        maxLength={120}
+                        placeholder="Title (e.g. Translate to French)"
                         placeholderTextColor={theme.placeholderText}
                         style={{ height: 36, borderWidth: 1, borderColor: theme.border, borderRadius: 6, paddingHorizontal: 8, marginBottom: 6, color: theme.textPrimary, fontSize: 12, fontFamily: monoFont }}
                       />
                       <TextInput
-                        value={newSkillName}
-                        onChangeText={setNewSkillName}
-                        placeholder="Skill Name (e.g. Translate to French)"
+                        value={newSkillSlug}
+                        onChangeText={text => setNewSkillSlug(text.toLowerCase())}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={40}
+                        placeholder={`/${toSkillSlug(newSkillName) || 'slug'} (from the title)`}
                         placeholderTextColor={theme.placeholderText}
                         style={{ height: 36, borderWidth: 1, borderColor: theme.border, borderRadius: 6, paddingHorizontal: 8, marginBottom: 6, color: theme.textPrimary, fontSize: 12, fontFamily: monoFont }}
                       />
                       <TextInput
                         value={newSkillPrompt}
                         onChangeText={setNewSkillPrompt}
-                        placeholder="Prompt template"
+                        multiline
+                        placeholder="Instructions the Bot follows"
                         placeholderTextColor={theme.placeholderText}
-                        style={{ height: 36, borderWidth: 1, borderColor: theme.border, borderRadius: 6, paddingHorizontal: 8, marginBottom: 8, color: theme.textPrimary, fontSize: 12, fontFamily: monoFont }}
+                        style={{ minHeight: 80, borderWidth: 1, borderColor: theme.border, borderRadius: 6, paddingHorizontal: 8, paddingTop: 8, marginBottom: 8, color: theme.textPrimary, fontSize: 12, fontFamily: monoFont, textAlignVertical: 'top' }}
                       />
                       <TouchableOpacity
                         onPress={handleSaveSkill}
                         style={{ height: 34, borderRadius: 6, backgroundColor: '#35D6B4', alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ color: '#141613', fontWeight: '700', fontSize: 12, fontFamily: monoFont }}>
-                          Save Skill
+                          Save skill
                         </Text>
                       </TouchableOpacity>
                     </View>
                   )}
 
-                  {userSkillsList.map(skill => (
-                    <View
-                      key={skill.slug}
-                      style={{
-                        padding: 10,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: theme.border,
-                        backgroundColor: theme.secondaryBackground,
-                        marginBottom: 8,
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}>
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <Text style={{ color: '#35D6B4', fontWeight: '700', fontSize: 12.5, fontFamily: monoFont }}>
-                          /{skill.slug}
-                        </Text>
-                        {outboxEntries.some(e => e.path.includes(skill.slug)) && (
-                          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#3D3418' : '#FEF3C7', alignSelf: 'flex-start', marginTop: 2 }}>
-                            <Text style={{ fontSize: 9.5, fontWeight: '600', color: isDark ? '#FBBF24' : '#D97706', fontFamily: monoFont }}>Waiting to sync</Text>
-                          </View>
-                        )}
-                        <Text style={{ color: theme.textPrimary, fontSize: 12, marginTop: 2, fontFamily: monoFont }}>
-                          {skill.name}
-                        </Text>
-                        {skill.description ? (
-                          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 11, marginTop: 2, fontFamily: monoFont }}>
-                            {skill.description}
+                  {(() => {
+                    const renderSkill = (skill: PukuBotSkill, editable: boolean) => (
+                      <View
+                        key={skill.slug}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: theme.border,
+                          backgroundColor: theme.secondaryBackground,
+                          marginBottom: 8,
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 12.5, fontFamily: monoFont }}>
+                            {skill.title}
                           </Text>
-                        ) : null}
+                          {outboxEntries.some(e => e.path.includes(skill.slug)) && (
+                            <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#3D3418' : '#FEF3C7', alignSelf: 'flex-start', marginTop: 2 }}>
+                              <Text style={{ fontSize: 9.5, fontWeight: '600', color: isDark ? '#FBBF24' : '#D97706', fontFamily: monoFont }}>Waiting to sync</Text>
+                            </View>
+                          )}
+                          <Text style={{ color: '#35D6B4', fontSize: 12, marginTop: 2, fontFamily: monoFont }}>
+                            /{skill.slug}
+                          </Text>
+                          {skill.summary ? (
+                            <Text numberOfLines={2} style={{ color: theme.textMuted, fontSize: 11, marginTop: 2, fontFamily: monoFont }}>
+                              {skill.summary}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {editable && (
+                          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete /${skill.slug}`} onPress={() => handleDeleteSkill(skill.slug)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <TrashIcon size={14} color="#FF4D4F" />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      <TouchableOpacity onPress={() => handleDeleteSkill(skill.slug)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <TrashIcon size={14} color="#FF4D4F" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+                    );
+                    const mine = userSkillsList.filter(s => s.mine !== false && !s.deployment);
+                    const workspace = userSkillsList.filter(s => s.deployment);
+                    return (
+                      <>
+                        {mine.length === 0 ? (
+                          <Text style={{ color: theme.textMuted, fontSize: 12, fontStyle: 'italic', marginVertical: 10, fontFamily: monoFont }}>
+                            You don&apos;t have any skills yet.
+                          </Text>
+                        ) : (
+                          mine.map(skill => renderSkill(skill, true))
+                        )}
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, marginTop: 12, fontFamily: monoFont }}>
+                          Workspace skills
+                        </Text>
+                        <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2, marginBottom: 8, fontFamily: monoFont }}>
+                          Written for everyone by an administrator. Change them on the web.
+                        </Text>
+                        {workspace.length === 0 ? (
+                          <Text style={{ color: theme.textMuted, fontSize: 12, fontStyle: 'italic', marginVertical: 10, fontFamily: monoFont }}>
+                            No workspace skills.
+                          </Text>
+                        ) : (
+                          workspace.map(skill => renderSkill(skill, false))
+                        )}
+                      </>
+                    );
+                  })()}
                 </View>
               )}
 

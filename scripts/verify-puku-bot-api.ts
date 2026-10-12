@@ -150,6 +150,41 @@ async function run() {
     results.push({ endpoint: '/bots/:id', method: 'GET', status: 'FAIL', notes: err.message });
   }
 
+  // 3b. Workspace (read-only): what the app's Skills, Agents, Memory, Marketplace and
+  // Agent Cloud read. A v1 route this server lacks is fine when its web twin answers,
+  // since the app falls back to it.
+  const WEB_ORIGIN = BASE_URL.replace(/\/api\/v1\/?$/, '');
+  const workspaceChecks: Array<{ label: string; v1?: string; web: string }> = [
+    { label: 'Memory', v1: `/memory?botId=${encodeURIComponent(defaultBotId)}`, web: `/api/memory?agentId=${encodeURIComponent(defaultBotId)}` },
+    { label: 'Skills', v1: '/skills', web: '/api/plugins' },
+    { label: 'Routines', v1: '/routines', web: '/api/routines' },
+    { label: 'Agents', web: '/api/agents' },
+    { label: 'Marketplace', web: '/api/agents/marketplace' },
+    { label: 'Capabilities (Agent Cloud)', web: '/api/capabilities' },
+  ];
+  for (const check of workspaceChecks) {
+    try {
+      let via = 'web';
+      let res: Response | null = null;
+      if (check.v1) {
+        res = await fetch(`${BASE_URL}${check.v1}`, { headers });
+        via = 'v1';
+      }
+      if (!res || res.status === 404) {
+        res = await fetch(`${WEB_ORIGIN}${check.web}`, { headers });
+        via = check.v1 ? 'web (v1 404)' : 'web';
+      }
+      results.push({
+        endpoint: `Workspace: ${check.label}`,
+        method: 'GET',
+        status: res.ok ? 'PASS' : 'FAIL',
+        notes: `${via}: HTTP ${res.status}`,
+      });
+    } catch (err: any) {
+      results.push({ endpoint: `Workspace: ${check.label}`, method: 'GET', status: 'FAIL', notes: err.message });
+    }
+  }
+
   // 4. Conversations CRUD & Routing
   let testConvId: string | null = null;
   // Create with text (auto-routing)
