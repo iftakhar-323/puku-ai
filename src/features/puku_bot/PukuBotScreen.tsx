@@ -2,11 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { useTranslation } from 'react-i18next';
@@ -61,8 +65,9 @@ import {
 } from '../../services/nativeModules';
 import { formatActivityDate } from '../../utils/date';
 import { MAX_INSTRUCTIONS_LENGTH, pukuBotApi } from '../../services/pukuBotApi';
+import { pukuBotOutbox, PukuBotOutboxEntry } from '../../services/pukuBotOutbox';
+import { isOnline, addConnectivityListener } from '../../utils/connectivity';
 import { ignore } from '../../utils/devLog';
-import { tokenManager } from '../../services/tokenManager';
 import { useApp } from '../../store/AppContext';
 import { useRemoteSession } from '../../store/RemoteSessionContext';
 import {
@@ -88,6 +93,10 @@ interface LocalChatMessage {
   timestamp?: string;
   toolCalls?: PukuBotToolCall[];
   attachment?: PickedMedia;
+  attachments?: PukuBotAttachment[];
+  botId?: string;
+  botName?: string;
+  kind?: 'background_task';
   /** A status line from the app (e.g. a failed reply), not something a Bot said. */
   notice?: boolean;
 }
@@ -405,7 +414,16 @@ export function describeTurnFailure(event: { code?: string; message?: string }):
 }
 
 function toLocalMessages(list: PukuBotMessage[]): LocalChatMessage[] {
-  return list.map(m => ({ id: m.id, role: m.role, text: m.text, toolCalls: m.toolCalls }));
+  return list.map(m => ({
+    id: m.id,
+    role: m.role,
+    text: m.text,
+    botId: m.botId,
+    botName: m.botName,
+    kind: m.kind,
+    attachments: m.attachments,
+    toolCalls: m.toolCalls,
+  }));
 }
 
 export function PukuBotScreen() {
@@ -435,6 +453,12 @@ export function PukuBotScreen() {
   const [inputVal, setInputVal] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const loadedBeforeIdsRef = useRef<Set<string>>(new Set());
+  const [isDeviceOnline, setIsDeviceOnline] = useState(true);
+  const [outboxEntries, setOutboxEntries] = useState<PukuBotOutboxEntry[]>([]);
+  const [outboxNotice, setOutboxNotice] = useState<string | null>(null);
 
   // Puku Bot API (v1) state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -624,17 +648,7 @@ export function PukuBotScreen() {
       await pukuBotApi.init();
       if (!isMounted) return;
 
-      let authed = pukuBotApi.isAuthenticated();
-      if (!authed) {
-        const appToken =
-          (await tokenManager.ensureValidToken().catch(() => null)) ||
-          tokenManager.getAccessTokenSync();
-        if (appToken) {
-          await pukuBotApi.setToken(appToken);
-          authed = true;
-        }
-      }
-
+      const authed = pukuBotApi.isAuthenticated();
       setIsAuthenticated(authed);
       setBotUser(pukuBotApi.getUser());
       setCustomApiUrl(pukuBotApi.getBaseUrl());
@@ -659,11 +673,6 @@ export function PukuBotScreen() {
           }
           if (me) {
             setBotUser(me);
-            // The app has no onboarding screens of its own: once signed in,
-            // finish onboarding so the web does not run it again.
-            if (me.onboarding && !me.onboarding.completedAt) {
-              pukuBotApi.updateOnboarding({ completed: true }).catch(ignore('PukuBotScreen'));
-            }
           }
           setUserSkillsList(skills);
           if (instructions?.instructions) {
@@ -705,6 +714,34 @@ export function PukuBotScreen() {
     // Mount-only: sets up the API client and auth listener once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Offline connectivity tracking and automatic outbox replay
+  useEffect(() => {
+    isOnline().then(setIsDeviceOnline);
+    const unsubNet = addConnectivityListener(online => {
+      setIsDeviceOnline(online);
+      if (online && isAuthenticated) {
+        pukuBotApi.replayOutbox().catch(ignore('PukuBotScreen'));
+      }
+    });
+    const unsubOutbox = pukuBotOutbox.subscribe((entries, notice) => {
+      setOutboxEntries(entries);
+      if (notice) setOutboxNotice(notice);
+    });
+    const appStateSub = AppState.addEventListener('change', state => {
+      if (state === 'active' && isAuthenticated) {
+        pukuBotApi.replayOutbox().catch(ignore('PukuBotScreen'));
+      }
+    });
+    if (isAuthenticated) {
+      pukuBotApi.replayOutbox().catch(ignore('PukuBotScreen'));
+    }
+    return () => {
+      unsubNet();
+      unsubOutbox();
+      appStateSub.remove();
+    };
+  }, [isAuthenticated]);
 
   const [showBotPickerSheet, setShowBotPickerSheet] = useState(false);
 
@@ -844,9 +881,11 @@ export function PukuBotScreen() {
     });
 
   /**
-   * Opens a conversation at once (its Bot, an empty thread with a spinner)
-   * and fills in the messages as they arrive, so a tap never waits on the
-   * network. A reply still running there is picked up live.
+   * Opens a conversation at once:
+   * 1. Shows cached messages immediately from AsyncStorage.
+   * 2. Fetches GET /conversations/:id/messages?limit=50 and replaces the cache and view.
+   * 3. If offline, keeps cached messages and displays quiet notice without error popup.
+   * 4. Resumes any active reply stream.
    */
   const openConversation = async (convId: string) => {
     if (openingConvIdRef.current === convId && activeConversation?.id === convId) return;
@@ -855,6 +894,8 @@ export function PukuBotScreen() {
     setNeedsPerson(null);
     setPendingAttachment(null);
     setShowSkillsMenu(false);
+    setHasMoreMessages(false);
+    loadedBeforeIdsRef.current = new Set();
 
     if (!isAuthenticated) {
       const local = botConversations.find(c => c.id === convId);
@@ -866,14 +907,36 @@ export function PukuBotScreen() {
     const known = serverConversations.find(c => c.id === convId);
     setActiveConversation(known || ({ id: convId, botId: null } as unknown as PukuBotConversation));
     if (known?.botId) setSelectedBotId(known.botId);
-    setMessages([]);
+
+    // 1. Immediately show cached messages for that conversation from AsyncStorage
+    const cacheKey = `@pukubot_messages_${convId}`;
+    let hasCached = false;
+    try {
+      const cachedRaw = await AsyncStorage.getItem(cacheKey);
+      if (openingConvIdRef.current !== convId) return;
+      if (cachedRaw) {
+        const parsed = JSON.parse(cachedRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(toLocalMessages(parsed));
+          hasCached = true;
+        }
+      }
+    } catch {}
+
+    if (openingConvIdRef.current !== convId) return;
+    if (!hasCached) {
+      setMessages([]);
+    }
     setIsLoadingThread(true);
 
     try {
       const res = await pukuBotApi.getMessages(convId, 50);
       if (openingConvIdRef.current !== convId) return;
-      setMessages(toLocalMessages(res.messages || []));
+      const loaded = toLocalMessages(res.messages || []);
+      setMessages(loaded);
+      setHasMoreMessages(Boolean(res.hasMore));
       setIsLoadingThread(false);
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(res.messages || [])).catch(ignore('PukuBotScreen'));
 
       pukuBotApi.markConversationRead(convId).catch(ignore('PukuBotScreen'));
       setServerConversations(prev => prev.map(c => (c.id === convId ? { ...c, unread: false } : c)));
@@ -887,15 +950,45 @@ export function PukuBotScreen() {
         const fresh = await pukuBotApi.getMessages(convId, 50).catch(() => null);
         if (fresh && openingConvIdRef.current === convId) {
           setMessages(toLocalMessages(fresh.messages || []));
+          setHasMoreMessages(Boolean(fresh.hasMore));
+          await AsyncStorage.setItem(cacheKey, JSON.stringify(fresh.messages || [])).catch(ignore('PukuBotScreen'));
         }
       }
     } catch (err: any) {
       if (openingConvIdRef.current !== convId) return;
       setIsLoadingThread(false);
-      appendNotice(
-        err?.message ||
-          t('pukuBot.openFailed', { defaultValue: 'Could not open this conversation. Please try again.' })
-      );
+      // Offline: if the request fails because there's no network, keep showing the cached messages
+      // and a quiet "Offline — showing saved messages" line. Do not show an error popup.
+      appendNotice('Offline — showing saved messages');
+    }
+  };
+
+  const handleLoadOlderMessages = async () => {
+    if (!activeConversation || !hasMoreMessages || isLoadingOlderMessages) return;
+    const currentConvId = activeConversation.id;
+    const oldestMsg = messages.find(m => !m.notice);
+    const oldestId = oldestMsg?.id;
+    if (!oldestId || loadedBeforeIdsRef.current.has(oldestId)) return;
+    loadedBeforeIdsRef.current.add(oldestId);
+    setIsLoadingOlderMessages(true);
+    try {
+      const res = await pukuBotApi.getMessages(currentConvId, 50, oldestId);
+      if (openingConvIdRef.current !== currentConvId) return;
+      const older = toLocalMessages(res.messages || []);
+      setMessages(prev => [...older, ...prev]);
+      setHasMoreMessages(Boolean(res.hasMore));
+    } catch {
+      // Quietly ignore pagination error
+    } finally {
+      if (openingConvIdRef.current === currentConvId) {
+        setIsLoadingOlderMessages(false);
+      }
+    }
+  };
+
+  const handleListScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (e.nativeEvent.contentOffset.y <= 15 && hasMoreMessages && !isLoadingOlderMessages) {
+      handleLoadOlderMessages();
     }
   };
 
@@ -946,17 +1039,7 @@ export function PukuBotScreen() {
     if ((!raw && !pendingAttachment) || isStreaming) return;
 
     if (!pukuBotApi.isAuthenticated()) {
-      const appToken =
-        (await tokenManager.ensureValidToken().catch(() => null)) ||
-        tokenManager.getAccessTokenSync();
-      if (appToken) {
-        await pukuBotApi.setToken(appToken);
-        setIsAuthenticated(true);
-      }
-    }
-    if (!pukuBotApi.isAuthenticated()) {
-      setActiveSettingsTab('profile');
-      setShowSettingsModal(true);
+      handleConnectAuth();
       return;
     }
 
@@ -1615,11 +1698,45 @@ export function PukuBotScreen() {
             <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
 
             {recentConversations.length === 0 && (
-              <Text style={[styles.botRecentsEmpty, { color: theme.textMuted, fontFamily: monoFont }]}>
-                {isAuthenticated
-                  ? t('pukuBot.noConversations', { defaultValue: 'No conversations yet. Send a message to start one.' })
-                  : t('pukuBot.signInForConversations', { defaultValue: 'Sign in to Puku Bot to see your conversations.' })}
-              </Text>
+              <View>
+                <Text style={[styles.botRecentsEmpty, { color: theme.textMuted, fontFamily: monoFont }]}>
+                  {isAuthenticated
+                    ? t('pukuBot.noConversations', { defaultValue: 'No conversations yet. Send a message to start one.' })
+                    : t('pukuBot.signInForConversations', { defaultValue: 'Sign in to Puku Bot to see your conversations and chat.' })}
+                </Text>
+                {!isAuthenticated && (
+                  <TouchableOpacity
+                    onPress={handleConnectAuth}
+                    disabled={isConnectingAuth}
+                    style={[
+                      styles.signInBtn,
+                      {
+                        backgroundColor: isDark ? '#35D6B4' : '#1A1D18',
+                        marginTop: 14,
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        alignItems: 'center',
+                        borderRadius: 10,
+                      },
+                    ]}>
+                    {isConnectingAuth ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.signInBtnText,
+                          {
+                            color: isDark ? '#141613' : '#FFFFFF',
+                            fontFamily: monoFont,
+                            fontWeight: '700',
+                          },
+                        ]}>
+                        {t('pukuBot.signInButton', { defaultValue: 'Sign in to Puku Bot' })}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
 
             {recentConversations.map(conv => (
@@ -1720,6 +1837,15 @@ export function PukuBotScreen() {
             keyboardShouldPersistTaps="handled"
             style={styles.flatList}
             contentContainerStyle={[styles.listContent, { paddingBottom: 24 }]}
+            onScroll={handleListScroll}
+            scrollEventThrottle={100}
+            ListHeaderComponent={
+              isLoadingOlderMessages ? (
+                <View style={{ paddingVertical: 10, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={theme.textMuted} />
+                </View>
+              ) : undefined
+            }
             onLayout={() => {
               if (messages.length > 0) {
                 flatListRef.current?.scrollToEnd({ animated: false });
@@ -1766,6 +1892,79 @@ export function PukuBotScreen() {
                     </View>
                   )}
                   <View style={{ maxWidth: '84%' }}>
+                    {!isUser && !!item.botName && (
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: '700',
+                          color: theme.textSecondary,
+                          marginBottom: 4,
+                          fontFamily: monoFont,
+                        }}>
+                        {item.botName}
+                      </Text>
+                    )}
+
+                    {item.kind === 'background_task' && (
+                      <View
+                        style={{
+                          marginBottom: 6,
+                          padding: 10,
+                          borderRadius: 8,
+                          backgroundColor: isDark ? '#1C271E' : '#E9F5EB',
+                          borderWidth: 1,
+                          borderColor: isDark ? '#2D5E37' : '#BEE2C7',
+                        }}>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: isDark ? '#94C7A0' : '#2D7543',
+                            fontFamily: monoFont,
+                            marginBottom: 2,
+                          }}>
+                          Background task started
+                        </Text>
+                        {!!item.text && (
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: theme.textPrimary,
+                              fontFamily: monoFont,
+                            }}>
+                            {item.text}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
+                    {!!item.attachments && item.attachments.length > 0 && (
+                      <View style={{ marginBottom: 6, gap: 4 }}>
+                        {item.attachments.map((att: PukuBotAttachment, attIdx: number) => (
+                          <View
+                            key={att.id || attIdx}
+                            style={[
+                              styles.bubbleDocAttachment,
+                              {
+                                backgroundColor: isUser
+                                  ? 'rgba(255, 255, 255, 0.12)'
+                                  : (isDark ? '#262925' : '#E4E5DB'),
+                              },
+                            ]}>
+                            <PaperclipIcon size={14} color={theme.textPrimary} />
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.bubbleDocName,
+                                { color: theme.textPrimary, fontFamily: monoFont },
+                              ]}>
+                              {att.name || att.id}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
                     {/* Tool execution indicators */}
                     {!isUser && hasToolCalls && (
                       <View style={styles.toolCallsContainer}>
@@ -2025,10 +2224,17 @@ export function PukuBotScreen() {
           ref={inputRef}
           value={inputVal}
           onChangeText={setInputVal}
-          placeholder={t('pukuBot.composerPlaceholder')}
+          placeholder={!isDeviceOnline ? "You're offline" : t('pukuBot.composerPlaceholder')}
           placeholderTextColor={theme.placeholderText}
           multiline
-          style={[styles.composerInput, { color: theme.textPrimary, fontFamily: monoFont }]}
+          editable={isDeviceOnline}
+          style={[
+            styles.composerInput,
+            {
+              color: isDeviceOnline ? theme.textPrimary : theme.textMuted,
+              fontFamily: monoFont,
+            },
+          ]}
         />
 
         <View style={styles.composerBottomRow}>
@@ -2065,12 +2271,12 @@ export function PukuBotScreen() {
           ) : (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send"
               activeOpacity={0.7}
-              disabled={!inputVal.trim() && !pendingAttachment}
+              disabled={!isDeviceOnline || (!inputVal.trim() && !pendingAttachment)}
               onPress={() => handleSend()}
               style={[
                 styles.sendBtn,
                 {
-                  backgroundColor: (inputVal.trim() || pendingAttachment)
+                  backgroundColor: (isDeviceOnline && (inputVal.trim() || pendingAttachment))
                     ? (isDark ? '#E4E8E2' : '#1A1D18')
                     : (isDark ? '#262925' : '#E4E5DB'),
                 },
@@ -2145,6 +2351,53 @@ export function PukuBotScreen() {
                 })}
               </ScrollView>
             </View>
+
+            {outboxEntries.length > 0 && (
+              <View
+                style={{
+                  marginVertical: 4,
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                  backgroundColor: isDark ? '#1C271E' : '#E9F5EB',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#2D5E37' : '#BEE2C7',
+                }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: isDark ? '#94C7A0' : '#2D7543',
+                    fontFamily: monoFont,
+                  }}>
+                  {outboxEntries.length === 1
+                    ? '1 change waiting to sync'
+                    : `${outboxEntries.length} changes waiting to sync`}
+                </Text>
+              </View>
+            )}
+
+            {!!outboxNotice && (
+              <View
+                style={{
+                  marginVertical: 4,
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                  backgroundColor: isDark ? '#2E1A1A' : '#FDECEC',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#5E2D2D' : '#F5C2C2',
+                }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: isDark ? '#F87171' : '#DC2626',
+                    fontFamily: monoFont,
+                  }}>
+                  {outboxNotice}
+                </Text>
+              </View>
+            )}
 
             <ScrollView style={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
               {/* TAB 1: Profile & General */}
@@ -2249,6 +2502,11 @@ export function PukuBotScreen() {
               {/* TAB 2: Personal Instructions */}
               {activeSettingsTab === 'instructions' && (
                 <View>
+                  {outboxEntries.some(e => e.path === '/settings/instructions') && (
+                    <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#3D3418' : '#FEF3C7', alignSelf: 'flex-start', marginBottom: 6 }}>
+                      <Text style={{ fontSize: 9.5, fontWeight: '600', color: isDark ? '#FBBF24' : '#D97706', fontFamily: monoFont }}>Waiting to sync</Text>
+                    </View>
+                  )}
                   <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8, fontFamily: monoFont }}>
                     Personal instructions on how your Bots should talk to you (tone, brevity, formatting):
                   </Text>
@@ -2358,6 +2616,11 @@ export function PukuBotScreen() {
                         <Text style={{ color: theme.textPrimary, fontSize: 12.5, fontFamily: monoFont }}>
                           {mem.content}
                         </Text>
+                        {(mem.id.startsWith('mem_') || outboxEntries.some(e => e.path.includes(mem.id))) && (
+                          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#3D3418' : '#FEF3C7', alignSelf: 'flex-start', marginTop: 4 }}>
+                            <Text style={{ fontSize: 9.5, fontWeight: '600', color: isDark ? '#FBBF24' : '#D97706', fontFamily: monoFont }}>Waiting to sync</Text>
+                          </View>
+                        )}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                           <TouchableOpacity
                             onPress={() => handleToggleMemoryShare(mem.id, mem.shared)}
@@ -2406,9 +2669,16 @@ export function PukuBotScreen() {
                           marginBottom: 8,
                         }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 13, fontFamily: monoFont }}>
-                            {rt.name}
-                          </Text>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={{ color: theme.textPrimary, fontWeight: '700', fontSize: 13, fontFamily: monoFont }}>
+                              {rt.name}
+                            </Text>
+                            {outboxEntries.some(e => e.path.includes(rt.id)) && (
+                              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#3D3418' : '#FEF3C7', alignSelf: 'flex-start', marginTop: 2 }}>
+                                <Text style={{ fontSize: 9.5, fontWeight: '600', color: isDark ? '#FBBF24' : '#D97706', fontFamily: monoFont }}>Waiting to sync</Text>
+                              </View>
+                            )}
+                          </View>
                           <TouchableOpacity
                             onPress={() => handleToggleRoutine(rt.id, rt.enabled)}
                             style={{
@@ -2506,6 +2776,11 @@ export function PukuBotScreen() {
                         <Text style={{ color: '#35D6B4', fontWeight: '700', fontSize: 12.5, fontFamily: monoFont }}>
                           /{skill.slug}
                         </Text>
+                        {outboxEntries.some(e => e.path.includes(skill.slug)) && (
+                          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: isDark ? '#3D3418' : '#FEF3C7', alignSelf: 'flex-start', marginTop: 2 }}>
+                            <Text style={{ fontSize: 9.5, fontWeight: '600', color: isDark ? '#FBBF24' : '#D97706', fontFamily: monoFont }}>Waiting to sync</Text>
+                          </View>
+                        )}
                         <Text style={{ color: theme.textPrimary, fontSize: 12, marginTop: 2, fontFamily: monoFont }}>
                           {skill.name}
                         </Text>

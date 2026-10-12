@@ -566,17 +566,8 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(user.onboarding?.step).toBe(3);
   });
 
-  test('onboarding can be completed', async () => {
-    (globalThis as any).fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ onboarding: { step: 3, completedAt: '2026-10-12T10:00:00.000Z' } }),
-    });
-    const res = await client.updateOnboarding({ completed: true });
-    expect(res.onboarding?.completedAt).toBeTruthy();
-    const [url, init] = (globalThis as any).fetch.mock.calls[0];
-    expect(url).toContain('/me/onboarding');
-    expect(JSON.parse(init.body)).toEqual({ completed: true });
+  test('app never calls POST /me/onboarding and updateOnboarding is not exposed', () => {
+    expect((client as any).updateOnboarding).toBeUndefined();
   });
 
   test('screenshot source carries the bearer token', async () => {
@@ -586,16 +577,7 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(source.headers?.Authorization).toBe('Bearer tok_screen');
   });
 
-  test('onboarding and deleteAccount calls', async () => {
-    (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ ok: true }),
-    });
-
-    const onboardRes = await client.updateOnboarding(2);
-    expect(onboardRes.ok).toBe(true);
-
+  test('deleteAccount calls DELETE /me with confirm: DELETE', async () => {
     (globalThis as any).fetch = jest.fn().mockResolvedValueOnce({
       ok: true,
       status: 204,

@@ -26,7 +26,6 @@ import {
   PukuBotMemory,
   PukuBotMessage,
   PukuBotRoutine,
-  PukuBotSendMessageOptions,
   PukuBotSkill,
   PukuBotTurnEvent,
   PukuBotUser,
@@ -34,8 +33,8 @@ import {
 import { generatePkcePair, generateRandomString } from '../utils/auth';
 import { NativePicker } from './nativeModules';
 import { secureStorage } from './secureStorage';
-import { tokenManager } from './tokenManager';
 import { ignore } from '../utils/devLog';
+import { pukuBotOutbox, OUTBOX_USER_KEY } from './pukuBotOutbox';
 
 const STORAGE_KEYS = {
   BASE_URL: '@pukubot_base_url',
@@ -155,13 +154,6 @@ export class PukuBotApiClient {
       }
       if (savedToken) {
         this.token = savedToken;
-      } else {
-        const appToken =
-          (await tokenManager.ensureValidToken().catch(() => null)) ||
-          tokenManager.getAccessTokenSync();
-        if (appToken) {
-          this.token = appToken;
-        }
       }
       if (savedUser) {
         try {
@@ -193,7 +185,7 @@ export class PukuBotApiClient {
   }
 
   public getToken(): string | null {
-    return this.token || tokenManager.getAccessTokenSync();
+    return this.token;
   }
 
   public getUser(): PukuBotUser | null {
@@ -201,7 +193,7 @@ export class PukuBotApiClient {
   }
 
   public isAuthenticated(): boolean {
-    return !!(this.token || tokenManager.getAccessTokenSync());
+    return !!this.token;
   }
 
   public async setToken(token: string | null, user?: PukuBotUser | null): Promise<void> {
@@ -214,10 +206,20 @@ export class PukuBotApiClient {
     }
     if (this.user) {
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.user));
+      if (this.user.id) {
+        const prevUserId = await AsyncStorage.getItem(OUTBOX_USER_KEY).catch(() => null);
+        if (prevUserId && prevUserId !== this.user.id) {
+          await pukuBotOutbox.clear();
+        }
+        await AsyncStorage.setItem(OUTBOX_USER_KEY, this.user.id);
+      }
     } else {
       await AsyncStorage.removeItem(STORAGE_KEYS.USER);
     }
     this.notifyAuthChange();
+    if (this.isAuthenticated()) {
+      this.replayOutbox().catch(ignore('pukuBotApi'));
+    }
   }
 
   public onAuthChange(listener: (user: PukuBotUser | null) => void): () => void {
@@ -464,9 +466,8 @@ export class PukuBotApiClient {
       Accept: 'application/json',
       ...additional,
     };
-    const activeToken = this.token || tokenManager.getAccessTokenSync();
-    if (activeToken) {
-      headers.Authorization = `Bearer ${activeToken}`;
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
     }
     return headers;
   }
@@ -514,31 +515,6 @@ export class PukuBotApiClient {
     await this.signOut();
   }
 
-  /**
-   * POST /me/onboarding: `{ step }` remembers where the person is,
-   * `{ completed: true }` finishes it so the web does not run it again.
-   */
-  public async updateOnboarding(
-    update: number | { step?: number; completed?: boolean }
-  ): Promise<{ ok?: boolean; onboarding?: { step: number; completedAt: string | null } }> {
-    await this.init();
-    const body = typeof update === 'number' ? { step: update } : update;
-    const res = await fetch(`${this.baseUrl}/me/onboarding`, {
-      method: 'POST',
-      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      throw await this.errorFrom(res, 'Failed to update onboarding.');
-    }
-    const data = await res.json().catch(() => ({ ok: true }));
-    if (data?.onboarding && this.user) {
-      this.user = { ...this.user, onboarding: data.onboarding };
-      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.user));
-    }
-    return data;
-  }
-
   public async getPersonalInstructions(): Promise<PukuBotInstructions> {
     await this.init();
     try {
@@ -571,10 +547,16 @@ export class PukuBotApiClient {
     }
     // Saved on the server, or kept on this device while offline.
     await AsyncStorage.setItem(STORAGE_KEYS.INSTRUCTIONS, instructions);
-    if (res) {
-      return res.json().catch(() => ({ instructions }));
+    if (!res) {
+      await pukuBotOutbox.enqueue({
+        method: 'PUT',
+        path: '/settings/instructions',
+        body: { instructions },
+        userId: this.user?.id,
+      });
+      return { instructions, updatedAt: new Date().toISOString() };
     }
-    return { instructions, updatedAt: new Date().toISOString() };
+    return res.json().catch(() => ({ instructions }));
   }
 
   public async getBots(): Promise<PukuBotItem[]> {
@@ -1208,6 +1190,16 @@ export class PukuBotApiClient {
     return `${this.baseUrl}/bots/${encodeURIComponent(botId)}/files/download?path=${encodeURIComponent(filePath)}`;
   }
 
+  public async downloadFile(botId: string, filePath: string): Promise<string> {
+    await this.init();
+    const url = this.getTaskFileDownloadUrl(botId, filePath);
+    const res = await fetch(url, { headers: this.getAuthHeaders() });
+    if (!res.ok) {
+      throw await this.errorFrom(res, 'Failed to download file.');
+    }
+    return res.text();
+  }
+
   public getComputerStreamWsUrl(botId: string): string {
     const wsProto = this.baseUrl.startsWith('https') ? 'wss:' : 'ws:';
     const host = this.baseUrl.replace(/^https?:\/\//, '').split('/')[0];
@@ -1364,6 +1356,13 @@ export class PukuBotApiClient {
         shared: false,
         createdAt: new Date().toISOString(),
       };
+      await pukuBotOutbox.enqueue({
+        method: 'POST',
+        path: '/memory',
+        body: { content, botId },
+        tempId: created.id,
+        userId: this.user?.id,
+      });
     }
     await this.writeCache(STORAGE_KEYS.MEMORIES, [created, ...current]);
     return created;
@@ -1382,6 +1381,13 @@ export class PukuBotApiClient {
     if (res) {
       const data = await res.json().catch(() => null);
       updated = data?.memory || (data?.id ? data : undefined);
+    } else {
+      await pukuBotOutbox.enqueue({
+        method: 'PUT',
+        path: `/memory/${encodeURIComponent(id)}`,
+        body: { content },
+        userId: this.user?.id,
+      });
     }
     updated = updated || (local ? { ...local, content, updatedAt: new Date().toISOString() } : undefined);
     if (!updated) throw new Error('Memory not found');
@@ -1397,6 +1403,13 @@ export class PukuBotApiClient {
     const res = await this.tryFetch(`/memory/${encodeURIComponent(id)}`, { method: 'DELETE' });
     if (res && !res.ok && res.status !== 404) {
       throw await this.errorFrom(res, 'Failed to delete memory.');
+    }
+    if (!res) {
+      await pukuBotOutbox.enqueue({
+        method: 'DELETE',
+        path: `/memory/${encodeURIComponent(id)}`,
+        userId: this.user?.id,
+      });
     }
     const current = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
     await this.writeCache(STORAGE_KEYS.MEMORIES, current.filter(m => m.id !== id));
@@ -1417,6 +1430,13 @@ export class PukuBotApiClient {
       { method: 'POST' }
     );
     if (res && !res.ok) throw await this.errorFrom(res, 'Failed to update memory.');
+    if (!res) {
+      await pukuBotOutbox.enqueue({
+        method: 'POST',
+        path: `/memory/${encodeURIComponent(id)}/${shared ? 'share' : 'unshare'}`,
+        userId: this.user?.id,
+      });
+    }
     const current = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
     await this.writeCache(
       STORAGE_KEYS.MEMORIES,
@@ -1449,6 +1469,13 @@ export class PukuBotApiClient {
     if (res) {
       const data = await res.json().catch(() => null);
       updated = data?.routine || (data?.id ? data : undefined);
+    } else {
+      await pukuBotOutbox.enqueue({
+        method: 'PUT',
+        path: `/routines/${encodeURIComponent(id)}/enabled`,
+        body: { enabled },
+        userId: this.user?.id,
+      });
     }
     const local = current.find(r => r.id === id);
     updated = updated || (local ? { ...local, enabled } : undefined);
@@ -1465,6 +1492,13 @@ export class PukuBotApiClient {
     const res = await this.tryFetch(`/routines/${encodeURIComponent(id)}`, { method: 'DELETE' });
     if (res && !res.ok && res.status !== 404) {
       throw await this.errorFrom(res, 'Failed to delete routine.');
+    }
+    if (!res) {
+      await pukuBotOutbox.enqueue({
+        method: 'DELETE',
+        path: `/routines/${encodeURIComponent(id)}`,
+        userId: this.user?.id,
+      });
     }
     const current = await this.readCache<PukuBotRoutine>(STORAGE_KEYS.ROUTINES);
     await this.writeCache(STORAGE_KEYS.ROUTINES, current.filter(r => r.id !== id));
@@ -1499,6 +1533,13 @@ export class PukuBotApiClient {
     if (res) {
       const data = await res.json().catch(() => null);
       saved = data?.skill || saved;
+    } else {
+      await pukuBotOutbox.enqueue({
+        method: 'PUT',
+        path: `/skills/${encodeURIComponent(cleanSlug)}`,
+        body: skill,
+        userId: this.user?.id,
+      });
     }
     const current = await this.readCache<PukuBotSkill>(STORAGE_KEYS.SKILLS);
     await this.writeCache(
@@ -1514,8 +1555,33 @@ export class PukuBotApiClient {
     if (res && !res.ok && res.status !== 404) {
       throw await this.errorFrom(res, 'Failed to delete skill.');
     }
+    if (!res) {
+      await pukuBotOutbox.enqueue({
+        method: 'DELETE',
+        path: `/skills/${encodeURIComponent(slug)}`,
+        userId: this.user?.id,
+      });
+    }
     const current = await this.readCache<PukuBotSkill>(STORAGE_KEYS.SKILLS);
     await this.writeCache(STORAGE_KEYS.SKILLS, current.filter(s => s.slug !== slug));
+  }
+
+  public async updateCachedMemoryId(tempId: string, realMemory: PukuBotMemory): Promise<void> {
+    const current = await this.readCache<PukuBotMemory>(STORAGE_KEYS.MEMORIES);
+    const updated = current.map(m => (m.id === tempId ? { ...m, ...realMemory } : m));
+    await this.writeCache(STORAGE_KEYS.MEMORIES, updated);
+  }
+
+  public async replayOutbox(): Promise<{ replayed: number; failed: boolean }> {
+    await this.init();
+    if (!this.isAuthenticated()) return { replayed: 0, failed: false };
+    return pukuBotOutbox.replay({
+      getBaseUrl: () => this.baseUrl,
+      getAuthHeaders: (extra?: Record<string, string>) => this.getAuthHeaders(extra),
+      signOut: () => this.signOut(),
+      updateCachedMemoryId: (tempId: string, realMemory: any) =>
+        this.updateCachedMemoryId(tempId, realMemory),
+    });
   }
 
   public async getConnections(): Promise<PukuBotConnection[]> {

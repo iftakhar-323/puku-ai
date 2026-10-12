@@ -252,6 +252,9 @@ export interface PukuBotMessage {
   id: string;
   role: 'user' | 'assistant';
   text: string;
+  botId?: string;
+  botName?: string;
+  kind?: 'background_task';
   attachments?: PukuBotAttachment[];
   toolCalls?: PukuBotToolCall[];
 }
