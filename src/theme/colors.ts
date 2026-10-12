@@ -43,6 +43,15 @@ export const AppColors = {
   link: '#b0b3fc',
 } as const;
 
+export const PaperColors = {
+  color1: '#373737', // Background Dark
+  color2: '#A3A3A3', // Text Secondary
+  color3: '#E8B187', // Text Light / Accent
+  color4: '#F2F2F2', // Background Light
+  color5: '#FFFFFF', // Text Light
+} as const;
+
 export const colors = AppColors;
 export type Colors = typeof AppColors;
+export type PaperColorsType = typeof PaperColors;
 
