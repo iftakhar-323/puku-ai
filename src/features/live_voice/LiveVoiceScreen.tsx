@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -12,19 +12,24 @@ import {
   LiveVoiceIcon,
   MicIcon,
 } from '../../components/common/Icons';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../store/AppContext';
+import { NativeSpeech, NativeTts } from '../../services/nativeModules';
+
+type VoiceStatus = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
 
 export function LiveVoiceScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, goBack } = useApp();
+  const { t } = useTranslation();
+  const { goBack, sendMessage, isGenerating, activeConversation } = useApp();
 
-  const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [voiceStatus, setVoiceStatus] = useState<
-    'listening' | 'thinking' | 'speaking'
-  >('listening');
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
+  const [lastReply, setLastReply] = useState('');
+  const [errorText, setErrorText] = useState('');
 
-  const pulseAnim = new Animated.Value(1);
+  // One Animated.Value for the screen's lifetime; a new one per render detaches the loop.
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.loop(
@@ -41,27 +46,87 @@ export function LiveVoiceScreen() {
         }),
       ])
     ).start();
+  }, [pulseAnim]);
 
-    // Cycle through live voice states to demonstrate natural conversation
-    const timer = setInterval(() => {
-      setVoiceStatus(curr => {
-        if (curr === 'listening') return 'thinking';
-        if (curr === 'thinking') return 'speaking';
-        return 'listening';
-      });
-    }, 4000);
+  // Wire the real conversation loop: listen -> send to Puku AI -> speak the
+  // reply -> back to idle, ready for the next tap.
+  useEffect(() => {
+    const unsubResults = NativeSpeech.onSpeechResults(text => {
+      if (text.trim()) {
+        setVoiceStatus('thinking');
+        sendMessage(text);
+      } else {
+        setVoiceStatus('idle');
+      }
+    });
 
-    return () => clearInterval(timer);
-  }, []);
+    const unsubEnd = NativeSpeech.onSpeechEnd(() => {
+      // onSpeechResults fires right after; only fall back to idle if it
+      // never arrives (e.g. silence timeout with no final result).
+      setVoiceStatus(curr => (curr === 'listening' ? 'idle' : curr));
+    });
+
+    const unsubSpeechError = NativeSpeech.onSpeechError(err => {
+      setErrorText(err.message);
+      setVoiceStatus('error');
+    });
+
+    const unsubTtsDone = NativeTts.onDone(() => setVoiceStatus('idle'));
+    const unsubTtsError = NativeTts.onError(() => setVoiceStatus('idle'));
+
+    return () => {
+      unsubResults();
+      unsubEnd();
+      unsubSpeechError();
+      unsubTtsDone();
+      unsubTtsError();
+      NativeSpeech.cancelListening();
+      NativeTts.stop();
+    };
+  }, [sendMessage]);
+
+  // Speak the reply once generation finishes.
+  const wasGenerating = useRef(false);
+  useEffect(() => {
+    if (wasGenerating.current && !isGenerating) {
+      const last = activeConversation?.messages[activeConversation.messages.length - 1];
+      if (last && last.role === 'assistant' && last.content.trim()) {
+        setLastReply(last.content);
+        setVoiceStatus('speaking');
+        NativeTts.speak(last.content);
+      } else {
+        setVoiceStatus('idle');
+      }
+    }
+    wasGenerating.current = isGenerating;
+  }, [isGenerating, activeConversation]);
+
+  const handleMicPress = async () => {
+    if (voiceStatus === 'idle' || voiceStatus === 'error') {
+      setErrorText('');
+      const started = await NativeSpeech.startListening();
+      setVoiceStatus(started ? 'listening' : 'error');
+      if (!started) setErrorText(t('liveVoice.recognitionUnavailable'));
+    } else if (voiceStatus === 'listening') {
+      await NativeSpeech.stopListening();
+    } else if (voiceStatus === 'speaking') {
+      await NativeTts.stop();
+      setVoiceStatus('idle');
+    }
+  };
 
   const getStatusText = () => {
     switch (voiceStatus) {
+      case 'idle':
+        return t('liveVoice.tapToTalk');
       case 'listening':
-        return 'Start talking...';
+        return t('liveVoice.listening');
       case 'thinking':
-        return 'Puku is thinking...';
+        return t('liveVoice.thinking');
       case 'speaking':
-        return 'Puku is responding...';
+        return t('liveVoice.speaking');
+      case 'error':
+        return t('liveVoice.error');
     }
   };
 
@@ -79,10 +144,10 @@ export function LiveVoiceScreen() {
       <View style={styles.topBar}>
         <View style={styles.badge}>
           <LiveVoiceIcon size={18} color="#A5A5FF" />
-          <Text style={styles.badgeText}>LIVE CONVERSATION</Text>
+          <Text style={styles.badgeText}>{t('liveVoice.badge')}</Text>
         </View>
 
-        <TouchableOpacity onPress={goBack} style={styles.closeBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={goBack} style={styles.closeBtn}>
           <CloseIcon size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
@@ -117,6 +182,8 @@ export function LiveVoiceScreen() {
                   ? '#8B6BFF'
                   : voiceStatus === 'thinking'
                   ? '#FAAD14'
+                  : voiceStatus === 'error'
+                  ? '#FF4D4F'
                   : '#6C47EB',
             },
           ]}>
@@ -125,9 +192,11 @@ export function LiveVoiceScreen() {
 
         <Text style={styles.statusTitle}>{getStatusText()}</Text>
         <Text style={styles.subtext}>
-          {voiceStatus === 'speaking'
-            ? '“I can help you build and deploy mobile features with ease.”'
-            : 'Natural real-time low latency audio'}
+          {voiceStatus === 'error'
+            ? errorText || t('liveVoice.subtextErrorFallback')
+            : voiceStatus === 'speaking' && lastReply
+            ? lastReply
+            : t('liveVoice.subtextIdle')}
         </Text>
       </View>
 
@@ -140,15 +209,20 @@ export function LiveVoiceScreen() {
             { backgroundColor: isSpeakerOn ? '#201C59' : '#151125' },
           ]}>
           <Text style={styles.controlBtnText}>
-            {isSpeakerOn ? '🔊 Speaker' : '🔈 Ear'}
+            {isSpeakerOn ? t('liveVoice.speakerOn') : t('liveVoice.speakerOff')}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => setIsMuted(!isMuted)}
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Voice input"
+          accessibilityState={{ disabled: voiceStatus === 'thinking' }}
+          disabled={voiceStatus === 'thinking'}
+          onPress={handleMicPress}
           style={[
             styles.micBtn,
-            { backgroundColor: isMuted ? '#FF4D4F' : '#6C47EB' },
+            {
+              backgroundColor: voiceStatus === 'listening' ? '#FF4D4F' : '#6C47EB',
+              opacity: voiceStatus === 'thinking' ? 0.5 : 1,
+            },
           ]}>
           <MicIcon size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -157,7 +231,7 @@ export function LiveVoiceScreen() {
           onPress={goBack}
           style={[styles.controlBtn, { backgroundColor: '#FF4D4F' }]}>
           <Text style={[styles.controlBtnText, { color: '#FFFFFF' }]}>
-            End
+            {t('liveVoice.end')}
           </Text>
         </TouchableOpacity>
       </View>

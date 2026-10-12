@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Sentry from '@sentry/react-native';
 import {
   AppRoute,
   AppSettings,
@@ -13,7 +14,6 @@ import {
   CodeSession,
   Conversation,
   Project,
-  RemoteSession,
   UserProfile,
 } from '../types';
 import { darkTheme, lightTheme, ThemeColors } from '../theme/theme';
@@ -21,7 +21,9 @@ import { pukuApi, mapModelToApi, mapApiToModel } from '../services/api';
 import { tokenManager } from '../services/tokenManager';
 import { extractJwtData } from '../utils/auth';
 import { formatActivityDate, getConversationTimestamp } from '../utils/date';
-import { ENV } from '../config/env';
+import { ignore } from '../utils/devLog';
+import { extractFencedCodeBlocks, titleForLanguage } from '../utils/codeBlocks';
+import { formatFileSize } from '../utils/fileSize';
 
 interface AppContextValue {
   theme: ThemeColors;
@@ -62,23 +64,28 @@ interface AppContextValue {
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
   refreshProjects: () => Promise<void>;
-  addProjectKnowledge: (projectId: string, fileName: string, type: string) => void;
+  addProjectKnowledge: (
+    projectId: string,
+    fileName: string,
+    type: string,
+    sizeBytes?: number
+  ) => void;
   // Artifacts
   artifacts: Artifact[];
   activeArtifact: Artifact | null;
   selectArtifact: (id: string | null) => void;
-  createArtifact: (title: string, type: Artifact['type'], content: string) => Artifact;
+  createArtifact: (
+    title: string,
+    type: Artifact['type'],
+    content: string,
+    options?: { conversationId?: string; language?: string }
+  ) => Artifact;
   // Code sessions
   codeSessions: CodeSession[];
   activeCodeSession: CodeSession | null;
   selectCodeSession: (id: string | null) => void;
   createCodeSession: (title: string, environment: string, autoAccept: boolean) => CodeSession;
   runCodeSession: (sessionId: string, code: string) => void;
-  // Remote sessions
-  remoteSession: RemoteSession;
-  connectRemoteSession: (sessionId: string, token: string) => void;
-  disconnectRemoteSession: () => void;
-  respondToTool: (approved: boolean) => void;
   // Puku Bot state
   botConversations: BotConversation[];
   activeBotConversationId: string | null;
@@ -205,7 +212,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeBotId, setActiveBotId] = useState<string>('general-assistant');
   const [availableBots, _setAvailableBots] = useState<BotItem[]>(DEFAULT_AVAILABLE_BOTS);
   const logoutRef = useRef<() => void>(() => {});
-  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     const unsub = tokenManager.onSessionExpired(() => {
@@ -381,7 +387,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 );
               }
             })
-            .catch(() => {});
+            .catch(ignore('AppContext'));
         }
 
         // Proactively sync cloud conversations from server
@@ -438,11 +444,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
                 // Sort chronologically (newest first)
                 merged.sort((a, b) => (b.updatedAtTimestamp || 0) - (a.updatedAtTimestamp || 0));
-                AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(() => {});
+                AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(ignore('AppContext'));
                 return merged;
               });
             }
-          }).catch(() => {});
+          }).catch(ignore('AppContext'));
         }
 
         if (savedProjectsStr) {
@@ -484,7 +490,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 return merged;
               });
             }
-          }).catch(() => {});
+          }).catch(ignore('AppContext'));
         }
 
         const targetRoute =
@@ -514,25 +520,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (conversations.length > 0) {
-      AsyncStorage.setItem('@puku_conversations', JSON.stringify(conversations)).catch(() => {});
+      AsyncStorage.setItem('@puku_conversations', JSON.stringify(conversations)).catch(ignore('AppContext'));
     }
   }, [conversations]);
 
   useEffect(() => {
-    AsyncStorage.setItem('@puku_app_settings', JSON.stringify(settings)).catch(() => {});
+    AsyncStorage.setItem('@puku_app_settings', JSON.stringify(settings)).catch(ignore('AppContext'));
   }, [settings]);
 
   useEffect(() => {
     if (activeRoute && activeRoute !== 'login') {
-      AsyncStorage.setItem('@puku_active_route', activeRoute).catch(() => {});
+      AsyncStorage.setItem('@puku_active_route', activeRoute).catch(ignore('AppContext'));
     }
   }, [activeRoute]);
 
   useEffect(() => {
     if (activeConversationId && !activeConversationId.startsWith('incog_')) {
-      AsyncStorage.setItem('@puku_active_conversation_id', activeConversationId).catch(() => {});
+      AsyncStorage.setItem('@puku_active_conversation_id', activeConversationId).catch(ignore('AppContext'));
     } else if (!activeConversationId) {
-      AsyncStorage.removeItem('@puku_active_conversation_id').catch(() => {});
+      AsyncStorage.removeItem('@puku_active_conversation_id').catch(ignore('AppContext'));
     }
   }, [activeConversationId]);
 
@@ -540,7 +546,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedModel = (model: ChatModelType) => {
     setSelectedModelState(model);
-    AsyncStorage.setItem('@puku_selected_model', model).catch(() => {});
+    AsyncStorage.setItem('@puku_selected_model', model).catch(ignore('AppContext'));
     if (activeConversationId) {
       setConversations(prev =>
         prev.map(c => (c.id === activeConversationId ? { ...c, model } : c))
@@ -550,7 +556,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .updateConversation(activeConversationId, {
             model: mapModelToApi(model),
           })
-          .catch(() => {});
+          .catch(ignore('AppContext'));
       }
     }
   };
@@ -561,7 +567,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const idToDelete = incognitoConversationIdRef.current || incognitoConversationId;
     if (idToDelete && !idToDelete.startsWith('incog_')) {
       try {
-        pukuApi.deleteConversation(idToDelete).catch(() => {});
+        pukuApi.deleteConversation(idToDelete).catch(ignore('AppContext'));
       } catch {}
     }
     incognitoConversationIdRef.current = null;
@@ -576,7 +582,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           c.title?.toLowerCase() !== 'incognito'
       );
       if (filtered.length !== prev.length) {
-        AsyncStorage.setItem('@puku_conversations', JSON.stringify(filtered)).catch(() => {});
+        AsyncStorage.setItem('@puku_conversations', JSON.stringify(filtered)).catch(ignore('AppContext'));
       }
       return filtered;
     });
@@ -598,7 +604,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (projects.length > 0) {
-      AsyncStorage.setItem('@puku_projects', JSON.stringify(projects)).catch(() => {});
+      AsyncStorage.setItem('@puku_projects', JSON.stringify(projects)).catch(ignore('AppContext'));
     }
   }, [projects]);
 
@@ -609,18 +615,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeCodeSessionId, setActiveCodeSessionId] = useState<string | null>(
     initialCodeSessions[0]?.id || null
   );
-
-  const [remoteSession, setRemoteSession] = useState<RemoteSession>({
-    sessionId: 'puku-relay-9281',
-    token: 'tk_live_secure_9201948',
-    title: 'Remote Agent Desktop Relay',
-    status: 'idle',
-    progressStatus: 'ready',
-    logs: [
-      '[System] Relay client connected to puku-relay-9281',
-      '[Worker] CLI agent ready for tasks.',
-    ],
-  });
 
   const isDark = settings.themeMode === 'dark';
   const theme = isDark ? darkTheme : lightTheme;
@@ -634,8 +628,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRouteParams(params);
     setRouteHistory(prev => [...prev, route]);
     setActiveRoute(route);
+    // RN equivalent of Flutter's SentryNavigatorObserver, since the app uses
+    // a custom router instead of react-navigation.
+    Sentry.addBreadcrumb({
+      category: 'navigation',
+      message: `Navigated to ${route}`,
+      level: 'info',
+      data: { from: activeRoute, to: route },
+    });
     if (route !== 'login') {
-      AsyncStorage.setItem('@puku_active_route', route).catch(() => {});
+      AsyncStorage.setItem('@puku_active_route', route).catch(ignore('AppContext'));
     }
   };
 
@@ -706,7 +708,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             raw.id === incognitoConversationIdRef.current
         );
         incognitoOnServer.forEach((raw: any) => {
-          pukuApi.deleteConversation(raw.id).catch(() => {});
+          pukuApi.deleteConversation(raw.id).catch(ignore('AppContext'));
         });
 
         const validCloudConvs = cloudConvs.filter(
@@ -771,7 +773,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
           // Sort chronologically (newest conversation first)
           merged.sort((a, b) => (b.updatedAtTimestamp || 0) - (a.updatedAtTimestamp || 0));
-          AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(() => {});
+          AsyncStorage.setItem('@puku_conversations', JSON.stringify(merged)).catch(ignore('AppContext'));
           return merged;
         });
       }
@@ -848,7 +850,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               };
               updated = [newConv, ...prev];
             }
-            AsyncStorage.setItem('@puku_conversations', JSON.stringify(updated)).catch(() => {});
+            AsyncStorage.setItem('@puku_conversations', JSON.stringify(updated)).catch(ignore('AppContext'));
             return updated;
           });
         }
@@ -877,7 +879,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     ids.forEach(id => {
       if (!id.startsWith('conv_')) {
-        pukuApi.deleteConversation(id).catch(() => {});
+        pukuApi.deleteConversation(id).catch(ignore('AppContext'));
       }
     });
   };
@@ -1135,6 +1137,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         setActiveConversationId(finalServerId);
       }
+
+      // Best-effort: mirror Flutter's auto-persistence of fenced code blocks
+      // from assistant replies as Artifacts. Never blocks the chat flow.
+      try {
+        const blocks = extractFencedCodeBlocks(response.text);
+        for (const block of blocks) {
+          createArtifact(titleForLanguage(block.language), 'code', block.code, {
+            conversationId: finalServerId || undefined,
+            language: block.language,
+          });
+        }
+      } catch {}
     } catch (err: any) {
       const errorMsg =
         err?.message ||
@@ -1233,7 +1247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setProjects(prev => prev.map(p => (p.id === tempId ? { ...p, id: realId } : p)));
         }
       })
-      .catch(() => {});
+      .catch(ignore('AppContext'));
 
     return newProj;
   };
@@ -1241,7 +1255,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateProject = (id: string, updates: Partial<Project>) => {
     setProjects(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
     if (!id.startsWith('proj_')) {
-      pukuApi.updateProject(id, updates as any).catch(() => {});
+      pukuApi.updateProject(id, updates as any).catch(ignore('AppContext'));
     }
   };
 
@@ -1249,16 +1263,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProjects(prev => prev.filter(p => p.id !== id));
     if (activeProjectId === id) setActiveProjectId(null);
     if (!id.startsWith('proj_')) {
-      pukuApi.deleteProject(id).catch(() => {});
+      pukuApi.deleteProject(id).catch(ignore('AppContext'));
     }
   };
 
-  const addProjectKnowledge = (projectId: string, fileName: string, type: string) => {
+  const addProjectKnowledge = (
+    projectId: string,
+    fileName: string,
+    type: string,
+    sizeBytes?: number
+  ) => {
     const newItem = {
       id: 'k_' + Date.now(),
       name: fileName,
       type,
-      size: '256 KB',
+      size: formatFileSize(sizeBytes),
       date: 'Just now',
     };
     setProjects(prev =>
@@ -1276,13 +1295,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveArtifactId(id);
   };
 
-  const createArtifact = (title: string, type: Artifact['type'], content: string) => {
+  const createArtifact = (
+    title: string,
+    type: Artifact['type'],
+    content: string,
+    options?: { conversationId?: string; language?: string }
+  ) => {
     const newArt: Artifact = {
-      id: 'art_' + Date.now(),
+      id: 'art_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       title,
       type,
+      language: options?.language,
       content,
       createdAt: 'Just now',
+      conversationId: options?.conversationId,
     };
     setArtifacts(prev => [newArt, ...prev]);
     return newArt;
@@ -1353,150 +1379,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, 1000);
   };
 
-  const connectRemoteSession = (sessionId: string, token: string) => {
-    if (wsRef.current) {
-      try {
-        wsRef.current.close();
-      } catch {}
-      wsRef.current = null;
-    }
-
-    setRemoteSession(prev => ({
-      ...prev,
-      sessionId,
-      token,
-      status: 'connecting',
-      logs: [...prev.logs, `[Connection] Connecting to relay session ${sessionId}...`],
-    }));
-
-    try {
-      const wsUrl = `${ENV.REMOTE_SESSION_RELAY_HOST.replace(/^http/, 'ws')}/v1/sessions/${sessionId}/stream?token=${token}`;
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      let fallbackTimer: any = setTimeout(() => {
-        setRemoteSession(prev => ({
-          ...prev,
-          status: 'connected',
-          progressStatus: 'thinking',
-          currentTool: {
-            name: 'run_command',
-            description: 'npm test -- --watchAll=false',
-            status: 'pending',
-          },
-          diffLines: [
-            { type: 'context', text: '  const apiVersion = "2.7";' },
-            { type: 'remove', text: '- function authenticateUser() { return false; }' },
-            { type: 'add', text: '+ function authenticateUser() { return verifyPKCEToken(); }' },
-          ],
-          logs: [
-            ...prev.logs,
-            `[Connection] Authenticated successfully with token ${token.slice(0, 6)}***`,
-            `[Agent] Remote workspace synced. Awaiting tool approval.`,
-          ],
-        }));
-      }, 1500);
-
-      ws.onopen = () => {
-        if (fallbackTimer) {
-          clearTimeout(fallbackTimer);
-          fallbackTimer = null;
-        }
-        setRemoteSession(prev => ({
-          ...prev,
-          status: 'connected',
-          logs: [
-            ...prev.logs,
-            `[Connection] Live WebSocket connected to ${ENV.REMOTE_SESSION_RELAY_HOST}`,
-            `[Agent] Remote workspace synced. Awaiting tool commands.`,
-          ],
-        }));
-      };
-
-      ws.onmessage = (event: any) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'tool_request') {
-            setRemoteSession(prev => ({
-              ...prev,
-              currentTool: {
-                id: data.id || 'tool_' + Date.now(),
-                name: data.name || 'Remote Tool Execution',
-                description: data.description || data.command || '',
-                timestamp: 'Just now',
-                status: 'pending',
-              },
-              logs: [...prev.logs, `[Incoming Tool] ${data.name}: ${data.description || ''}`],
-            }));
-          } else if (data.log) {
-            setRemoteSession(prev => ({
-              ...prev,
-              logs: [...prev.logs, `[Remote] ${data.log}`],
-            }));
-          }
-        } catch {
-          setRemoteSession(prev => ({
-            ...prev,
-            logs: [...prev.logs, `[Remote] ${event.data}`],
-          }));
-        }
-      };
-
-      ws.onerror = () => {
-        // Fallback handles gracefully
-      };
-
-      ws.onclose = () => {
-        wsRef.current = null;
-      };
-    } catch {
-      // Fallback
-    }
-  };
-
-  const disconnectRemoteSession = () => {
-    if (wsRef.current) {
-      try {
-        wsRef.current.close();
-      } catch {}
-      wsRef.current = null;
-    }
-    setRemoteSession(prev => ({
-      ...prev,
-      status: 'disconnected',
-      logs: [...prev.logs, '[Connection] Session closed.'],
-    }));
-  };
-
-  const respondToTool = (approved: boolean) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      try {
-        wsRef.current.send(
-          JSON.stringify({
-            action: 'tool_response',
-            approved,
-            toolId: remoteSession.currentTool?.id,
-          })
-        );
-      } catch {}
-    }
-    setRemoteSession(prev => ({
-      ...prev,
-      currentTool: prev.currentTool
-        ? { ...prev.currentTool, status: approved ? 'approved' : 'rejected' }
-        : undefined,
-      logs: [
-        ...prev.logs,
-        approved ? '[Permission] Tool execution APPROVED.' : '[Permission] Tool execution REJECTED.',
-      ],
-      progressStatus: approved ? 'completed' : 'idle',
-    }));
-  };
-
   const updateProfile = (updates: Partial<UserProfile>) => {
     setProfile(prev => {
       const updated = { ...prev, ...updates };
-      AsyncStorage.setItem('@puku_user_profile', JSON.stringify(updated)).catch(() => {});
+      AsyncStorage.setItem('@puku_user_profile', JSON.stringify(updated)).catch(ignore('AppContext'));
       return updated;
     });
   };
@@ -1507,19 +1393,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     pukuApi.setAuthToken(null);
-    tokenManager.clearTokens().catch(() => {});
+    tokenManager.clearTokens().catch(ignore('AppContext'));
     clearIncognitoChat();
-    AsyncStorage.setItem('@puku_is_logged_out', 'true').catch(() => {});
-    AsyncStorage.removeItem('@puku_auth_token').catch(() => {});
-    AsyncStorage.removeItem('@puku_refresh_token').catch(() => {});
-    AsyncStorage.removeItem('@puku_token_expires_at').catch(() => {});
-    AsyncStorage.removeItem('@puku_user_profile').catch(() => {});
-    AsyncStorage.removeItem('@puku_conversations').catch(() => {});
-    AsyncStorage.removeItem('@puku_projects').catch(() => {});
-    AsyncStorage.removeItem('@puku_active_route').catch(() => {});
-    AsyncStorage.removeItem('@puku_active_conversation_id').catch(() => {});
-    AsyncStorage.removeItem('@puku_is_logged_in').catch(() => {});
-    AsyncStorage.removeItem('@puku_selected_model').catch(() => {});
+    AsyncStorage.setItem('@puku_is_logged_out', 'true').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_auth_token').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_refresh_token').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_token_expires_at').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_user_profile').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_conversations').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_projects').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_active_route').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_active_conversation_id').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_is_logged_in').catch(ignore('AppContext'));
+    AsyncStorage.removeItem('@puku_selected_model').catch(ignore('AppContext'));
     setSelectedModelState('puku-ai-2.7');
     setProfile(initialProfile);
     setConversations([]);
@@ -1532,13 +1418,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isRestoringSession) {
-      AsyncStorage.setItem('@pukubot_local_conversations', JSON.stringify(botConversations)).catch(() => {});
+      AsyncStorage.setItem('@pukubot_local_conversations', JSON.stringify(botConversations)).catch(ignore('AppContext'));
     }
   }, [botConversations, isRestoringSession]);
 
   useEffect(() => {
     if (!isRestoringSession && activeBotConversationId) {
-      AsyncStorage.setItem('@pukubot_active_bot_conv', activeBotConversationId).catch(() => {});
+      AsyncStorage.setItem('@pukubot_active_bot_conv', activeBotConversationId).catch(ignore('AppContext'));
     }
   }, [activeBotConversationId, isRestoringSession]);
 
@@ -1660,10 +1546,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         selectCodeSession,
         createCodeSession,
         runCodeSession,
-        remoteSession,
-        connectRemoteSession,
-        disconnectRemoteSession,
-        respondToTool,
         botConversations,
         activeBotConversationId,
         activeBotId,

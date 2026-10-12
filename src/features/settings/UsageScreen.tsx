@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   BotIcon,
   CalendarIcon,
@@ -23,6 +24,7 @@ import { useApp } from '../../store/AppContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 
 export function UsageScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { keyboardHeight } = useKeyboardHeight();
   const { theme, isDark, updateSettings, setDrawerOpen, navigate } = useApp();
@@ -63,7 +65,7 @@ export function UsageScreen() {
       ]}>
       {/* Authentic Header */}
       <View style={styles.header}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open menu"
           activeOpacity={0.7}
           onPress={() => setDrawerOpen(true)}
           style={styles.actionBtn}>
@@ -71,21 +73,21 @@ export function UsageScreen() {
         </TouchableOpacity>
 
         <View style={styles.trailingGroup}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remote laptop sessions"
             activeOpacity={0.7}
             onPress={() => navigate('code')}
             style={styles.actionBtn}>
             <TerminalPromptIcon size={20} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Puku Bot"
             activeOpacity={0.7}
             onPress={() => navigate('pukuBot')}
             style={styles.actionBtn}>
             <BotIcon size={20} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Toggle theme"
             activeOpacity={0.7}
             onPress={() => updateSettings({ themeMode: isDark ? 'light' : 'dark' })}
             style={styles.actionBtn}>
@@ -113,9 +115,9 @@ export function UsageScreen() {
         {/* Top Title & Refresh Row */}
         <View style={styles.titleRow}>
           <Text style={[styles.mainTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-            Usage
+            {t('usage.title')}
           </Text>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh"
             activeOpacity={0.7}
             onPress={handleRefresh}
             style={[styles.refreshBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
@@ -130,33 +132,33 @@ export function UsageScreen() {
         {/* Plan Section */}
         <View style={styles.sectionBlock}>
           <Text style={[styles.metaLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
-            Plan
+            {t('usage.plan')}
           </Text>
           <Text style={[styles.planValue, { color: theme.textPrimary, fontFamily: monoFont }]}>
             Power
           </Text>
           <Text style={[styles.activeStatus, { color: theme.textMuted, fontFamily: monoFont }]}>
-            active
+            {t('usage.active')}
           </Text>
         </View>
 
         {/* Billing Period Section */}
         <View style={styles.sectionBlock}>
           <Text style={[styles.metaLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
-            Billing period
+            {t('usage.billingPeriod')}
           </Text>
           <Text style={[styles.periodValue, { color: theme.textPrimary, fontFamily: monoFont }]}>
             Sep 26, 2026
           </Text>
           <Text style={[styles.periodSub, { color: theme.textMuted, fontFamily: monoFont }]}>
-            to Oct 26, 2026
+            {t('usage.periodTo', { date: 'Oct 26, 2026' })}
           </Text>
         </View>
 
         {/* Tokens Used Section */}
         <View style={styles.sectionBlock}>
           <Text style={[styles.metaLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
-            Tokens used
+            {t('usage.tokensUsed')}
           </Text>
           <Text style={[styles.periodValue, { color: theme.textPrimary, fontFamily: monoFont }]}>
             0
@@ -167,7 +169,7 @@ export function UsageScreen() {
         {/* Quotas Section */}
         <View style={styles.quotasBlock}>
           <Text style={[styles.sectionHeading, { color: theme.textPrimary, fontFamily: monoFont }]}>
-            Quotas
+            {t('usage.quotas')}
           </Text>
 
           {quotas.map((q, idx) => (
@@ -199,18 +201,18 @@ export function UsageScreen() {
         {/* Request History Section */}
         <View style={styles.requestHistoryBlock}>
           <Text style={[styles.sectionHeading, { color: theme.textPrimary, fontFamily: monoFont }]}>
-            Request history
+            {t('usage.requestHistory')}
           </Text>
 
           {/* From Input */}
           <Text style={[styles.inputLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
-            From
+            {t('usage.from')}
           </Text>
           <View style={[styles.dateInputBox, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
             <TextInput
               value={fromDate}
               onChangeText={setFromDate}
-              placeholder="mm/dd/yyyy"
+              placeholder={t('usage.datePlaceholder')}
               placeholderTextColor={theme.placeholderText}
               style={[styles.dateTextInput, { color: theme.textPrimary, fontFamily: monoFont }]}
             />
@@ -219,13 +221,13 @@ export function UsageScreen() {
 
           {/* To Input */}
           <Text style={[styles.inputLabel, { color: theme.textMuted, fontFamily: monoFont }]}>
-            To
+            {t('usage.to')}
           </Text>
           <View style={[styles.dateInputBox, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
             <TextInput
               value={toDate}
               onChangeText={setToDate}
-              placeholder="mm/dd/yyyy"
+              placeholder={t('usage.datePlaceholder')}
               placeholderTextColor={theme.placeholderText}
               style={[styles.dateTextInput, { color: theme.textPrimary, fontFamily: monoFont }]}
             />
@@ -237,7 +239,7 @@ export function UsageScreen() {
             activeOpacity={0.7}
             style={[styles.applyDatesBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
             <Text style={[styles.applyDatesText, { color: theme.textPrimary, fontFamily: monoFont }]}>
-              Apply dates
+              {t('usage.applyDates')}
             </Text>
           </TouchableOpacity>
 
@@ -246,13 +248,13 @@ export function UsageScreen() {
             {/* Table Header */}
             <View style={styles.tableHeaderRow}>
               <Text style={[styles.colHeader, { flex: 2, color: theme.textMuted, fontFamily: monoFont }]}>
-                Date
+                {t('usage.colDate')}
               </Text>
               <Text style={[styles.colHeader, { flex: 1.5, color: theme.textMuted, fontFamily: monoFont }]}>
-                Service
+                {t('usage.colService')}
               </Text>
               <Text style={[styles.colHeader, { flex: 1, textAlign: 'right', color: theme.textMuted, fontFamily: monoFont }]}>
-                Requests
+                {t('usage.colRequests')}
               </Text>
             </View>
 

@@ -1,6 +1,7 @@
 import { AppColors } from './colors';
 
 export interface ThemeColors {
+  isDark: boolean;
   background: string;
   secondaryBackground: string;
   cardBackground: string;
@@ -23,6 +24,10 @@ export interface ThemeColors {
   success: string;
   warning: string;
   codeBackground: string;
+  /** Inline `code` and links in agent output (remote session). */
+  inlineCode: string;
+  inlineCodeBackground: string;
+  link: string;
   thinkingBackground: string;
   userBubble: string;
   onUserBubble: string;
@@ -35,6 +40,7 @@ export interface ThemeColors {
 }
 
 export const darkTheme: ThemeColors = {
+  isDark: true,
   background: AppColors.background, // #151614 (official Puku deep charcoal black)
   secondaryBackground: AppColors.secondaryBackground, // #1c1d1a (official Puku panel)
   cardBackground: AppColors.secondaryBackground, // #1c1d1a
@@ -57,6 +63,9 @@ export const darkTheme: ThemeColors = {
   success: AppColors.pukuSuccess, // #94c7a0
   warning: AppColors.pukuWarning, // #e8b187
   codeBackground: AppColors.secondary, // #10110f
+  inlineCode: '#F28B82',
+  inlineCodeBackground: 'rgba(255, 255, 255, 0.06)',
+  link: '#5AA9FF',
   thinkingBackground: 'rgba(255, 255, 255, 0.04)',
   userBubble: 'rgba(255, 255, 255, 0.08)',
   onUserBubble: AppColors.primaryText, // #eeeee5
@@ -69,28 +78,32 @@ export const darkTheme: ThemeColors = {
 };
 
 export const lightTheme: ThemeColors = {
-  background: '#faf9f5',
-  secondaryBackground: '#f3f1e8',
-  cardBackground: '#ffffff',
-  chatBarBackground: '#ffffff',
-  chatBarBorder: '#d0d4c6',
+  isDark: false,
+  background: '#f1f0e9', // official Puku light "main"
+  secondaryBackground: '#e9e9e0', // official Puku light "sidebar"
+  cardBackground: '#fafaf5', // official Puku light "panel"
+  chatBarBackground: '#fafaf5', // official Puku light "panel"
+  chatBarBorder: '#c9cdc0', // official Puku light "border"
   primary: '#111310',
-  primaryLight: '#484dd0',
+  primaryLight: '#484dd0', // official Puku light "accent"
   accent: '#111310',
-  textPrimary: '#111310', // Deep black for high contrast & clear legibility
-  textSecondary: '#2b2f27', // Dark charcoal black-like text
-  textMuted: '#4a4f43', // Dark readable muted text
-  placeholderText: '#686e60', // Dark readable placeholder
-  border: '#d0d4c6',
-  outline: '#d0d4c6',
+  textPrimary: '#282c22', // official Puku light "text"
+  textSecondary: '#626759', // official Puku light "muted"
+  textMuted: '#626759', // official Puku light "muted"
+  placeholderText: '#626759', // official Puku light "muted"
+  border: '#c9cdc0', // official Puku light "border"
+  outline: '#c9cdc0', // official Puku light "border"
   buttonBackground: '#ffffff',
-  pillBackground: '#e5e7dc',
+  pillBackground: '#e4e5db', // official Puku light "hover"
   tagText: '#111310',
   menuIcon: '#111310',
   error: '#b5263e',
-  success: '#206b35',
+  success: '#326b40', // official Puku light "success"
   warning: '#8b4a18',
   codeBackground: '#edece4',
+  inlineCode: '#C0392B',
+  inlineCodeBackground: '#F1EFE8',
+  link: '#2563EB',
   thinkingBackground: '#e7e9df',
   userBubble: '#e8e7df',
   onUserBubble: '#111310',

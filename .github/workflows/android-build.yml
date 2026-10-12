@@ -12,6 +12,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Building all 3 flavors (dev/qa/prod) x release, each with ABI
+      # splits, is heavy enough on the default GH-hosted runner's disk that
+      # it can run the box out of space mid-build. Free some up first, and
+      # (below) only build the one flavor that's actually shipped.
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -34,14 +49,48 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Build Android Release APK
+      # Only configures real signing when the repo has a release keystore in
+      # secrets; otherwise the build below falls back to the debug keystore
+      # (see android/app/build.gradle) and stays debug-signed, same as before.
+      - name: Configure release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "No ANDROID_KEYSTORE_BASE64 secret set; building debug-signed."
+            exit 0
+          fi
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/android/release-key.jks"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          cat > android/keystore.properties <<EOF
+          storeFile=$KEYSTORE_PATH
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      # Only the "prod" flavor is actually shipped (bare applicationId
+      # com.pukuai, matching the existing Play Store listing — see the
+      # flavor comment in app/build.gradle). Building dev+qa+prod release
+      # variants too is 3x the work for artifacts nobody downloads here,
+      # and was enough to exhaust the runner's disk in practice.
+      - name: Build Android Release APK and AAB (prod flavor)
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleProdRelease bundleProdRelease --no-daemon
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/prod/release/*.apk
+
+      - name: Upload Release AAB (Play Store upload format)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: android/app/build/outputs/bundle/prodRelease/*.aab

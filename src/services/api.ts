@@ -9,6 +9,7 @@ import { ChatModelType } from '../types';
 import { ENV } from '../config/env';
 import { tokenManager, TOKEN_KEYS } from './tokenManager';
 import { NativePicker } from './nativeModules';
+import { ignore } from '../utils/devLog';
 
 export const API_CONFIG = {
   chatApiUrl: ENV.API_BASE_URL,
@@ -94,9 +95,9 @@ export class PukuApiService {
   setAuthToken(token: string | null) {
     this.authToken = token;
     if (token) {
-      tokenManager.saveTokens({ accessToken: token }).catch(() => {});
+      tokenManager.saveTokens({ accessToken: token }).catch(ignore('api'));
     } else {
-      tokenManager.clearTokens().catch(() => {});
+      tokenManager.clearTokens().catch(ignore('api'));
     }
   }
 

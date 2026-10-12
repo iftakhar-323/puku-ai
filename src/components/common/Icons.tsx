@@ -6,7 +6,6 @@ import Svg, {
   Stop,
   Rect,
   Circle,
-  G,
 } from 'react-native-svg';
 
 interface IconProps {
@@ -820,6 +819,42 @@ export function TerminalPromptIcon({ size = 20, color = '#FFFFFF' }: IconProps) 
   );
 }
 
+export function TerminalWindowIcon({ size = 20, color = '#7C3AED' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="2" y="4" width="20" height="16" rx="4" stroke={color} strokeWidth="1.8" />
+      <Path
+        d="M6 9L9.5 12L6 15M12 15H17"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function ConnectedLinkIcon({ size = 20, color = '#22C55E' }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function ArrowUpRightIcon({ size = 16, color = '#8E9297' }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
@@ -1065,6 +1100,32 @@ export function PukuBotGradientIcon({ size = 20 }: { size?: number }) {
       <Path d="M8.5 15.5H15.5" stroke={`url(#${gradId})`} strokeWidth="1.6" strokeLinecap="round" />
       {/* Ears */}
       <Path d="M2 10.5V13.5M22 10.5V13.5" stroke={`url(#${gradId})`} strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/**
+ * Official Puku Remote Logo with brand purple/indigo gradient
+ */
+export function PukuRemoteGradientIcon({ size = 20 }: { size?: number }) {
+  const gradId = 'remoteGrad_' + size;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Defs>
+        <LinearGradient id={gradId} x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#0718D2" />
+          <Stop offset="0.48" stopColor="#D08BFF" />
+          <Stop offset="1" stopColor="#A4ABFF" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="2" y="4" width="20" height="16" rx="4" stroke={`url(#${gradId})`} strokeWidth="1.8" />
+      <Path
+        d="M6 9L9.5 12L6 15M12 15H17"
+        stroke={`url(#${gradId})`}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }

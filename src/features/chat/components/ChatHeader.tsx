@@ -1,16 +1,16 @@
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
   BackIcon,
-  BotIcon,
   CloseIcon,
   GhostIcon,
   MoonIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
+  PukuRemoteGradientIcon,
   SidebarToggleIcon,
   SunIcon,
-  TerminalPromptIcon,
 } from '../../../components/common/Icons';
 import { ThemeColors } from '../../../theme/theme';
 
@@ -23,6 +23,7 @@ interface ChatHeaderProps {
   onLeadingTap: () => void;
   onTrailingTap?: () => void;
   onTerminalTap?: () => void;
+  isTerminalLive?: boolean;
   onBotTap?: () => void;
   onThemeTap?: () => void;
 }
@@ -36,9 +37,11 @@ export function ChatHeader({
   onLeadingTap,
   onTrailingTap,
   onTerminalTap,
+  isTerminalLive = false,
   onBotTap,
   onThemeTap,
 }: ChatHeaderProps) {
+  const { t } = useTranslation();
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   return (
@@ -47,12 +50,12 @@ export function ChatHeader({
         <View style={styles.incognitoLeftGroup}>
           <GhostIcon size={20} color={theme.textPrimary} eyeColor={theme.background} />
           <Text style={[styles.incognitoTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-            Incognito chat
+            {t('chat.incognitoChatTitle')}
           </Text>
         </View>
       ) : (
         <View style={styles.leftGroup}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={showsBackButton ? t('common.back') : t('chat.openMenu')}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 16, right: 12 }}
             onPress={onLeadingTap}
@@ -74,7 +77,7 @@ export function ChatHeader({
       )}
 
       {isIncognitoMode ? (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.exitIncognito')}
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 16 }}
           onPress={onTrailingTap}
@@ -83,26 +86,20 @@ export function ChatHeader({
         </TouchableOpacity>
       ) : (
         <View style={styles.trailingGroup}>
-          {onTrailingTap && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={onTrailingTap}
-              style={styles.actionBtn}>
-              <GhostIcon size={19} color={theme.textSecondary} eyeColor={theme.background} />
-            </TouchableOpacity>
-          )}
-
           {onTerminalTap && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.remoteSessions')}
               activeOpacity={0.7}
               onPress={onTerminalTap}
               style={styles.actionBtn}>
-              <TerminalPromptIcon size={19} color={theme.textSecondary} />
+              <PukuRemoteGradientIcon size={20} />
+              {isTerminalLive && (
+                <View style={[styles.liveDot, { backgroundColor: theme.primaryLight }]} />
+              )}
             </TouchableOpacity>
           )}
 
           {onBotTap && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.pukuBotButton')}
               activeOpacity={0.7}
               onPress={onBotTap}
               style={styles.actionBtn}>
@@ -110,8 +107,17 @@ export function ChatHeader({
             </TouchableOpacity>
           )}
 
+          {onTrailingTap && (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.incognitoChatButton')}
+              activeOpacity={0.7}
+              onPress={onTrailingTap}
+              style={styles.actionBtn}>
+              <GhostIcon size={19} color={theme.textSecondary} eyeColor={theme.background} />
+            </TouchableOpacity>
+          )}
+
           {onThemeTap && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('chat.toggleTheme')}
               activeOpacity={0.7}
               hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
               onPress={onThemeTap}
@@ -161,6 +167,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   brandTitleWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -172,8 +179,9 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     flex: 1,
-    fontSize: 13,
-    fontWeight: '400',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   actionBtn: {
     width: 32,
@@ -181,6 +189,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  liveDot: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   trailingBtn: {
     width: 22,

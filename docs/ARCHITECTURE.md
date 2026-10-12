@@ -9,7 +9,8 @@ This document details the architectural design, component hierarchy, state flow,
 ```mermaid
 graph TD
     App[App.tsx / ErrorBoundary] --> AppProvider[AppContext Provider]
-    AppProvider --> NavigationRouter[Root Navigation Router]
+    AppProvider --> RemoteProvider[RemoteSessionProvider - relay socket]
+    RemoteProvider --> NavigationRouter[Root Navigation Router]
     
     subgraph Navigation & Screens
         NavigationRouter --> LoginScreen[LoginScreen - Auth / Welcome]
@@ -24,7 +25,8 @@ graph TD
 
     subgraph Core Services
         AppProvider --> pukuApi[Puku API Client]
-        AppProvider --> tokenManager[Token Manager - Secure Cache]
+        AppProvider --> tokenManager[Token Manager]
+        tokenManager --> secureStorage[secureStorage - expo-secure-store]
         AppProvider --> updateService[EAS Updates Service]
     end
 
@@ -64,11 +66,11 @@ puku-app-rn/
 │   │   ├── login/             # Retro cream welcome screen & OAuth modals
 │   │   ├── projects/          # Projects, custom instructions, knowledge attachment
 │   │   ├── puku_bot/          # Puku bot (Fun, Fast, Deep reasoning modes)
-│   │   ├── remote_session/    # Desktop pairing & tool confirmation
+│   │   ├── remote_session/    # Desktop pairing & tool confirmation (relay/ = protocol reducer)
 │   │   ├── settings/          # Settings, profile, usage metrics
 │   │   └── transcribe/        # Voice-to-text transcription
 │   ├── services/              # API client, token management, native modules
-│   ├── store/                 # Global AppContext state provider
+│   ├── store/                 # AppContext (app state) and RemoteSessionContext (laptop relay)
 │   ├── theme/                 # Dark / Light theme tokens, color palettes
 │   ├── types/                 # Shared TypeScript interfaces & types
 │   └── utils/                 # Auth helpers, date formatters, keyboard hook

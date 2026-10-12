@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AppHeader } from '../../components/common/AppHeader';
 import {
   CheckmarkIcon,
@@ -20,6 +21,7 @@ import {
 import { useApp } from '../../store/AppContext';
 import { Conversation } from '../../types';
 import { formatActivityDate } from '../../utils/date';
+import { ignore } from '../../utils/devLog';
 
 function formatModelName(model?: string): string {
   switch (model) {
@@ -37,6 +39,7 @@ function formatModelName(model?: string): string {
 }
 
 export function ChatsScreen() {
+  const { t } = useTranslation();
   const {
     theme,
     conversations,
@@ -53,7 +56,7 @@ export function ChatsScreen() {
 
   // Sync cloud conversations on screen mount so cross-device/past chats appear immediately
   useEffect(() => {
-    refreshConversations().catch(() => {});
+    refreshConversations().catch(ignore('ChatsScreen'));
   }, [refreshConversations]);
 
   const handleRefresh = async () => {
@@ -112,14 +115,12 @@ export function ChatsScreen() {
 
   const confirmDelete = () => {
     Alert.alert(
-      'Delete conversations?',
-      `Are you sure you want to delete ${selectedIds.length} conversation${
-        selectedIds.length > 1 ? 's' : ''
-      }? This cannot be undone.`,
+      t('chats.deleteDialogTitle'),
+      t('chats.deleteDialogMessage', { count: selectedIds.length }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             deleteConversations(selectedIds);
@@ -137,18 +138,18 @@ export function ChatsScreen() {
         showBack
         title={
           isSelectionMode
-            ? `${selectedIds.length} selected`
-            : 'Chats'
+            ? t('chats.selectedCount', { count: selectedIds.length })
+            : t('chats.title')
         }
         rightAction={
           isSelectionMode ? (
             <View style={styles.selectionActions}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete"
                 onPress={confirmDelete}
                 style={[styles.deleteBtn, { backgroundColor: theme.buttonBackground }]}>
                 <DeleteIcon size={18} color={theme.error} />
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                 onPress={() => {
                   setIsSelectionMode(false);
                   setSelectedIds([]);
@@ -173,13 +174,13 @@ export function ChatsScreen() {
           <SearchIcon size={18} color={theme.placeholderText} />
           <TextInput
             style={[styles.searchInput, { color: theme.textPrimary, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}
-            placeholder="Search your thoughts..."
+            placeholder={t('chats.searchPlaceholder')}
             placeholderTextColor={theme.placeholderText}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setSearchQuery('')}>
               <CloseIcon size={16} color={theme.textMuted} />
             </TouchableOpacity>
           )}
@@ -190,8 +191,8 @@ export function ChatsScreen() {
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
             {searchQuery.trim().length > 0
-              ? 'No conversations found matching your search'
-              : 'No conversations yet'}
+              ? t('chats.noResults')
+              : t('chats.noConversations')}
           </Text>
         </View>
       ) : (

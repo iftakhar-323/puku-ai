@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { ArrowUpRightIcon } from '../../../components/common/Icons';
+import { RetroComputerIllustration } from '../../../components/common/RetroComputerIllustration';
 import { ThemeColors } from '../../../theme/theme';
 import { Conversation } from '../../../types';
 import { formatActivityDate } from '../../../utils/date';
@@ -21,24 +23,12 @@ interface ChatEmptyStateProps {
   onPromptTap?: (prompt: string) => void;
 }
 
-function getGreeting(userName?: string): { lead: string; name: string } {
+function getGreetingKey(): string {
   const h = new Date().getHours();
-  let lead = 'Good morning,';
-  if (h >= 12 && h < 17) {
-    lead = 'Good afternoon,';
-  } else if (h >= 17 && h < 22) {
-    lead = 'Good evening,';
-  } else if (h >= 22 || h < 5) {
-    lead = 'Back at it,';
-  }
-
-  let name = 'there';
-  if (userName?.trim()) {
-    name = userName.trim().split(/\s+/)[0];
-    name = name.charAt(0).toUpperCase() + name.slice(1);
-  }
-
-  return { lead, name };
+  if (h >= 12 && h < 17) return 'chatEmptyState.greetingAfternoon';
+  if (h >= 17 && h < 22) return 'chatEmptyState.greetingEvening';
+  if (h >= 22 || h < 5) return 'chatEmptyState.greetingLate';
+  return 'chatEmptyState.greetingMorning';
 }
 
 export function ChatEmptyState({
@@ -48,7 +38,13 @@ export function ChatEmptyState({
   onSelectConversation,
   onPromptTap,
 }: ChatEmptyStateProps) {
-  const greeting = getGreeting(userName);
+  const { t } = useTranslation();
+  const greetingLead = t(getGreetingKey());
+  let greetingName = t('chatEmptyState.greetingFallbackName');
+  if (userName?.trim()) {
+    greetingName = userName.trim().split(/\s+/)[0];
+    greetingName = greetingName.charAt(0).toUpperCase() + greetingName.slice(1);
+  }
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   // If user has real conversations, show top 3; otherwise show matching sample conversations from Image 1
@@ -64,11 +60,11 @@ export function ChatEmptyState({
             c.activityDate;
           let formatted = formatActivityDate(rawTime);
           if (!formatted || formatted === 'Recent') {
-            formatted = 'Just now';
+            formatted = t('chatEmptyState.justNow');
           }
           return {
             id: c.id,
-            title: c.title || 'Untitled conversation',
+            title: c.title || t('chatEmptyState.untitledConversation'),
             time: formatted,
             isReal: true,
           };
@@ -112,15 +108,19 @@ export function ChatEmptyState({
       <View style={styles.heroRow}>
         <View style={styles.headlineWrapper}>
           <Text style={[styles.headlineLead, { color: theme.textSecondary }]}>
-            {greeting.lead}
+            {greetingLead}
           </Text>
           <Text style={[styles.headlineName, { color: theme.textPrimary }]}>
-            {greeting.name}
+            {greetingName}
           </Text>
         </View>
-        <View style={styles.computerWrapper}>
-          <Image
-            source={require('../../../../assets/images/retro_puku_computer.png')}
+        <View
+          style={[
+            styles.computerWrapper,
+            { backgroundColor: theme.cardBackground, borderColor: theme.outline },
+          ]}
+        >
+          <RetroComputerIllustration
             style={styles.computerImage}
             resizeMode="contain"
           />
@@ -134,7 +134,7 @@ export function ChatEmptyState({
             styles.sectionTitle,
             { color: theme.textSecondary, fontFamily: monoFont },
           ]}>
-          Recent conversations
+          {t('chatEmptyState.recentConversations')}
         </Text>
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
@@ -206,6 +206,9 @@ const styles = StyleSheet.create({
   computerWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12, // official Puku "panelRadius" token
+    borderWidth: 1,
   },
   computerImage: {
     width: 120,

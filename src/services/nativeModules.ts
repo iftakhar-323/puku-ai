@@ -1,6 +1,6 @@
-import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
+import { Alert, NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 'react-native';
 
-const { PukuClipboard, PukuSpeech, PukuPicker } = NativeModules;
+const { PukuClipboard, PukuSpeech, PukuTts, PukuPicker } = NativeModules;
 
 export interface PickedMedia {
   uri: string;
@@ -8,6 +8,25 @@ export interface PickedMedia {
   type: string;
   size: number;
   base64?: string;
+}
+
+export async function requestCameraPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+      {
+        title: 'Camera Permission',
+        message: 'Puku needs access to your camera to take and attach photos.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      }
+    );
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
 }
 
 export const NativePicker = {
@@ -18,6 +37,20 @@ export const NativePicker = {
       }
     } catch (e) {
       console.warn('Failed to pick media', e);
+    }
+    return null;
+  },
+  takePhoto: async (options?: any): Promise<PickedMedia | null> => {
+    try {
+      if (Platform.OS === 'android') {
+        const hasPerm = await requestCameraPermission();
+        if (!hasPerm) return null;
+      }
+      if (PukuPicker && PukuPicker.takePhoto) {
+        return await PukuPicker.takePhoto(options || {});
+      }
+    } catch (e) {
+      console.warn('Failed to take photo', e);
     }
     return null;
   },
@@ -34,6 +67,45 @@ export const NativePicker = {
     throw new Error('Native upload is not available');
   },
 };
+
+export function promptMediaAttachment(
+  onSelected: (media: PickedMedia) => void,
+  title: string = 'Add Photo or File',
+) {
+  Alert.alert(
+    title,
+    'Choose an option to attach an image or file',
+    [
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          try {
+            const media = await NativePicker.takePhoto();
+            if (media) onSelected(media);
+          } catch (e) {
+            console.warn('Camera error', e);
+          }
+        },
+      },
+      {
+        text: 'Choose File / Photo',
+        onPress: async () => {
+          try {
+            const media = await NativePicker.pickMedia();
+            if (media) onSelected(media);
+          } catch (e) {
+            console.warn('Picker error', e);
+          }
+        },
+      },
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+    ],
+    { cancelable: true }
+  );
+}
 
 export async function requestAudioPermission(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
@@ -80,6 +152,8 @@ export const NativeClipboard = {
 const speechEventEmitter = PukuSpeech
   ? new NativeEventEmitter(PukuSpeech)
   : null;
+
+const ttsEventEmitter = PukuTts ? new NativeEventEmitter(PukuTts) : null;
 
 export interface SpeechResultsEvent {
   text: string;
@@ -156,6 +230,42 @@ export const NativeSpeech = {
     const sub = speechEventEmitter.addListener('onSpeechError', (err: any) => {
       callback({ code: err?.code || -1, message: err?.message || 'Unknown error' });
     });
+    return () => sub.remove();
+  },
+};
+
+export const NativeTts = {
+  speak: async (text: string): Promise<boolean> => {
+    try {
+      if (PukuTts && PukuTts.speak) {
+        return await PukuTts.speak(text);
+      }
+    } catch (e) {
+      console.warn('Failed to speak', e);
+    }
+    return false;
+  },
+  stop: async (): Promise<boolean> => {
+    try {
+      if (PukuTts && PukuTts.stop) {
+        return await PukuTts.stop();
+      }
+    } catch {}
+    return false;
+  },
+  onStart: (callback: () => void) => {
+    if (!ttsEventEmitter) return () => {};
+    const sub = ttsEventEmitter.addListener('onTtsStart', () => callback());
+    return () => sub.remove();
+  },
+  onDone: (callback: () => void) => {
+    if (!ttsEventEmitter) return () => {};
+    const sub = ttsEventEmitter.addListener('onTtsDone', () => callback());
+    return () => sub.remove();
+  },
+  onError: (callback: () => void) => {
+    if (!ttsEventEmitter) return () => {};
+    const sub = ttsEventEmitter.addListener('onTtsError', () => callback());
     return () => sub.remove();
   },
 };

@@ -37,7 +37,7 @@ export function TooltipRoot({ children }: { children: React.ReactNode }) {
 export function TooltipTrigger({
   children,
   style,
-  asChild,
+  asChild: _asChild,
 }: {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
