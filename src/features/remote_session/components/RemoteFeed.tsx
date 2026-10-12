@@ -1,0 +1,696 @@
+import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import {
+  FlatList,
+  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  RefreshIcon,
+} from '../../../components/common/Icons';
+import i18next from '../../../i18n';
+import { RetroComputerIllustration } from '../../../components/common/RetroComputerIllustration';
+import { useApp } from '../../../store/AppContext';
+import { ThemeColors } from '../../../theme/theme';
+import {
+  CliColors,
+  MarkdownRenderer,
+  StreamingText,
+} from '../../chat/components/MarkdownRenderer';
+import { TypingIndicator } from '../../chat/components/TypingIndicator';
+import type { RemoteEntry, ToolCall } from '../relay/protocol';
+import {
+  FeedItem,
+  buildFeed,
+  describeTool,
+  summarizeTools,
+} from '../relay/feed';
+
+const monoFont = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+const NEAR_BOTTOM_PX = 160;
+
+function getGreeting(userName?: string): { lead: string; name: string } {
+  const h = new Date().getHours();
+  let lead = i18next.t('chatEmptyState.greetingMorning');
+  if (h >= 12 && h < 17) {
+    lead = i18next.t('chatEmptyState.greetingAfternoon');
+  } else if (h >= 17 && h < 22) {
+    lead = i18next.t('chatEmptyState.greetingEvening');
+  } else if (h >= 22 || h < 5) {
+    lead = i18next.t('chatEmptyState.greetingLate');
+  }
+
+  let name = i18next.t('chatEmptyState.greetingFallbackName');
+  if (userName?.trim()) {
+    name = userName.trim().split(/\s+/)[0];
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  return { lead, name };
+}
+
+interface Props {
+  entries: RemoteEntry[];
+  isWorking: boolean;
+  canResend: boolean;
+  theme: ThemeColors;
+  keyboardHeight?: number;
+  onCopy: (text: string) => void;
+  onResend: (text: string) => void;
+  onOpenTool: (tool: ToolCall) => void;
+}
+
+export function RemoteFeed({
+  entries,
+  isWorking,
+  canResend,
+  theme,
+  keyboardHeight,
+  onCopy,
+  onResend,
+  onOpenTool,
+}: Props) {
+  const listRef = useRef<FlatList<FeedItem>>(null);
+  const nearBottom = useRef(true);
+  const [showJump, setShowJump] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+
+  const feed = useMemo(() => buildFeed(entries), [entries]);
+  const cliColors = useMemo<CliColors>(
+    () => ({
+      inlineCode: theme.inlineCode,
+      inlineCodeBackground: theme.inlineCodeBackground,
+      link: theme.link,
+    }),
+    [theme],
+  );
+
+  const toggleGroup = useCallback((id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    const isNear =
+      layoutMeasurement.height + contentOffset.y >=
+      contentSize.height - NEAR_BOTTOM_PX;
+    nearBottom.current = isNear;
+    setShowJump(prev => (prev === !isNear ? prev : !isNear));
+  }, []);
+
+  // Follow new output while near the bottom; never yank the view back down
+  // if the user has deliberately scrolled up to read earlier output.
+  const onContentSizeChange = useCallback(() => {
+    if (nearBottom.current) {
+      listRef.current?.scrollToEnd({ animated: true });
+    }
+  }, []);
+
+  // Scroll to bottom when keyboard opens so Puku's writing is never obscured
+  React.useEffect(() => {
+    if (keyboardHeight && keyboardHeight > 0) {
+      setTimeout(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      }, 60);
+    }
+  }, [keyboardHeight]);
+
+  const last = entries[entries.length - 1];
+  const showTyping =
+    isWorking && !(last?.kind === 'assistant' && last.streaming);
+
+  const renderItem = useCallback(
+    ({ item }: { item: FeedItem }) => (
+      <FeedRowErrorBoundary>
+        <FeedRow
+          item={item}
+          isExpanded={expanded.has(item.id)}
+          canResend={canResend}
+          theme={theme}
+          cliColors={cliColors}
+          onCopy={onCopy}
+          onResend={onResend}
+          onOpenTool={onOpenTool}
+          onToggleGroup={toggleGroup}
+        />
+      </FeedRowErrorBoundary>
+    ),
+    [
+      expanded,
+      canResend,
+      theme,
+      cliColors,
+      onCopy,
+      onResend,
+      onOpenTool,
+      toggleGroup,
+    ],
+  );
+
+  const { profile, isDark } = useApp();
+  const greeting = getGreeting(profile?.name);
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        ref={listRef}
+        data={feed}
+        keyExtractor={item => item.id}
+        renderItem={renderItem}
+        extraData={expanded}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={100}
+        onContentSizeChange={onContentSizeChange}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            {/* Hero Header with Dynamic Greeting & Retro Computer Illustration (matching Puku AI 1:1) */}
+            <View style={styles.heroRow}>
+              <View style={styles.headlineWrapper}>
+                <Text style={[styles.headlineLead, { color: theme.textSecondary }]}>
+                  {greeting.lead}
+                </Text>
+                <Text style={[styles.headlineName, { color: theme.textPrimary }]}>
+                  {greeting.name}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.computerWrapper,
+                  {
+                    backgroundColor: theme.cardBackground,
+                    borderColor: theme.outline || theme.border,
+                  },
+                ]}
+              >
+                <RetroComputerIllustration
+                  style={styles.computerImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+          </View>
+        }
+        ListFooterComponent={
+          showTyping ? (
+            <View style={styles.typing}>
+              <TypingIndicator theme={theme} />
+            </View>
+          ) : undefined
+        }
+      />
+      {showJump && (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Scroll to latest"
+          onPress={() => listRef.current?.scrollToEnd({ animated: true })}
+          style={[
+            styles.jump,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.outline,
+            },
+          ]}
+        >
+          <ChevronDownIcon size={18} color={theme.textPrimary} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+interface RowProps {
+  item: FeedItem;
+  isExpanded: boolean;
+  canResend: boolean;
+  theme: ThemeColors;
+  cliColors: CliColors;
+  onCopy: (text: string) => void;
+  onResend: (text: string) => void;
+  onOpenTool: (tool: ToolCall) => void;
+  onToggleGroup: (id: string) => void;
+}
+
+class FeedRowErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(err: any) {
+    console.warn('Feed row render error caught:', err);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
+const FeedRow = memo(function FeedRowView({
+  item,
+  isExpanded,
+  canResend,
+  theme,
+  cliColors,
+  onCopy,
+  onResend,
+  onOpenTool,
+  onToggleGroup,
+}: RowProps) {
+  if (!item || !item.kind) return null;
+
+  switch (item.kind) {
+    case 'user': {
+      const userText =
+        typeof item.text === 'string' ? item.text : String(item.text || '');
+      return (
+        <View style={styles.userRow}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            delayLongPress={200}
+            onLongPress={() => userText && onCopy(userText)}
+            style={[styles.userBubble, { backgroundColor: theme.userBubble }]}
+          >
+            {item.attachmentUri ? (
+              <Image
+                source={{ uri: item.attachmentUri }}
+                style={styles.userAttachment}
+              />
+            ) : null}
+            {userText ? (
+              <Text
+                selectable
+                style={[styles.userText, { color: theme.onUserBubble }]}
+              >
+                {userText}
+              </Text>
+            ) : null}
+          </TouchableOpacity>
+          <View style={styles.userActions}>
+            {userText ? (
+              <TouchableOpacity
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel="Copy message"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => onCopy(userText)}
+              >
+                <CopyIcon size={14} color={theme.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+            {canResend && userText && (
+              <TouchableOpacity
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel="Send this message again"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => onResend(userText)}
+              >
+                <RefreshIcon size={14} color={theme.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    case 'tools': {
+      const rawTools = Array.isArray(item.tools) ? item.tools : [];
+      const validToolEntries = rawTools.filter(
+        t => t && t.tool && typeof t.tool === 'object',
+      );
+      if (validToolEntries.length === 0) return null;
+
+      const tools = validToolEntries.map(t => t.tool);
+      const running = tools.some(t => t.status === 'running');
+      const failed = tools.some(t => t.status === 'error');
+      return (
+        <View style={styles.toolGroup}>
+          <TouchableOpacity
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isExpanded }}
+            onPress={() => onToggleGroup(item.id)}
+            style={styles.toolGroupHeader}
+          >
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.toolGroupText,
+                { color: failed ? theme.error : theme.textSecondary },
+              ]}
+            >
+              {summarizeTools(tools)}
+              {running ? '…' : ''}
+            </Text>
+            {isExpanded ? (
+              <ChevronDownIcon size={13} color={theme.textSecondary} />
+            ) : (
+              <ChevronRightIcon size={14} color={theme.textSecondary} />
+            )}
+          </TouchableOpacity>
+          {isExpanded && (
+            <View style={[styles.toolList, { borderLeftColor: theme.outline }]}>
+              {validToolEntries.map(({ id, tool }, idx) => (
+                <TouchableOpacity
+                  key={id || `tool_${idx}`}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityHint="Shows the command and its output"
+                  onPress={() => onOpenTool(tool)}
+                  style={styles.toolRow}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.toolRowText,
+                      {
+                        color:
+                          tool.status === 'error'
+                            ? theme.error
+                            : theme.textSecondary,
+                      },
+                    ]}
+                  >
+                    {describeTool(tool)}
+                  </Text>
+                  <ChevronRightIcon size={14} color={theme.textMuted} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    case 'system': {
+      const systemText =
+        typeof item.text === 'string' ? item.text : String(item.text || '');
+      return (
+        <View style={styles.systemRow}>
+          <View
+            style={[
+              styles.systemPill,
+              { backgroundColor: theme.pillBackground },
+            ]}
+          >
+            <Text
+              style={[
+                styles.systemText,
+                {
+                  color:
+                    item.tone === 'error' ? theme.error : theme.textSecondary,
+                },
+              ]}
+            >
+              {systemText}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    case 'assistant': {
+      const assistantText =
+        typeof item.text === 'string' ? item.text : String(item.text || '');
+      return (
+        <View style={styles.assistantRow}>
+          {item.streaming ? (
+            <StreamingText
+              content={assistantText}
+              theme={theme}
+              cliColors={cliColors}
+              cursor
+            />
+          ) : (
+            <MarkdownRenderer
+              content={assistantText}
+              theme={theme}
+              cliColors={cliColors}
+            />
+          )}
+          {assistantText.trim() ? (
+            <TouchableOpacity
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel="Copy response"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => onCopy(assistantText)}
+              style={styles.assistantCopyBtn}
+            >
+              <CopyIcon size={13} color={theme.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      );
+    }
+
+    case 'thinking': {
+      const thinkingText =
+        typeof item.text === 'string' ? item.text : String(item.text || '');
+      if (!thinkingText.trim()) return null;
+      return (
+        <View style={styles.thinkingGroup}>
+          <TouchableOpacity
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isExpanded }}
+            onPress={() => onToggleGroup(item.id)}
+            style={styles.thinkingHeader}
+          >
+            <Text style={[styles.thinkingHeaderText, { color: theme.textMuted }]}>
+              {item.streaming
+                ? i18next.t('remoteSession.thinking')
+                : i18next.t('remoteSession.thought')}
+            </Text>
+            {isExpanded ? (
+              <ChevronDownIcon size={12} color={theme.textMuted} />
+            ) : (
+              <ChevronRightIcon size={13} color={theme.textMuted} />
+            )}
+          </TouchableOpacity>
+          {isExpanded && (
+            <View
+              style={[
+                styles.thinkingTextWrap,
+                { borderLeftColor: theme.outline },
+              ]}
+            >
+              <StreamingText
+                content={thinkingText}
+                theme={theme}
+                cursor={item.streaming}
+                style={[styles.thinkingText, { color: theme.textMuted }]}
+              />
+            </View>
+          )}
+        </View>
+      );
+    }
+  }
+});
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexGrow: 1,
+  },
+  emptyContainer: {
+    paddingHorizontal: 4,
+    paddingTop: 8,
+    paddingBottom: 24,
+    width: '100%',
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  headlineWrapper: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  headlineLead: {
+    fontSize: 27,
+    fontWeight: '700',
+    lineHeight: 35,
+    letterSpacing: -0.4,
+  },
+  headlineName: {
+    fontSize: 27,
+    fontWeight: '700',
+    lineHeight: 35,
+    letterSpacing: -0.4,
+  },
+  computerWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  computerImage: {
+    width: 120,
+    height: 112,
+  },
+  typing: {
+    marginVertical: 4,
+    paddingLeft: 4,
+  },
+  jump: {
+    position: 'absolute',
+    bottom: 8,
+    alignSelf: 'center',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+  },
+  userRow: {
+    alignItems: 'flex-end',
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 4,
+  },
+  userBubble: {
+    maxWidth: '85%',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  userText: {
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  userAttachment: {
+    width: 160,
+    height: 160,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  userActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 8,
+    paddingRight: 4,
+  },
+  toolGroup: {
+    paddingHorizontal: 4,
+    marginVertical: 2,
+  },
+  toolGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingVertical: 6,
+  },
+  toolGroupText: {
+    fontSize: 14,
+  },
+  toolList: {
+    borderLeftWidth: 1,
+    marginLeft: 4,
+    paddingLeft: 10,
+    marginBottom: 4,
+  },
+  toolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 7,
+  },
+  toolRowText: {
+    fontSize: 12.5,
+    flex: 1,
+    marginRight: 8,
+    fontFamily: monoFont,
+  },
+  systemRow: {
+    alignItems: 'center',
+    marginVertical: 6,
+  },
+  systemPill: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    maxWidth: '90%',
+  },
+  systemText: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  assistantRow: {
+    width: '100%',
+    marginVertical: 4,
+    paddingHorizontal: 4,
+  },
+  assistantCopyBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    padding: 2,
+  },
+  thinkingGroup: {
+    paddingHorizontal: 4,
+    marginVertical: 2,
+  },
+  thinkingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingVertical: 6,
+  },
+  thinkingHeaderText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
+  thinkingTextWrap: {
+    borderLeftWidth: 2,
+    marginLeft: 4,
+    paddingLeft: 10,
+    marginBottom: 4,
+  },
+  thinkingText: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
+});
