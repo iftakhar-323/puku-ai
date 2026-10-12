@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -368,7 +369,9 @@ export function PukuBotWorkspaceSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.overlay}>
         <View style={[styles.sheet, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
           <View style={styles.header}>
             <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -386,7 +389,7 @@ export function PukuBotWorkspaceSheet({
             {panel === 'agents' ? renderAgents() : renderMarketplace()}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

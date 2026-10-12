@@ -442,6 +442,8 @@ export function PukuBotScreen() {
     replaceBotConversations,
     profile,
     botWorkspaceRequest,
+    clearBotWorkspaceRequest,
+    isDrawerOpen,
   } = useApp();
   const { isActive: isRemoteActive, liveRelaySessions } = useRemoteSession();
   const isTerminalLive = isRemoteActive || liveRelaySessions.length > 0;
@@ -672,21 +674,34 @@ export function PukuBotScreen() {
 
   // The drawer's Workspace entries: Skills and Memory are tabs of the settings
   // sheet; Agents and Marketplace have a sheet of their own.
+  //
+  // The drawer is itself a Modal. iOS will not present a Modal while another is
+  // still being dismissed (it silently shows nothing), so a request waits until
+  // the drawer has closed and its dismissal has finished.
   useEffect(() => {
-    if (!botWorkspaceRequest) return;
+    if (!botWorkspaceRequest || isDrawerOpen) return;
     const { panel } = botWorkspaceRequest;
-    if (panel === 'skills' || panel === 'memory') {
-      setWorkspaceSheet(null);
-      setActiveSettingsTab(panel);
-      setShowSettingsModal(true);
-      if (pukuBotApi.isAuthenticated()) {
-        if (panel === 'skills') pukuBotApi.getSkills().then(setUserSkillsList).catch(ignore('PukuBotScreen'));
-      }
-    } else {
-      setShowSettingsModal(false);
-      setWorkspaceSheet(panel);
-    }
-  }, [botWorkspaceRequest]);
+    const timer = setTimeout(
+      () => {
+        clearBotWorkspaceRequest();
+        if (panel === 'skills' || panel === 'memory') {
+          setWorkspaceSheet(null);
+          setActiveSettingsTab(panel);
+          setShowSettingsModal(true);
+          if (panel === 'skills' && pukuBotApi.isAuthenticated()) {
+            pukuBotApi.getSkills().then(setUserSkillsList).catch(ignore('PukuBotScreen'));
+          }
+        } else {
+          setShowSettingsModal(false);
+          setWorkspaceSheet(panel);
+        }
+      },
+      Platform.OS === 'ios' ? 450 : 0
+    );
+    return () => clearTimeout(timer);
+    // clearBotWorkspaceRequest is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botWorkspaceRequest, isDrawerOpen]);
 
   /** From Agents or Marketplace: refresh the roster (it may have just grown) and talk to that Bot. */
   const handleStartChatWith = async (botId: string) => {

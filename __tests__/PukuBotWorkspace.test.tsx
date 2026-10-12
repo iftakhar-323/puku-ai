@@ -129,5 +129,8 @@ describe('Puku Bot Workspace', () => {
     // Tapping the same entry again is a new request.
     await ReactTestRenderer.act(async () => app!.openBotWorkspace('marketplace'));
     expect(app!.botWorkspaceRequest!.at).not.toBe(first);
+    // Once the Bot screen has opened it, it is gone, so a later visit opens nothing.
+    await ReactTestRenderer.act(async () => app!.clearBotWorkspaceRequest());
+    expect(app!.botWorkspaceRequest).toBeNull();
   });
 });

@@ -101,6 +101,8 @@ interface AppContextValue {
   /** The Workspace panel the drawer last asked the Bot screen to open; `at` tells repeat taps apart. */
   botWorkspaceRequest: { panel: BotWorkspacePanel; at: number } | null;
   openBotWorkspace: (panel: BotWorkspacePanel) => void;
+  /** The Bot screen has opened it; a later visit must not open it again. */
+  clearBotWorkspaceRequest: () => void;
   addBotMessage: (convId: string, message: { role: 'user' | 'assistant'; text: string; toolCalls?: any[] }) => void;
   // Profile & Settings
   profile: UserProfile;
@@ -1451,6 +1453,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const openBotWorkspace = useCallback((panel: BotWorkspacePanel) => {
     setBotWorkspaceRequest({ panel, at: Date.now() });
   }, []);
+  const clearBotWorkspaceRequest = useCallback(() => setBotWorkspaceRequest(null), []);
 
   const addBotMessage = useCallback(
     (convId: string, message: { role: 'user' | 'assistant'; text: string; toolCalls?: any[] }) => {
@@ -1540,6 +1543,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         selectBot,
         botWorkspaceRequest,
         openBotWorkspace,
+        clearBotWorkspaceRequest,
         addBotMessage,
         profile,
         settings,
