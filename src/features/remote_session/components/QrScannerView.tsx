@@ -1,0 +1,168 @@
+import React, { useState } from 'react';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import { CloseIcon } from '../../../components/common/Icons';
+import { ThemeColors } from '../../../theme/theme';
+import { parsePairingPayload } from '../relay/pairing';
+
+interface Props {
+  theme: ThemeColors;
+  visible: boolean;
+  onClose: () => void;
+  onScanned: (sessionId: string, token: string) => void;
+}
+
+/** Scans the QR code `/remote-control` prints in Puku CLI to pair instantly. */
+export function QrScannerView({ theme, visible, onClose, onScanned }: Props) {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [error, setError] = useState<string | null>(null);
+  const [handled, setHandled] = useState(false);
+
+  const handleScan = (rawValue: string) => {
+    if (handled) return;
+    const pairing = parsePairingPayload(rawValue);
+    if (!pairing) {
+      setError(t('remoteSession.unsupportedQrCode'));
+      return;
+    }
+    setHandled(true);
+    setError(null);
+    onScanned(pairing.sessionId, pairing.token);
+  };
+
+  const handleClose = () => {
+    setHandled(false);
+    setError(null);
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={handleClose}
+      presentationStyle="fullScreen"
+    >
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>
+            {t('remoteSession.scanRemoteSession')}
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            activeOpacity={0.7}
+            onPress={handleClose}
+            style={styles.closeBtn}
+          >
+            <CloseIcon size={20} color={theme.textPrimary} />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={[styles.hint, { color: theme.textSecondary }]}>
+          {t('remoteSession.scanHint')}
+        </Text>
+
+        <View style={styles.cameraWrap}>
+          {!permission ? null : !permission.granted ? (
+            <View style={styles.permissionBox}>
+              <Text style={[styles.permissionText, { color: theme.textSecondary }]}>
+                {t('remoteSession.cameraAccessNeeded')}
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                activeOpacity={0.8}
+                onPress={requestPermission}
+                style={[styles.permissionBtn, { backgroundColor: theme.primary }]}
+              >
+                <Text style={styles.permissionBtnText}>{t('remoteSession.allowCameraAccess')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={({ data }) => handleScan(data)}
+            />
+          )}
+        </View>
+
+        {error ? (
+          <View style={[styles.errorBox, { borderColor: theme.error }]}>
+            <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
+          </View>
+        ) : null}
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  hint: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  cameraWrap: {
+    flex: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  camera: {
+    flex: 1,
+  },
+  permissionBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    paddingHorizontal: 24,
+  },
+  permissionText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  permissionBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  permissionBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  errorBox: {
+    backgroundColor: 'rgba(181, 38, 62, 0.12)',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 13,
+  },
+});
