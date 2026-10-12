@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { useTranslation } from 'react-i18next';
 import i18next from '../../i18n';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Rect } from 'react-native-svg';
 import {
   ArrowUpRightIcon,
   BotIcon,
@@ -43,7 +43,6 @@ import {
   PukuBotGradientIcon,
   PukuLogoIcon,
   PukuRemoteGradientIcon,
-  RefreshIcon,
   RemoteIcon,
   SettingsIcon,
   SidebarToggleIcon,
@@ -78,7 +77,6 @@ import { useApp } from '../../store/AppContext';
 import { useRemoteSession } from '../../store/RemoteSessionContext';
 import {
   PukuBotAttachment,
-  PukuBotComputerInfo,
   PukuBotConnection,
   PukuBotConversation,
   PukuBotItem,
@@ -132,16 +130,6 @@ function getGreeting(userName?: string): { lead: string; name: string } {
   }
 
   return { lead, name };
-}
-
-function ComputerMonitorIcon({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x="2" y="3" width="20" height="14" rx="2" stroke={color} strokeWidth="1.75" />
-      <Path d="M8 21H16" stroke={color} strokeWidth="1.75" strokeLinecap="round" />
-      <Path d="M12 17V21" stroke={color} strokeWidth="1.75" strokeLinecap="round" />
-    </Svg>
-  );
 }
 
 function StopSquareIcon({ size = 16, color = '#FFFFFF' }: { size?: number; color?: string }) {
@@ -432,6 +420,9 @@ function toLocalMessages(list: PukuBotMessage[]): LocalChatMessage[] {
   }));
 }
 
+/** How many conversations the home screen lists: the latest ones only. */
+export const HOME_RECENT_LIMIT = 3;
+
 export function PukuBotScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -479,7 +470,6 @@ export function PukuBotScreen() {
   const [activeConversation, setActiveConversation] = useState<PukuBotConversation | null>(null);
   const [serverConversations, setServerConversations] = useState<PukuBotConversation[]>([]);
   const [conversationsCursor, setConversationsCursor] = useState<string | null>(null);
-  const [isLoadingMoreConvs, setIsLoadingMoreConvs] = useState(false);
 
   const [pendingAttachment, setPendingAttachment] = useState<PickedMedia | null>(null);
 
@@ -488,13 +478,6 @@ export function PukuBotScreen() {
   const [secretInput, setSecretInput] = useState('');
   const [isSecretMasked, setIsSecretMasked] = useState(true);
   const [isSubmittingSecret, setIsSubmittingSecret] = useState(false);
-
-  // Computer screen / status modal state
-  const [showComputerModal, setShowComputerModal] = useState(false);
-  const [computerInfo, setComputerInfo] = useState<PukuBotComputerInfo | null>(null);
-  const [isLoadingComputer, setIsLoadingComputer] = useState(false);
-  const [screenshotTimestamp, setScreenshotTimestamp] = useState<number>(Date.now());
-  const [isTakingControl, setIsTakingControl] = useState(false);
 
   // Settings / Connection modal state
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -541,18 +524,6 @@ export function PukuBotScreen() {
   const openingConvIdRef = useRef<string | null>(null);
   const { keyboardHeight } = useKeyboardHeight();
 
-  // Auto-refresh computer screenshot every 2.5 seconds while monitor modal is open
-  useEffect(() => {
-    let timer: any = null;
-    if (showComputerModal && isAuthenticated && selectedBotId) {
-      timer = setInterval(() => {
-        setScreenshotTimestamp(Date.now());
-      }, 2500);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [showComputerModal, isAuthenticated, selectedBotId]);
 
   // Scroll to bottom on keyboard or new messages
   useEffect(() => {
@@ -585,19 +556,6 @@ export function PukuBotScreen() {
       applyConversationPage(res.conversations || [], res.nextCursor ?? null, false);
     } catch (err) {
       console.warn('[PukuBotScreen] Failed to refresh conversations:', err);
-    }
-  };
-
-  const handleLoadMoreConversations = async () => {
-    if (!conversationsCursor || isLoadingMoreConvs) return;
-    setIsLoadingMoreConvs(true);
-    try {
-      const res = await pukuBotApi.getConversations(20, conversationsCursor);
-      applyConversationPage(res.conversations || [], res.nextCursor ?? null, true);
-    } catch (err: any) {
-      Alert.alert(t('pukuBot.errorTitle'), err?.message || t('pukuBot.loadFailed', { defaultValue: 'Could not load more conversations.' }));
-    } finally {
-      setIsLoadingMoreConvs(false);
     }
   };
 
@@ -1207,56 +1165,16 @@ export function PukuBotScreen() {
     }
   };
 
-  // Load Bot computer status
-  const handleOpenComputerModal = async () => {
-    setShowComputerModal(true);
-    setIsLoadingComputer(true);
-    setScreenshotTimestamp(Date.now());
-    try {
-      const info = await pukuBotApi.getComputer(selectedBotId);
-      setComputerInfo(info);
-    } catch (err: any) {
-      console.warn('[PukuBotScreen] getComputer error:', err);
-    } finally {
-      setIsLoadingComputer(false);
-    }
-  };
-
-  // "Bot needs you": open its computer and take over in one tap.
-  const handleTakeOver = async () => {
-    const botId = needsPerson?.botId || selectedBotId;
-    await handleOpenComputerModal();
-    setIsTakingControl(true);
-    try {
-      const res = await pukuBotApi.takeComputerControl(botId);
-      setComputerInfo(prev => (prev ? { ...prev, control: res.control } : prev));
-      setNeedsPerson(null);
-      setScreenshotTimestamp(Date.now());
-    } catch (err: any) {
-      Alert.alert(t('pukuBot.controlErrorTitle'), err.message || t('pukuBot.failedToggleControl'));
-    } finally {
-      setIsTakingControl(false);
-    }
-  };
-
-  const handleToggleControl = async () => {
-    if (!selectedBotId) return;
-    setIsTakingControl(true);
-    try {
-      const isHuman = computerInfo?.control?.holder === 'human';
-      if (isHuman) {
-        const res = await pukuBotApi.releaseComputerControl(selectedBotId);
-        setComputerInfo(prev => (prev ? { ...prev, control: res.control } : prev));
-      } else {
-        const res = await pukuBotApi.takeComputerControl(selectedBotId);
-        setComputerInfo(prev => (prev ? { ...prev, control: res.control } : prev));
-      }
-      setScreenshotTimestamp(Date.now());
-    } catch (err: any) {
-      Alert.alert(t('pukuBot.controlErrorTitle'), err.message || t('pukuBot.failedToggleControl'));
-    } finally {
-      setIsTakingControl(false);
-    }
+  // "Bot needs you": the Bot's computer is not part of the app, so hand the
+  // person this conversation on the web, where they can take over.
+  const handleTakeOver = () => {
+    const convId = activeConversation?.id;
+    const url = convId
+      ? `${pukuBotApi.getWebOrigin()}/channel/${encodeURIComponent(convId)}`
+      : pukuBotApi.getWebOrigin();
+    Linking.openURL(url).catch(() =>
+      Alert.alert(t('pukuBot.errorTitle'), `Could not open ${url}`)
+    );
   };
 
   // Start PKCE Sign-In
@@ -1312,39 +1230,6 @@ export function PukuBotScreen() {
             setServerConversations(prev => prev.filter(c => c.id !== convId));
             if (activeConversation?.id === convId) {
               handleNewConversation();
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleRebuildComputer = async () => {
-    if (!selectedBotId) return;
-    Alert.alert(
-      t('pukuBot.rebuildConfirmTitle', { defaultValue: 'Rebuild Computer?' }),
-      t('pukuBot.rebuildConfirmDesc', {
-        defaultValue: 'This will terminate the VM and provision a fresh computer environment. Any unsaved temporary files will be wiped.',
-      }),
-      [
-        { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
-        {
-          text: t('pukuBot.rebuildAction', { defaultValue: 'Rebuild' }),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsLoadingComputer(true);
-              await pukuBotApi.rebuildComputer(selectedBotId);
-              Alert.alert(
-                t('pukuBot.rebuildStarted', { defaultValue: 'Rebuild Started' }),
-                t('pukuBot.rebuildStartedDesc', { defaultValue: 'Computer rebuild has been initiated.' })
-              );
-              const info = await pukuBotApi.getComputer(selectedBotId);
-              setComputerInfo(info);
-            } catch (err: any) {
-              Alert.alert(t('pukuBot.errorTitle'), err.message || 'Failed to rebuild computer.');
-            } finally {
-              setIsLoadingComputer(false);
             }
           },
         },
@@ -1541,11 +1426,11 @@ export function PukuBotScreen() {
           pinned: false,
           sortAt: c.updatedAt || c.createdAt || '',
         }))
-  ).sort(
-    (a, b) =>
-      Number(b.pinned) - Number(a.pinned) ||
-      (b.sortAt > a.sortAt ? 1 : b.sortAt < a.sortAt ? -1 : 0)
-  );
+  )
+    .sort((a, b) => (b.sortAt > a.sortAt ? 1 : b.sortAt < a.sortAt ? -1 : 0))
+    // The home screen shows only the latest few; the drawer holds the full history,
+    // and a conversation's messages load when it is opened.
+    .slice(0, HOME_RECENT_LIMIT);
 
   const filteredBotSkills = (() => {
     const match = inputVal.match(/^\/(\S*)$/);
@@ -1627,17 +1512,6 @@ export function PukuBotScreen() {
               onPress={handleNewConversation}
               style={styles.actionBtn}>
               <PlusIcon size={17} color={theme.textSecondary} />
-            </TouchableOpacity>
-          )}
-
-          {isAuthenticated && (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Bot's computer"
-              activeOpacity={0.7}
-              onPress={handleOpenComputerModal}
-              style={styles.actionBtn}>
-              <ComputerMonitorIcon size={18} color={theme.textSecondary} />
             </TouchableOpacity>
           )}
 
@@ -1738,11 +1612,10 @@ export function PukuBotScreen() {
             <View style={styles.needsPersonActions}>
               <TouchableOpacity
                 accessibilityRole="button"
-                disabled={isTakingControl}
                 onPress={handleTakeOver}
                 style={[styles.needsPersonBtn, { backgroundColor: isDark ? '#35D6B4' : '#1A1D18' }]}>
                 <Text style={[styles.needsPersonBtnText, { color: isDark ? '#141613' : '#FFFFFF', fontFamily: monoFont }]}>
-                  {t('pukuBot.takeControl')}
+                  {t('pukuBot.openOnWeb', { defaultValue: 'Open on web' })}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1883,23 +1756,6 @@ export function PukuBotScreen() {
                 <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
               </View>
             ))}
-
-            {isAuthenticated && !!conversationsCursor && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                activeOpacity={0.7}
-                disabled={isLoadingMoreConvs}
-                onPress={handleLoadMoreConversations}
-                style={styles.botShowMoreBtn}>
-                {isLoadingMoreConvs ? (
-                  <ActivityIndicator size="small" color={theme.textMuted} />
-                ) : (
-                  <Text style={[styles.botRecentItemTime, { color: theme.textSecondary, fontFamily: monoFont }]}>
-                    {t('pukuBot.showMore', { defaultValue: 'Show more' })}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
           </View>
         </ScrollView>
       ) : (
@@ -3050,119 +2906,6 @@ export function PukuBotScreen() {
         </View>
       </Modal>
 
-      {/* Computer Screen & Rebuild Modal */}
-      <Modal
-        visible={showComputerModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowComputerModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <ComputerMonitorIcon size={18} color="#35D6B4" />
-                <Text style={[styles.modalTitle, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                  {t('pukuBot.computerTitle', { defaultValue: "Bot's Computer" })}
-                </Text>
-              </View>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowComputerModal(false)}>
-                <CloseIcon size={20} color={theme.textPrimary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ paddingVertical: 14 }}>
-              {/* Status bar */}
-              <View style={[styles.computerStatusBar, { borderColor: theme.border }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View
-                    style={[
-                      styles.statusDot,
-                      {
-                        backgroundColor:
-                          computerInfo?.status?.state === 'ready'
-                            ? '#22C55E'
-                            : computerInfo?.status?.state === 'starting'
-                            ? '#F59E0B'
-                            : '#EF4444',
-                      },
-                    ]}
-                  />
-                  <Text style={[styles.statusText, { color: theme.textPrimary, fontFamily: monoFont }]}>
-                    State: {computerInfo?.status?.state || 'absent'}
-                  </Text>
-                </View>
-                <Text style={[styles.statusText, { color: theme.textMuted, fontFamily: monoFont }]}>
-                  Control: {computerInfo?.control?.holder === 'human' ? 'You' : 'Bot'}
-                </Text>
-              </View>
-
-              {/* Screen preview */}
-              <View style={[styles.screenFrame, { borderColor: theme.border, backgroundColor: '#000000' }]}>
-                {isLoadingComputer ? (
-                  <View style={styles.screenLoader}>
-                    <ActivityIndicator size="small" color="#35D6B4" />
-                    <Text style={{ color: '#888', fontSize: 11, marginTop: 6, fontFamily: monoFont }}>
-                      Connecting to display...
-                    </Text>
-                  </View>
-                ) : (
-                  <Image
-                    source={pukuBotApi.getScreenshotSource(selectedBotId, screenshotTimestamp)}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="contain"
-                  />
-                )}
-              </View>
-
-              {/* Action buttons */}
-              <View style={styles.computerActionRow}>
-                <TouchableOpacity
-                  disabled={isTakingControl}
-                  onPress={handleToggleControl}
-                  style={[
-                    styles.primaryActionBtn,
-                    {
-                      backgroundColor:
-                        computerInfo?.control?.holder === 'human' ? '#EF4444' : isDark ? '#35D6B4' : '#1A1D18',
-                      borderColor: theme.border,
-                    },
-                  ]}>
-                  {isTakingControl ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.actionBtnText,
-                        {
-                          color:
-                            computerInfo?.control?.holder === 'human'
-                              ? '#FFF'
-                              : isDark
-                              ? '#141613'
-                              : '#FFF',
-                          fontFamily: monoFont,
-                        },
-                      ]}>
-                      {computerInfo?.control?.holder === 'human'
-                        ? t('pukuBot.releaseControl', { defaultValue: 'Hand Back Control' })
-                        : t('pukuBot.takeControl', { defaultValue: 'Take Control' })}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleRebuildComputer}
-                  style={[styles.secondaryActionBtn, { borderColor: '#EF4444' }]}>
-                  <RefreshIcon size={14} color="#EF4444" />
-                  <Text style={[styles.secondaryBtnText, { color: '#EF4444', fontFamily: monoFont, fontWeight: '700' }]}>
-                    {t('pukuBot.rebuild', { defaultValue: 'Rebuild' })}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       {/* Bot Switcher Modal */}
       <Modal

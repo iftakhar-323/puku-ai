@@ -427,6 +427,11 @@ export class PukuBotApiClient {
       }
     }
 
+    await this.clearSession();
+  }
+
+  /** Forgets the session on this device only. */
+  private async clearSession(): Promise<void> {
     this.token = null;
     this.user = null;
 
@@ -434,6 +439,42 @@ export class PukuBotApiClient {
     await AsyncStorage.removeItem(STORAGE_KEYS.USER);
 
     this.notifyAuthChange();
+  }
+
+  private rejecting: Promise<boolean> | null = null;
+
+  /**
+   * A request was refused with 401. One refusal does not prove the session
+   * ended (a route may refuse this caller for its own reasons), and ending it
+   * here would send the person back through sign-in. So ask GET /me: only when
+   * it refuses too is the token dropped, on this device alone. The server has
+   * already ended that session, so nothing is signed out there. True when the
+   * session has ended.
+   */
+  public async sessionRejected(): Promise<boolean> {
+    if (!this.token) return true;
+    if (!this.rejecting) {
+      this.rejecting = (async () => {
+        const res = await fetch(`${this.baseUrl}/me`, { headers: this.getAuthHeaders() }).catch(
+          () => null
+        );
+        if (res?.status === 401) {
+          await this.clearSession();
+          return true;
+        }
+        return false;
+      })().finally(() => {
+        this.rejecting = null;
+      });
+    }
+    return this.rejecting;
+  }
+
+  /** The error to show for a 401, after checking whether the session really ended. */
+  private async unauthorizedError(): Promise<Error> {
+    return (await this.sessionRejected())
+      ? new Error('Session expired. Please sign in again.')
+      : new Error('You are not allowed to do that.');
   }
 
   /**
@@ -497,8 +538,7 @@ export class PukuBotApiClient {
    */
   private async errorFrom(res: Response, fallback: string): Promise<Error> {
     if (res.status === 401) {
-      await this.signOut();
-      return new Error('Session expired. Please sign in again.');
+      return this.unauthorizedError();
     }
     const body = await res.json().catch(() => null);
     return new Error(body?.error || fallback);
@@ -525,8 +565,7 @@ export class PukuBotApiClient {
       headers: this.getAuthHeaders(),
     });
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired. Please sign in again.');
+      throw await this.unauthorizedError();
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -609,8 +648,7 @@ export class PukuBotApiClient {
       headers: this.getAuthHeaders(),
     });
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired. Please sign in again.');
+      throw await this.unauthorizedError();
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -631,8 +669,7 @@ export class PukuBotApiClient {
       if (fromWeb) return fromWeb;
     }
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired.');
+      throw await this.unauthorizedError();
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -684,8 +721,7 @@ export class PukuBotApiClient {
       headers: this.getAuthHeaders(),
     });
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired. Please sign in again.');
+      throw await this.unauthorizedError();
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -711,21 +747,56 @@ export class PukuBotApiClient {
       if (params.text) body.text = params.text;
     }
 
-    const res = await fetch(`${this.baseUrl}/conversations`, {
+    let res = await fetch(`${this.baseUrl}/conversations`, {
       method: 'POST',
       headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     });
+    // A server that cannot pick the Bot itself ("botId or botIds is required."):
+    // pick it here the way it would, then start the conversation with it.
+    let routedBy: 'router' | 'default' | undefined;
+    if (res.status === 400 && !body.botId && !body.botIds) {
+      const picked = await this.pickBot(typeof body.text === 'string' ? body.text : '');
+      routedBy = picked.routedBy;
+      res = await fetch(`${this.baseUrl}/conversations`, {
+        method: 'POST',
+        headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ botId: picked.botId }),
+      });
+    }
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired. Please sign in again.');
+      throw await this.unauthorizedError();
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to start conversation.');
     }
     const data = await res.json();
-    return data.routedBy ? { ...data.conversation, routedBy: data.routedBy } : data.conversation;
+    const by = data.routedBy || routedBy;
+    return by ? { ...data.conversation, routedBy: by } : data.conversation;
+  }
+
+  /**
+   * The Bot for a first message nobody addressed, as the server's router
+   * would choose it: the web's router (POST /api/route) reads the text, and
+   * without an answer it is the deployment's default Bot.
+   */
+  private async pickBot(text: string): Promise<{ botId: string; routedBy: 'router' | 'default' }> {
+    if (text.trim()) {
+      const routed = await this.tryFetchUrl(`${this.getWebOrigin()}/api/route`, {
+        method: 'POST',
+        body: JSON.stringify({ text: text.trim().slice(0, 10000) }),
+      });
+      const answer = routed?.ok ? await routed.json().catch(() => null) : null;
+      if (typeof answer?.agentId === 'string' && answer.agentId) {
+        return { botId: answer.agentId, routedBy: 'router' };
+      }
+    }
+    const bots = await this.getBots().catch(() => [] as PukuBotItem[]);
+    const fallback = bots.find(b => b.default) || bots[0];
+    if (fallback) return { botId: fallback.id, routedBy: 'default' };
+    const capabilities = await this.getCapabilities().catch(() => null);
+    return { botId: capabilities?.defaultBotId || 'general-assistant', routedBy: 'default' };
   }
 
   public async pinConversation(conversationId: string, pinned = true): Promise<void> {
@@ -761,8 +832,7 @@ export class PukuBotApiClient {
       headers: this.getAuthHeaders(),
     });
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired.');
+      throw await this.unauthorizedError();
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -837,8 +907,7 @@ export class PukuBotApiClient {
     );
 
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired.');
+      throw await this.unauthorizedError();
     }
 
     if (!res.ok) {
@@ -869,8 +938,7 @@ export class PukuBotApiClient {
       { headers: this.getAuthHeaders() }
     );
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired. Please sign in again.');
+      throw await this.unauthorizedError();
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -1005,8 +1073,7 @@ export class PukuBotApiClient {
       onEnd: (status, responseText, sawEvents) => {
         if (finished || detached) return;
         if (status === 401) {
-          this.signOut().catch(ignore('pukuBotApi'));
-          emit({ type: 'turn.failed', code: 'error', message: 'Session expired. Please sign in again.' });
+          this.unauthorizedError().then(err => emit({ type: 'turn.failed', code: 'error', message: err.message }));
           return;
         }
         if (status === 202) {
@@ -1176,8 +1243,7 @@ export class PukuBotApiClient {
       headers: this.getAuthHeaders(),
     });
     if (res.status === 401) {
-      await this.signOut();
-      throw new Error('Session expired.');
+      throw await this.unauthorizedError();
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -1358,7 +1424,7 @@ export class PukuBotApiClient {
           if (status === 401) {
             stopped = true;
             onStatus?.('closed');
-            this.signOut().catch(ignore('pukuBotApi'));
+            this.sessionRejected().catch(ignore('pukuBotApi'));
             return;
           }
           if (status === 404 && !viaWebSocket) {
@@ -1866,7 +1932,7 @@ export class PukuBotApiClient {
     return pukuBotOutbox.replay({
       getBaseUrl: () => this.baseUrl,
       getAuthHeaders: (extra?: Record<string, string>) => this.getAuthHeaders(extra),
-      signOut: () => this.signOut(),
+      signOut: () => this.sessionRejected().then(() => undefined),
       updateCachedMemoryId: (tempId: string, realMemory: any) =>
         this.updateCachedMemoryId(tempId, realMemory),
       send: async entry => {

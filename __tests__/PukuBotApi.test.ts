@@ -713,6 +713,57 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(client.isAuthenticated()).toBe(false);
   });
 
+  test('a 401 from one route does not end a session /me still accepts', async () => {
+    await client.setToken('tok_still_good');
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ error: 'Authentication required.' }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ user: { id: 'u1' } }) });
+    await expect(client.getAgents()).rejects.toThrow('You are not allowed to do that.');
+    expect(client.isAuthenticated()).toBe(true);
+    // Never a server sign-out: that would end the session for real.
+    const urls = (globalThis as any).fetch.mock.calls.map((c: any[]) => c[0]);
+    expect(urls.some((u: string) => u.includes('/auth/sign-out'))).toBe(false);
+  });
+
+  test('a 401 that /me confirms ends the session on this device only', async () => {
+    await client.setToken('tok_expired');
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: 'Authentication required.' }) });
+    await expect(client.getBots()).rejects.toThrow('Session expired. Please sign in again.');
+    expect(client.isAuthenticated()).toBe(false);
+    const urls = (globalThis as any).fetch.mock.calls.map((c: any[]) => c[0]);
+    expect(urls.some((u: string) => u.includes('/auth/sign-out'))).toBe(false);
+  });
+
+  test('a server that needs a botId gets one: the router, else the default Bot', async () => {
+    const res = (status: number, body: any) => ({ ok: status < 300, status, json: async () => body });
+    const conversation = { id: 'channel_1', botId: 'research-desk', title: 'x' };
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(res(400, { error: 'botId or botIds is required.' }))
+      .mockResolvedValueOnce(res(200, { agentId: 'research-desk' }))
+      .mockResolvedValueOnce(res(201, { conversation }));
+    const routed = await client.createConversation({ text: 'Find three sources on X' });
+    expect(routed).toEqual(expect.objectContaining({ id: 'channel_1', routedBy: 'router' }));
+    let calls = (globalThis as any).fetch.mock.calls;
+    expect(calls[1][0]).toBe(`${client.getWebOrigin()}/api/route`);
+    expect(JSON.parse(calls[2][1].body)).toEqual({ botId: 'research-desk' });
+
+    // No router answer: the deployment's default Bot.
+    (globalThis as any).fetch = jest
+      .fn()
+      .mockResolvedValueOnce(res(400, { error: 'botId or botIds is required.' }))
+      .mockResolvedValueOnce(res(404, {}))
+      .mockResolvedValueOnce(res(200, { bots: [{ id: 'a' }, { id: 'general-assistant', default: true }] }))
+      .mockResolvedValueOnce(res(201, { conversation: { ...conversation, botId: 'general-assistant' } }));
+    const fallback = await client.createConversation({ text: 'Hlw' });
+    expect(fallback.routedBy).toBe('default');
+    calls = (globalThis as any).fetch.mock.calls;
+    expect(JSON.parse(calls[3][1].body)).toEqual({ botId: 'general-assistant' });
+  });
+
   // A bare 404 (no JSON error) is a server without the route; a JSON one names a missing thing.
   const missingRoute = () => ({ ok: false, status: 404, text: async () => '404 Not Found', json: async () => null });
   const notFound = (error: string) => ({

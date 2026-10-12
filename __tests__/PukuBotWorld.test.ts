@@ -121,4 +121,9 @@ describe('Puku Bot Dedicated World & State Contracts', () => {
     expect(PukuBotScreen).toBeDefined();
     expect(typeof PukuBotScreen).toBe('function');
   });
+
+  test('the home screen lists only the latest three conversations', () => {
+    const { HOME_RECENT_LIMIT } = require('../src/features/puku_bot/PukuBotScreen');
+    expect(HOME_RECENT_LIMIT).toBe(3);
+  });
 });
