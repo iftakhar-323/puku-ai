@@ -1,0 +1,13 @@
+appId: com.pukuai.dev
+---
+# Smoke test: the email/token sign-in modal opens and renders its fields,
+# without submitting (no test credentials in CI). Catches navigation/modal
+# regressions distinct from the plain launch smoke test.
+- launchApp
+- tapOn: "Sign in with email or access token"
+- assertVisible: "Sign in with Email"
+- assertVisible: "EMAIL ADDRESS"
+- assertVisible: "PASSWORD OR ACCESS TOKEN"
+- tapOn:
+    text: "Close"
+    optional: true

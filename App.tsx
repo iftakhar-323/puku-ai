@@ -5,9 +5,12 @@
  * @format
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Linking, Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initSentry } from './src/config/sentryConfig';
+import './src/i18n';
 import { AppDrawer } from './src/components/common/AppDrawer';
 import { ArtifactsScreen } from './src/features/artifacts/ArtifactsScreen';
 import { ChatScreen } from './src/features/chat/ChatScreen';
@@ -16,24 +19,36 @@ import { CodeScreen } from './src/features/code/CodeScreen';
 import { LiveVoiceScreen } from './src/features/live_voice/LiveVoiceScreen';
 import { LoginScreen } from './src/features/login/LoginScreen';
 import { ProfileScreen } from './src/features/settings/ProfileScreen';
+import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { ProjectDetailsScreen } from './src/features/projects/ProjectDetailsScreen';
 import { ProjectsScreen } from './src/features/projects/ProjectsScreen';
 import { PukuBotScreen } from './src/features/puku_bot/PukuBotScreen';
 import { RemoteSessionScreen } from './src/features/remote_session/RemoteSessionScreen';
-import { SettingsScreen } from './src/features/settings/SettingsScreen';
 import { UsageScreen } from './src/features/settings/UsageScreen';
 import { TranscribeScreen } from './src/features/transcribe/TranscribeScreen';
 import { AppProvider, useApp } from './src/store/AppContext';
+import { RemoteSessionProvider, useRemoteSession } from './src/store/RemoteSessionContext';
 import { ToastProvider } from './src/components/ui/Toast';
 import { UpdateService } from './src/services/updateService';
 import { pukuBotApi } from './src/services/pukuBotApi';
+import { ignore } from './src/utils/devLog';
+
+initSentry();
 
 function MainNavigator(): React.JSX.Element {
   const { activeRoute, isDark, isRestoringSession, navigate } = useApp();
+  const { connect: connectRemoteSession } = useRemoteSession();
+
+  // `navigate` and `connect` change identity on most renders; the effect below
+  // must run once, or it re-reads the launch URL and reconnects every time.
+  const navigateRef = useRef(navigate);
+  const connectRef = useRef(connectRemoteSession);
+  navigateRef.current = navigate;
+  connectRef.current = connectRemoteSession;
 
   useEffect(() => {
     try {
-      UpdateService.checkForUpdates(false).catch(() => {});
+      UpdateService.checkForUpdates(false).catch(ignore('App'));
     } catch {
       // Ignored
     }
@@ -43,9 +58,22 @@ function MainNavigator(): React.JSX.Element {
       if (url.startsWith('pukubot://')) {
         try {
           await pukuBotApi.handleAuthCallback(url);
-          navigate('pukuBot');
+          navigateRef.current('pukuBot');
         } catch (e) {
           console.warn('[PukuBot] Deep link auth callback failed:', e);
+        }
+      } else if (url.startsWith('puku://remote')) {
+        try {
+          const queryPart = url.split('?')[1] || '';
+          const params = new URLSearchParams(queryPart);
+          const s = params.get('s');
+          const t = params.get('t') || undefined;
+          if (s) {
+            connectRef.current(s, t);
+            navigateRef.current('remoteSession');
+          }
+        } catch (e) {
+          console.warn('[RemoteSession] Deep link parsing failed:', e);
         }
       }
     };
@@ -61,7 +89,7 @@ function MainNavigator(): React.JSX.Element {
     return () => {
       sub.remove();
     };
-  }, [navigate]);
+  }, []);
 
   if (isRestoringSession) {
     return (
@@ -110,6 +138,7 @@ function MainNavigator(): React.JSX.Element {
       case 'liveVoice':
         return <LiveVoiceScreen />;
       case 'settings':
+        return <SettingsScreen />;
       case 'profile':
         return <ProfileScreen />;
       case 'usage':
@@ -152,12 +181,13 @@ class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('App ErrorBoundary caught error:', error, errorInfo);
+    Sentry.captureException(error, { extra: errorInfo });
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <SafeAreaProvider>
+        <SafeAreaProvider style={{ flex: 1 }}>
           <StatusBar barStyle="light-content" />
           <View
             style={{
@@ -218,13 +248,15 @@ function App(): React.JSX.Element {
     <ErrorBoundary>
       <SafeAreaProvider>
         <AppProvider>
-          <ToastProvider>
-            <MainNavigator />
-          </ToastProvider>
+          <RemoteSessionProvider>
+            <ToastProvider>
+              <MainNavigator />
+            </ToastProvider>
+          </RemoteSessionProvider>
         </AppProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );
 }
 
-export default App;
+export default Sentry.wrap(App);

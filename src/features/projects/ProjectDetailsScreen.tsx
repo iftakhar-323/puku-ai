@@ -13,16 +13,23 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { AppHeader } from '../../components/common/AppHeader';
 import {
+  CameraIcon,
   CloseIcon,
   DeleteIcon,
+  PaperclipIcon,
   PlusIcon,
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
+import { NativePicker } from '../../services/nativeModules';
+
+const KNOWLEDGE_ITEM_CAP = 20;
 
 export function ProjectDetailsScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { keyboardHeight } = useKeyboardHeight();
   const {
@@ -40,15 +47,15 @@ export function ProjectDetailsScreen() {
     activeProject?.instructions || ''
   );
   const [showAddContentModal, setShowAddContentModal] = useState(false);
-  const [newFileName, setNewFileName] = useState('');
+  const [isPickingContent, setIsPickingContent] = useState(false);
 
   if (!activeProject) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <AppHeader showBack title="Project Details" />
+        <AppHeader showBack title={t('projects.detailsTitle')} />
         <View style={styles.centerBox}>
           <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-            No project selected
+            {t('projects.noProjectSelected')}
           </Text>
         </View>
       </View>
@@ -60,21 +67,41 @@ export function ProjectDetailsScreen() {
     setShowInstructionsModal(false);
   };
 
-  const handleAddKnowledge = () => {
-    if (!newFileName.trim()) return;
-    addProjectKnowledge(activeProject.id, newFileName.trim(), 'DOC');
-    setNewFileName('');
-    setShowAddContentModal(false);
+  const handlePickFile = async () => {
+    setIsPickingContent(true);
+    try {
+      const media = await NativePicker.pickMedia();
+      if (media) {
+        const type = media.type?.startsWith('image/') ? 'IMAGE' : 'DOC';
+        addProjectKnowledge(activeProject.id, media.name, type, media.size);
+        setShowAddContentModal(false);
+      }
+    } finally {
+      setIsPickingContent(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    setIsPickingContent(true);
+    try {
+      const media = await NativePicker.takePhoto();
+      if (media) {
+        addProjectKnowledge(activeProject.id, media.name, 'IMAGE', media.size);
+        setShowAddContentModal(false);
+      }
+    } finally {
+      setIsPickingContent(false);
+    }
   };
 
   const confirmDeleteProject = () => {
     Alert.alert(
-      'Delete project?',
-      `Are you sure you want to delete "${activeProject.name}"? This cannot be undone.`,
+      t('projects.deleteProjectTitle'),
+      t('projects.deleteProjectMessage', { name: activeProject.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             deleteProject(activeProject.id);
@@ -91,7 +118,7 @@ export function ProjectDetailsScreen() {
         showBack
         title={activeProject.name}
         rightAction={
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete"
             onPress={confirmDeleteProject}
             style={[styles.actionBtn, { backgroundColor: theme.buttonBackground }]}>
             <DeleteIcon size={18} color={theme.error} />
@@ -138,7 +165,7 @@ export function ProjectDetailsScreen() {
             onPress={() => startNewChat(activeProject.id)}
             style={[styles.newChatBtn, { backgroundColor: theme.primary }]}>
             <PlusIcon size={16} color="#FFFFFF" />
-            <Text style={styles.newChatBtnText}>New chat in this project</Text>
+            <Text style={styles.newChatBtnText}>{t('projects.newChatInProject')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -153,26 +180,48 @@ export function ProjectDetailsScreen() {
           ]}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-              Project Knowledge
+              {t('projects.knowledgeSectionTitle')}
             </Text>
             <TouchableOpacity
               onPress={() => setShowAddContentModal(true)}
               style={[styles.addBtn, { backgroundColor: theme.buttonBackground }]}>
               <PlusIcon size={14} color={theme.tagText} />
               <Text style={[styles.addBtnText, { color: theme.tagText }]}>
-                Add Content
+                {t('projects.addContent')}
               </Text>
             </TouchableOpacity>
           </View>
           <Text style={[styles.sectionDesc, { color: theme.textSecondary }]}>
-            Add relevant documents, code, or context for Puku to reference in all
-            conversations.
+            {t('projects.knowledgeSectionDesc')}
           </Text>
+
+          <View style={styles.capacityRow}>
+            <View style={[styles.capacityTrack, { backgroundColor: theme.border }]}>
+              <View
+                style={[
+                  styles.capacityFill,
+                  {
+                    backgroundColor:
+                      activeProject.knowledgeItems.length >= KNOWLEDGE_ITEM_CAP
+                        ? theme.error
+                        : theme.primaryLight,
+                    width: `${Math.min(
+                      100,
+                      (activeProject.knowledgeItems.length / KNOWLEDGE_ITEM_CAP) * 100
+                    )}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.capacityLabel, { color: theme.textMuted }]}>
+              {activeProject.knowledgeItems.length}/{KNOWLEDGE_ITEM_CAP}
+            </Text>
+          </View>
 
           {activeProject.knowledgeItems.length === 0 ? (
             <View style={styles.emptyBox}>
               <Text style={[styles.metaText, { color: theme.textMuted }]}>
-                No knowledge files attached yet.
+                {t('projects.noKnowledgeFiles')}
               </Text>
             </View>
           ) : (
@@ -214,20 +263,19 @@ export function ProjectDetailsScreen() {
           ]}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-              Custom Instructions
+              {t('projects.customInstructionsTitle')}
             </Text>
             <TouchableOpacity
               onPress={() => setShowInstructionsModal(true)}
               style={[styles.addBtn, { backgroundColor: theme.buttonBackground }]}>
               <Text style={[styles.addBtnText, { color: theme.tagText }]}>
-                {activeProject.instructions ? 'Edit' : 'Add'}
+                {activeProject.instructions ? t('projects.editLabel') : t('projects.addLabel')}
               </Text>
             </TouchableOpacity>
           </View>
 
           <Text style={[styles.sectionDesc, { color: theme.textSecondary }]}>
-            Tell Puku how to behave in this project — tone, technical stack,
-            formatting preferences.
+            {t('projects.customInstructionsDesc')}
           </Text>
 
           {activeProject.instructions ? (
@@ -246,7 +294,7 @@ export function ProjectDetailsScreen() {
           ) : (
             <View style={styles.emptyBox}>
               <Text style={[styles.metaText, { color: theme.textMuted }]}>
-                No custom instructions provided.
+                {t('projects.noCustomInstructions')}
               </Text>
             </View>
           )}
@@ -278,9 +326,9 @@ export function ProjectDetailsScreen() {
             ]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                Custom Instructions
+                {t('projects.customInstructionsTitle')}
               </Text>
-              <TouchableOpacity onPress={() => setShowInstructionsModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowInstructionsModal(false)}>
                 <CloseIcon size={20} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -293,7 +341,7 @@ export function ProjectDetailsScreen() {
                   borderColor: theme.border,
                 },
               ]}
-              placeholder="e.g. You are a senior React Native engineer. Respond concisely with code examples..."
+              placeholder={t('projects.instructionsPlaceholderLong')}
               placeholderTextColor={theme.placeholderText}
               value={instructionsText}
               onChangeText={setInstructionsText}
@@ -303,7 +351,7 @@ export function ProjectDetailsScreen() {
             <TouchableOpacity
               onPress={handleSaveInstructions}
               style={[styles.saveBtn, { backgroundColor: theme.primary }]}>
-              <Text style={styles.saveBtnText}>Save Instructions</Text>
+              <Text style={styles.saveBtnText}>{t('projects.saveInstructions')}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -334,30 +382,41 @@ export function ProjectDetailsScreen() {
             ]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                Add Knowledge Content
+                {t('projects.addContentModalTitle')}
               </Text>
-              <TouchableOpacity onPress={() => setShowAddContentModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowAddContentModal(false)}>
                 <CloseIcon size={20} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
-            <TextInput
-              style={[
-                styles.fileNameInput,
-                {
-                  backgroundColor: theme.background,
-                  color: theme.textPrimary,
-                  borderColor: theme.border,
-                },
-              ]}
-              placeholder="File name (e.g. API-Spec.md)"
-              placeholderTextColor={theme.placeholderText}
-              value={newFileName}
-              onChangeText={setNewFileName}
-            />
             <TouchableOpacity
-              onPress={handleAddKnowledge}
-              style={[styles.saveBtn, { backgroundColor: theme.primary }]}>
-              <Text style={styles.saveBtnText}>Attach to Project</Text>
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Take photo"
+              disabled={isPickingContent}
+              onPress={handleTakePhoto}
+              style={[
+                styles.pickerRow,
+                { backgroundColor: theme.background, borderColor: theme.border },
+              ]}>
+              <CameraIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.pickerRowText, { color: theme.textPrimary }]}>
+                {t('projects.takePhoto')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Choose file or photo"
+              disabled={isPickingContent}
+              onPress={handlePickFile}
+              style={[
+                styles.pickerRow,
+                { backgroundColor: theme.background, borderColor: theme.border },
+              ]}>
+              <PaperclipIcon size={20} color={theme.textPrimary} />
+              <Text style={[styles.pickerRowText, { color: theme.textPrimary }]}>
+                {t('projects.chooseFileOrPhoto')}
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -453,6 +512,26 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 12,
   },
+  capacityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  capacityTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  capacityFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  capacityLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   emptyBox: {
     padding: 16,
     alignItems: 'center',
@@ -513,12 +592,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlignVertical: 'top',
   },
-  fileNameInput: {
-    height: 48,
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    height: 52,
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
-    fontSize: 14,
+    marginBottom: 10,
+  },
+  pickerRowText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   saveBtn: {
     height: 48,
@@ -526,6 +612,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 18,
+  },
+  saveBtnDisabled: {
+    opacity: 0.4,
   },
   saveBtnText: {
     color: '#FFFFFF',

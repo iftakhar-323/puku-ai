@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../store/AppContext';
+import { useRemoteSession } from '../../store/RemoteSessionContext';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 import {
   ArchiveBoxIcon,
@@ -21,6 +22,8 @@ import {
   CheckmarkIcon,
   ChevronDownIcon,
   CloseIcon,
+  ConnectedLinkIcon,
+  CopyIcon,
   DownloadIcon,
   FolderSmallIcon,
   HelpCircleIcon,
@@ -29,6 +32,8 @@ import {
   PlusIcon,
   PukuBotGradientIcon,
   PukuLogoIcon,
+  PukuRemoteGradientIcon,
+  RefreshIcon,
   SearchIcon,
   SettingsIcon,
   SlidersIcon,
@@ -36,6 +41,8 @@ import {
   ThreeDotsHorizontalIcon,
   TrashIcon,
 } from './Icons';
+import { NativeClipboard } from '../../services/nativeModules';
+import { ignore } from '../../utils/devLog';
 
 export function AppDrawer() {
   const insets = useSafeAreaInsets();
@@ -64,13 +71,26 @@ export function AppDrawer() {
     renameBotConversation,
     selectBot,
   } = useApp();
+  const {
+    isActive: isRemoteActive,
+    activeRelaySessions,
+    liveRelaySessions,
+    connect: connectRemoteSession,
+    fetchActiveRelaySessions,
+  } = useRemoteSession();
 
   const isBotMode = activeRoute === 'pukuBot';
+  const isRemoteMode = activeRoute === 'code' || activeRoute === 'remoteSession';
+  const isChatMode = !isBotMode && !isRemoteMode;
 
   // Bot-specific drawer state
   const [botSearchQuery, setBotSearchQuery] = useState('');
   const [isBotDropdownOpen, setIsBotDropdownOpen] = useState(false);
   const [activeMenuBotConvId, setActiveMenuBotConvId] = useState<string | null>(null);
+
+  // Remote-specific drawer state
+  const [remoteSearchQuery, setRemoteSearchQuery] = useState('');
+  const [activeMenuRemoteId, setActiveMenuRemoteId] = useState<string | null>(null);
 
   const [isFindModalOpen, setIsFindModalOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
@@ -78,10 +98,15 @@ export function AppDrawer() {
   const [activeMenuConvId, setActiveMenuConvId] = useState<string | null>(null);
 
   React.useEffect(() => {
-    if (isDrawerOpen && conversations.length === 0) {
-      refreshConversations().catch(() => {});
+    if (isDrawerOpen) {
+      if (conversations.length === 0) {
+        refreshConversations().catch(ignore('AppDrawer'));
+      }
+      if (isRemoteMode) {
+        fetchActiveRelaySessions().catch(ignore('AppDrawer'));
+      }
     }
-  }, [isDrawerOpen, conversations.length, refreshConversations]);
+  }, [isDrawerOpen, conversations.length, refreshConversations, isRemoteMode, fetchActiveRelaySessions]);
 
   if (!isDrawerOpen) return null;
 
@@ -96,7 +121,29 @@ export function AppDrawer() {
     return c.title.toLowerCase().includes(findQuery.toLowerCase());
   });
 
-  const displayName = profile.name || 'iftakhar alam';
+  const filteredRemoteSessions = (activeRelaySessions || []).filter(s => {
+    if (!remoteSearchQuery.trim()) return true;
+    const q = remoteSearchQuery.toLowerCase();
+    return (
+      (s.title && s.title.toLowerCase().includes(q)) ||
+      (s.sessionId && s.sessionId.toLowerCase().includes(q))
+    );
+  });
+
+  const handleSelectRemoteSession = (sessionId: string, mobileToken?: string) => {
+    connectRemoteSession(sessionId, mobileToken);
+    setActiveMenuRemoteId(null);
+    setDrawerOpen(false);
+    navigate('remoteSession');
+  };
+
+  const handleCopyRemoteSessionId = (id: string) => {
+    NativeClipboard.setString(id);
+    setActiveMenuRemoteId(null);
+  };
+
+  const displayName =
+    profile.name || (profile.email ? profile.email.split('@')[0] : 'Guest');
 
   const handleDelete = (id: string) => {
     deleteConversations([id]);
@@ -171,6 +218,113 @@ export function AppDrawer() {
     setActiveMenuConvId(null);
   };
 
+  const renderSwitchToAiCard = (marginTop = 0) => (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => {
+        setDrawerOpen(false);
+        navigate('chat');
+      }}
+      style={[
+        styles.switchHubCard,
+        {
+          backgroundColor: theme.cardBackground,
+          borderColor: theme.border,
+          marginTop,
+        },
+      ]}>
+      <View style={styles.switchHubLeft}>
+        <PukuLogoIcon size={19} />
+        <View style={styles.switchHubTextWrap}>
+          <Text numberOfLines={1} style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
+            Switch to Puku AI
+          </Text>
+          <Text numberOfLines={1} style={[styles.switchHubSub, { color: theme.textMuted }]}>
+            General chat & workspaces
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderSwitchToBotCard = (marginTop = 0) => (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => {
+        selectBotConversation(null as any);
+        setDrawerOpen(false);
+        navigate('pukuBot');
+      }}
+      style={[
+        styles.switchHubCard,
+        {
+          backgroundColor: theme.cardBackground,
+          borderColor: theme.border,
+          marginTop,
+        },
+      ]}>
+      <View style={styles.switchHubLeft}>
+        <PukuBotGradientIcon size={20} />
+        <View style={styles.switchHubTextWrap}>
+          <Text numberOfLines={1} style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
+            Switch to Puku Bot
+          </Text>
+          <Text numberOfLines={1} style={[styles.switchHubSub, { color: theme.textMuted }]}>
+            Autonomous computer & laptop agent
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderSwitchToRemoteCard = (marginTop = 0) => {
+    const isLive = isRemoteActive || liveRelaySessions.length > 0;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => {
+          setDrawerOpen(false);
+          navigate('code');
+        }}
+        style={[
+          styles.switchHubCard,
+          {
+            backgroundColor: theme.cardBackground,
+            borderColor: isLive ? theme.primaryLight : theme.border,
+            marginTop,
+          },
+        ]}>
+        <View style={styles.switchHubLeft}>
+          <PukuRemoteGradientIcon size={20} />
+          <View style={styles.switchHubTextWrap}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text numberOfLines={1} style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
+                Puku Remote
+              </Text>
+              {isLive && (
+                <View
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: 4,
+                    backgroundColor: theme.primaryLight,
+                  }}
+                />
+              )}
+            </View>
+            <Text numberOfLines={1} style={[styles.switchHubSub, { color: theme.textMuted }]}>
+              {isRemoteActive
+                ? '● Live connected · Tap to open'
+                : liveRelaySessions.length > 0
+                ? `${liveRelaySessions.length} live session(s) detected`
+                : 'Mirror & control laptop terminal'}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <Modal
       visible={isDrawerOpen}
@@ -210,10 +364,10 @@ export function AppDrawer() {
               {/* Header Row: Bot Icon + 'Puku Bot' + Close (X) */}
               <View style={styles.drawerHeader}>
                 <View style={styles.brandRow}>
-                  <BotIcon size={22} color={isDark ? '#35D6B4' : theme.textPrimary} />
+                  <PukuBotGradientIcon size={22} />
                   <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku Bot</Text>
                 </View>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                   activeOpacity={0.7}
                   onPress={() => setDrawerOpen(false)}
                   style={styles.closeBtn}>
@@ -227,14 +381,14 @@ export function AppDrawer() {
                   activeOpacity={0.7}
                   onPress={() => setIsBotDropdownOpen(prev => !prev)}
                   style={[styles.allProjectsBtn, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}>
-                  <BotIcon size={16} color={isDark ? '#35D6B4' : theme.textPrimary} />
+                  <PukuBotGradientIcon size={16} />
                   <Text numberOfLines={1} style={[styles.allProjectsText, { color: theme.textPrimary }]}>
                     {currentBot.name}
                   </Text>
                   <ChevronDownIcon size={12} color={theme.textMuted} />
                 </TouchableOpacity>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Settings"
                   activeOpacity={0.7}
                   onPress={() => {
                     setDrawerOpen(false);
@@ -260,7 +414,7 @@ export function AppDrawer() {
                         }}
                         style={styles.dropdownItemRow}>
                         {isSelected ? (
-                          <CheckmarkIcon size={14} color={isDark ? '#35D6B4' : theme.textPrimary} />
+                          <CheckmarkIcon size={14} color={theme.primaryLight} />
                         ) : (
                           <View style={styles.dropdownCheckPlaceholder} />
                         )}
@@ -297,13 +451,13 @@ export function AppDrawer() {
                     style={[styles.searchInput, { color: theme.textPrimary }]}
                   />
                   {botSearchQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => setBotSearchQuery('')}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setBotSearchQuery('')}>
                       <CloseIcon size={14} color={theme.textMuted} />
                     </TouchableOpacity>
                   )}
                 </View>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="New chat"
                   activeOpacity={0.7}
                   onPress={() => {
                     createBotConversation(activeBotId);
@@ -320,7 +474,7 @@ export function AppDrawer() {
                 <Text style={[styles.recentHeaderText, { color: theme.textPrimary }]}>
                   Recent Bot Chats
                 </Text>
-                <TouchableOpacity activeOpacity={0.7}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Sort" activeOpacity={0.7}>
                   <SortIcon size={14} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -352,7 +506,7 @@ export function AppDrawer() {
                             styles.convItem,
                             isActive && { backgroundColor: theme.pillBackground },
                           ]}>
-                          <BotIcon size={15} color={isActive ? (isDark ? '#35D6B4' : theme.textPrimary) : theme.textSecondary} />
+                          <BotIcon size={15} color={isActive ? theme.primaryLight : theme.textSecondary} />
                           <Text
                             numberOfLines={1}
                             style={[
@@ -363,7 +517,7 @@ export function AppDrawer() {
                             {conv.title || 'Bot Session'}
                           </Text>
 
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button" accessibilityLabel="More options"
                             activeOpacity={0.7}
                             onPress={() =>
                               setActiveMenuBotConvId(prev => (prev === conv.id ? null : conv.id))
@@ -413,32 +567,300 @@ export function AppDrawer() {
               <View style={styles.footerSection}>
                 <View style={[styles.horizontalDivider, { backgroundColor: theme.border }]} />
 
-                {/* Switch to Puku AI Chat Card */}
+                {/* Switch to Puku AI Card */}
+                {renderSwitchToAiCard(0)}
+
+                {/* Switch to Puku Remote Card */}
+                {renderSwitchToRemoteCard(8)}
+
+                {/* User Profile Card */}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => {
                     setDrawerOpen(false);
-                    navigate('chat');
+                    navigate('settings');
+                  }}
+                  style={styles.userProfileCard}>
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarInitials}>
+                      {displayName.substring(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={[styles.userNameText, { color: theme.textPrimary }]}>
+                    {displayName}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : isRemoteMode ? (
+            /* ============================================================== */
+            /* PUKU REMOTE DEDICATED DRAWER WORLD ("Alada Dunia")             */
+            /* ============================================================== */
+            <>
+              {/* Header Row: Remote Icon + 'Puku Remote' + Close (X) */}
+              <View style={styles.drawerHeader}>
+                <View style={styles.brandRow}>
+                  <PukuRemoteGradientIcon size={22} />
+                  <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku Remote</Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                  activeOpacity={0.7}
+                  onPress={() => setDrawerOpen(false)}
+                  style={styles.closeBtn}>
+                  <CloseIcon size={20} color={theme.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Status / Console Selector Row */}
+              <View style={styles.projectsRow}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setDrawerOpen(false);
+                    navigate('code');
                   }}
                   style={[
-                    styles.switchHubCard,
+                    styles.allProjectsBtn,
                     {
+                      borderColor:
+                        isRemoteActive || liveRelaySessions.length > 0
+                          ? theme.primaryLight
+                          : theme.border,
                       backgroundColor: theme.cardBackground,
-                      borderColor: theme.border,
                     },
                   ]}>
-                  <View style={styles.switchHubLeft}>
-                    <PukuLogoIcon size={18} />
-                    <View style={styles.switchHubTextWrap}>
-                      <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
-                        Switch to Puku AI
-                      </Text>
-                      <Text style={[styles.switchHubSub, { color: theme.textMuted }]}>
-                        General chat & workspaces
-                      </Text>
-                    </View>
-                  </View>
+                  <PukuRemoteGradientIcon size={16} />
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.allProjectsText, { color: theme.textPrimary }]}>
+                    {isRemoteActive
+                      ? '● Live Terminal Active'
+                      : liveRelaySessions.length > 0
+                      ? `${liveRelaySessions.length} live session(s)`
+                      : 'Terminal Console'}
+                  </Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Refresh sessions"
+                  activeOpacity={0.7}
+                  onPress={() => fetchActiveRelaySessions().catch(ignore('AppDrawer'))}
+                  style={[
+                    styles.squareIconBtn,
+                    { borderColor: theme.border, backgroundColor: theme.cardBackground },
+                  ]}>
+                  <RefreshIcon size={16} color={theme.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Search & Direct Connect Row */}
+              <View style={styles.searchRow}>
+                <View
+                  style={[
+                    styles.searchBox,
+                    { borderColor: theme.border, backgroundColor: theme.cardBackground },
+                  ]}>
+                  <SearchIcon size={16} color={theme.textSecondary} />
+                  <TextInput
+                    value={remoteSearchQuery}
+                    onChangeText={setRemoteSearchQuery}
+                    placeholder="Search remote sessions"
+                    placeholderTextColor={theme.placeholderText}
+                    style={[styles.searchInput, { color: theme.textPrimary }]}
+                  />
+                  {remoteSearchQuery.length > 0 && (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Close"
+                      onPress={() => setRemoteSearchQuery('')}>
+                      <CloseIcon size={14} color={theme.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Console & New connection"
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setDrawerOpen(false);
+                    navigate('code');
+                  }}
+                  style={[
+                    styles.squareIconBtn,
+                    { borderColor: theme.border, backgroundColor: theme.cardBackground },
+                  ]}>
+                  <PlusIcon size={18} color={theme.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Recent Section Header */}
+              <View style={styles.recentSectionHeader}>
+                <Text style={[styles.recentHeaderText, { color: theme.textPrimary }]}>
+                  Recent Sessions
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Refresh"
+                  activeOpacity={0.7}
+                  onPress={() => fetchActiveRelaySessions().catch(ignore('AppDrawer'))}>
+                  <RefreshIcon size={13} color={theme.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Scrollable Remote Sessions List */}
+              <ScrollView
+                style={styles.conversationsScroll}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled">
+                {filteredRemoteSessions.length === 0 ? (
+                  <View style={styles.botEmptyWrap}>
+                    <Text style={[styles.botEmptyText, { color: theme.textMuted }]}>
+                      {remoteSearchQuery
+                        ? 'No matching remote sessions'
+                        : 'No remote sessions found.\nRun `puku remote` on laptop.'}
+                    </Text>
+                  </View>
+                ) : (
+                  filteredRemoteSessions.map(s => {
+                    const isOnline = (s.workerConnected || s.live) && !s.expired;
+                    return (
+                      <View key={s.sessionId} style={styles.convRowWrapper}>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleSelectRemoteSession(s.sessionId, s.mobileToken)}
+                          style={[
+                            styles.convItem,
+                            isOnline && { backgroundColor: theme.pillBackground },
+                          ]}>
+                          <PukuRemoteGradientIcon size={15} />
+                          <View
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}>
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.convTitle,
+                                { color: theme.textPrimary },
+                                isOnline ? styles.weight600 : styles.weight400,
+                              ]}>
+                              {s.title || s.sessionId}
+                            </Text>
+                            {isOnline && (
+                              <View
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: 3,
+                                  backgroundColor: theme.primaryLight,
+                                }}
+                              />
+                            )}
+                          </View>
+
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="More options"
+                            activeOpacity={0.7}
+                            onPress={() =>
+                              setActiveMenuRemoteId(prev =>
+                                prev === s.sessionId ? null : s.sessionId
+                              )
+                            }
+                            style={styles.dotsBtn}>
+                            <ThreeDotsHorizontalIcon size={16} color={theme.textSecondary} />
+                          </TouchableOpacity>
+                        </TouchableOpacity>
+
+                        {/* Context Menu Popup */}
+                        {activeMenuRemoteId === s.sessionId && (
+                          <View
+                            style={[
+                              styles.contextMenuCard,
+                              {
+                                backgroundColor: theme.cardBackground,
+                                borderColor: theme.border,
+                              },
+                            ]}>
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              onPress={() =>
+                                handleSelectRemoteSession(s.sessionId, s.mobileToken)
+                              }
+                              style={styles.contextMenuItem}>
+                              <ConnectedLinkIcon size={14} color={theme.textPrimary} />
+                              <Text
+                                style={[
+                                  styles.contextMenuText,
+                                  { color: theme.textPrimary },
+                                ]}>
+                                Connect Terminal
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              onPress={() => {
+                                setActiveMenuRemoteId(null);
+                                setDrawerOpen(false);
+                                navigate('code');
+                              }}
+                              style={styles.contextMenuItem}>
+                              <PukuRemoteGradientIcon size={14} />
+                              <Text
+                                style={[
+                                  styles.contextMenuText,
+                                  { color: theme.textPrimary },
+                                ]}>
+                                View in Console
+                              </Text>
+                            </TouchableOpacity>
+
+                            <View
+                              style={[
+                                styles.contextDivider,
+                                { backgroundColor: theme.border },
+                              ]}
+                            />
+
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              onPress={() => handleCopyRemoteSessionId(s.sessionId)}
+                              style={styles.contextMenuItem}>
+                              <CopyIcon size={14} color={theme.textPrimary} />
+                              <Text
+                                style={[
+                                  styles.contextMenuText,
+                                  { color: theme.textPrimary },
+                                ]}>
+                                Copy Session ID
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+              </ScrollView>
+
+              {/* Remote Footer: Switcher to Puku AI + Switcher to Puku Bot + User */}
+              <View style={styles.footerSection}>
+                <View style={[styles.horizontalDivider, { backgroundColor: theme.border }]} />
+
+                {/* Switch to Puku AI Card */}
+                {renderSwitchToAiCard(0)}
+
+                {/* Switch to Puku Bot Card */}
+                {renderSwitchToBotCard(8)}
 
                 {/* User Profile Card */}
                 <TouchableOpacity
@@ -460,20 +882,25 @@ export function AppDrawer() {
               </View>
             </>
           ) : (
+            /* ============================================================== */
+            /* PUKU AI DEDICATED DRAWER WORLD                                 */
+            /* ============================================================== */
             <>
-          {/* Header Row: Logo + 'Puku Chat' + Close (X) */}
-          <View style={styles.drawerHeader}>
-            <View style={styles.brandRow}>
-              <PukuLogoIcon size={24} />
-              <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku AI</Text>
-            </View>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setDrawerOpen(false)}
-              style={styles.closeBtn}>
-              <CloseIcon size={20} color={theme.textPrimary} />
-            </TouchableOpacity>
-          </View>
+              {/* Header Row: Logo + 'Puku AI' + Close (X) */}
+              <View style={styles.drawerHeader}>
+                <View style={styles.brandRow}>
+                  <PukuLogoIcon size={24} />
+                  <Text style={[styles.brandText, { color: theme.textPrimary }]}>Puku AI</Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                  activeOpacity={0.7}
+                  onPress={() => setDrawerOpen(false)}
+                  style={styles.closeBtn}>
+                  <CloseIcon size={20} color={theme.textPrimary} />
+                </TouchableOpacity>
+              </View>
 
           {/* Projects Selector Row */}
           <View style={styles.projectsRow}>
@@ -488,7 +915,7 @@ export function AppDrawer() {
               <ChevronDownIcon size={12} color={theme.textMuted} />
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Archived chats"
               activeOpacity={0.7}
               onPress={() => {
                 setDrawerOpen(false);
@@ -543,7 +970,7 @@ export function AppDrawer() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="New chat"
               activeOpacity={0.7}
               onPress={() => {
                 startNewChat();
@@ -560,7 +987,7 @@ export function AppDrawer() {
             <Text style={[styles.recentHeaderText, { color: theme.textPrimary }]}>
               Recent
             </Text>
-            <TouchableOpacity activeOpacity={0.7}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Sort" activeOpacity={0.7}>
               <SortIcon size={14} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -596,7 +1023,7 @@ export function AppDrawer() {
                       {conv.title || 'Untitled conversation'}
                     </Text>
 
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="More options"
                       activeOpacity={0.7}
                       onPress={() =>
                         setActiveMenuConvId(prev => (prev === conv.id ? null : conv.id))
@@ -678,33 +1105,9 @@ export function AppDrawer() {
           <View style={styles.footerSection}>
             <View style={[styles.horizontalDivider, { backgroundColor: theme.border }]} />
 
-            {/* Switch to Puku Bot Hub Card */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                selectBotConversation(null as any);
-                setDrawerOpen(false);
-                navigate('pukuBot');
-              }}
-              style={[
-                styles.switchHubCard,
-                {
-                  backgroundColor: theme.cardBackground,
-                  borderColor: theme.border,
-                },
-              ]}>
-              <View style={styles.switchHubLeft}>
-                <PukuBotGradientIcon size={20} />
-                <View style={styles.switchHubTextWrap}>
-                  <Text style={[styles.switchHubTitle, { color: theme.textPrimary }]}>
-                    Switch to Puku Bot
-                  </Text>
-                  <Text style={[styles.switchHubSub, { color: theme.textMuted }]}>
-                    Autonomous computer & laptop agent
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
+            {/* When in Puku AI: Show Puku Bot and Puku Remote */}
+            {renderSwitchToBotCard(0)}
+            {renderSwitchToRemoteCard(8)}
 
             {/* Actions: Customize, Download, Help */}
             <View style={styles.bottomActionsRow}>
@@ -722,10 +1125,10 @@ export function AppDrawer() {
               </TouchableOpacity>
 
               <View style={styles.rightActionIcons}>
-                <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Download" activeOpacity={0.7} style={styles.footerIconBtn}>
                   <DownloadIcon size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
-                <TouchableOpacity activeOpacity={0.7} style={styles.footerIconBtn}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Help" activeOpacity={0.7} style={styles.footerIconBtn}>
                   <HelpCircleIcon size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -809,7 +1212,7 @@ export function AppDrawer() {
                   ]}>
                   Find a conversation
                 </Text>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close"
                   activeOpacity={0.7}
                   onPress={() => setIsFindModalOpen(false)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1034,6 +1437,7 @@ const styles = StyleSheet.create({
   convTitle: {
     fontFamily: monoFont,
     flex: 1,
+    minWidth: 0,
     fontSize: 13,
   },
   dotsBtn: {
@@ -1117,6 +1521,8 @@ const styles = StyleSheet.create({
   switchHubLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
   },
   switchHubTitle: {
     fontFamily: monoFont,
@@ -1290,6 +1696,8 @@ const styles = StyleSheet.create({
   },
   switchHubTextWrap: {
     marginLeft: 10,
+    flex: 1,
+    minWidth: 0,
   },
   findModalOverlay: {
     position: 'absolute',

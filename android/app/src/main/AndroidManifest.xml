@@ -3,7 +3,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <queries>
         <intent>
@@ -29,7 +31,7 @@
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
       android:theme="@style/AppTheme"
-      android:usesCleartextTraffic="true"
+      android:usesCleartextTraffic="false"
       android:supportsRtl="true">
         <meta-data android:name="expo.modules.updates.ENABLED" android:value="true" />
         <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS" />
@@ -74,7 +76,27 @@
             <data
                 android:scheme="pukubot"
                 android:host="callback" />
+            <!-- puku://remote?s=<sessionId>&t=<token> launches straight into a
+                 shared remote-session link (e.g. a QR code rendered as a link,
+                 SMS, or email), same as the in-app Linking listener handles. -->
+            <data
+                android:scheme="puku"
+                android:host="remote" />
+            <data
+                android:scheme="puku"
+                android:host="remote"
+                android:pathPrefix="/" />
         </intent-filter>
       </activity>
+
+      <provider
+          android:name="androidx.core.content.FileProvider"
+          android:authorities="${applicationId}.fileprovider"
+          android:exported="false"
+          android:grantUriPermissions="true">
+          <meta-data
+              android:name="android.support.FILE_PROVIDER_PATHS"
+              android:resource="@xml/file_paths" />
+      </provider>
     </application>
 </manifest>

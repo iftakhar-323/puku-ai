@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,95 +11,289 @@ import {
 import { ThemeColors } from '../../../theme/theme';
 import { CheckmarkIcon, CopyIcon } from '../../../components/common/Icons';
 import { NativeClipboard } from '../../../services/nativeModules';
+import { ignore } from '../../../utils/devLog';
+import { syntaxColorsForTheme, tokenizeCode } from './syntaxHighlight';
+
+/**
+ * Claude Code-style accents: colored inline code, tappable links and
+ * header-less code blocks. Omit for the default chat rendering.
+ */
+export interface CliColors {
+  inlineCode: string;
+  inlineCodeBackground: string;
+  link: string;
+}
 
 interface MarkdownRendererProps {
   content: string;
   theme: ThemeColors;
+  cliColors?: CliColors;
 }
+
+const monoFamily = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 export function renderFormattedText(
   text: string,
   baseStyle: any,
-  theme: ThemeColors
+  theme: ThemeColors,
+  cliColors?: CliColors
 ) {
+  const safeText = typeof text === 'string' ? text : String(text || '');
+  if (!safeText) return [];
   const parts: React.ReactNode[] = [];
-  const regex = /(\*\*.*?\*\*|\*.*?\*|`.*?`)/g;
+  const regex = cliColors
+    ? /(\[[^\]]+\]\([^)\s]+\)|\*\*.*?\*\*|\*.*?\*|`.*?`)/g
+    : /(\*\*.*?\*\*|\*.*?\*|`.*?`)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
+  try {
+    while ((match = regex.exec(safeText)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(
+          <Text key={lastIndex} style={baseStyle}>
+            {safeText.slice(lastIndex, match.index)}
+          </Text>
+        );
+      }
+
+      const chunk = match[0];
+      const linkMatch = cliColors ? chunk.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/) : null;
+      if (linkMatch) {
+        const url = linkMatch[2];
+        const isWebUrl = /^https?:\/\//.test(url);
+        const linkColor = cliColors?.link || theme.primary;
+        parts.push(
+          <Text
+            key={match.index}
+            onPress={isWebUrl ? () => Linking.openURL(url).catch(ignore('MarkdownRenderer')) : undefined}
+            style={[baseStyle, { color: linkColor, textDecorationLine: 'underline' }]}>
+            {linkMatch[1]}
+          </Text>
+        );
+      } else if (chunk.startsWith('**') && chunk.endsWith('**')) {
+        parts.push(
+          <Text
+            key={match.index}
+            style={[baseStyle, { fontWeight: '700', color: theme.textPrimary }]}>
+            {chunk.slice(2, -2)}
+          </Text>
+        );
+      } else if (chunk.startsWith('*') && chunk.endsWith('*')) {
+        parts.push(
+          <Text key={match.index} style={[baseStyle, { fontStyle: 'italic' }]}>
+            {chunk.slice(1, -1)}
+          </Text>
+        );
+      } else if (chunk.startsWith('`') && chunk.endsWith('`')) {
+        parts.push(
+          <Text
+            key={match.index}
+            style={[
+              baseStyle,
+              {
+                fontFamily: monoFamily,
+                backgroundColor: cliColors?.inlineCodeBackground ?? theme.codeBackground,
+                paddingHorizontal: 4,
+                borderRadius: 4,
+              },
+              cliColors && { color: cliColors.inlineCode, fontSize: 13.5 },
+            ]}>
+            {chunk.slice(1, -1)}
+          </Text>
+        );
+      }
+
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < safeText.length) {
       parts.push(
         <Text key={lastIndex} style={baseStyle}>
-          {text.slice(lastIndex, match.index)}
+          {safeText.slice(lastIndex)}
         </Text>
       );
     }
-
-    const chunk = match[0];
-    if (chunk.startsWith('**') && chunk.endsWith('**')) {
-      parts.push(
-        <Text
-          key={match.index}
-          style={[baseStyle, { fontWeight: '700', color: theme.textPrimary }]}>
-          {chunk.slice(2, -2)}
-        </Text>
-      );
-    } else if (chunk.startsWith('*') && chunk.endsWith('*')) {
-      parts.push(
-        <Text key={match.index} style={[baseStyle, { fontStyle: 'italic' }]}>
-          {chunk.slice(1, -1)}
-        </Text>
-      );
-    } else if (chunk.startsWith('`') && chunk.endsWith('`')) {
-      parts.push(
-        <Text
-          key={match.index}
-          style={[
-            baseStyle,
-            {
-              fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-              backgroundColor: theme.codeBackground,
-              paddingHorizontal: 4,
-              borderRadius: 4,
-            },
-          ]}>
-          {chunk.slice(1, -1)}
-        </Text>
-      );
-    }
-
-    lastIndex = regex.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(
-      <Text key={lastIndex} style={baseStyle}>
-        {text.slice(lastIndex)}
+  } catch {
+    return [
+      <Text key="fallback" style={baseStyle}>
+        {safeText}
       </Text>
-    );
+    ];
   }
 
   return parts;
+}
+
+/** Blinking terminal-style cursor shown at the end of actively streaming text. */
+function BlinkingCursor({ color }: { color: string }) {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const id = setInterval(() => setVisible(v => !v), 500);
+    return () => clearInterval(id);
+  }, []);
+
+  return <Text style={{ color, opacity: visible ? 1 : 0 }}>{'▌'}</Text>;
+}
+
+/**
+ * Cheap, no-structure renderer used while a reply is still streaming in:
+ * one regex pass for inline formatting (bold/italic/code/links), no line-by-line
+ * table/heading/bullet parsing. Avoids re-running that heavier parser on every
+ * incoming token, and avoids a half-written table row flashing as plain text
+ * before "popping" into a table once its closing `|` arrives. The full
+ * `MarkdownRenderer` takes over once the entry finalizes.
+ */
+export function StreamingText({
+  content,
+  theme,
+  cliColors,
+  cursor,
+  style,
+}: MarkdownRendererProps & { cursor?: boolean; style?: any }) {
+  const textContent = typeof content === 'string' ? content : String(content || '');
+  if (!textContent && !cursor) return null;
+  const baseStyle = [styles.paragraph, { color: theme.textPrimary }, style];
+  return (
+    <Text style={baseStyle}>
+      {renderFormattedText(textContent, baseStyle, theme, cliColors)}
+      {cursor ? <BlinkingCursor color={theme.textPrimary} /> : null}
+    </Text>
+  );
+}
+
+/** Renders one line of tokenized code as colored inline spans. */
+function HighlightedLine({
+  line,
+  theme,
+}: {
+  line: { text: string; kind: string }[];
+  theme: ThemeColors;
+}) {
+  const colors = syntaxColorsForTheme(theme.isDark);
+  return (
+    <Text style={styles.codeText}>
+      {line.map((tok, idx) => (
+        <Text
+          key={idx}
+          style={{
+            color: (colors as any)[tok.kind] || colors.plain,
+            fontWeight: tok.kind === 'keyword' ? '600' : '400',
+          }}>
+          {tok.text}
+        </Text>
+      ))}
+      {'\n'}
+    </Text>
+  );
+}
+
+/** Renders a `diff`/`patch` fence with colored +/-/@@ lines. */
+/** Heuristic for unprompted plain text that's actually a unified diff (e.g. tool output). */
+export function looksLikeDiff(text: string): boolean {
+  if (!text) return false;
+  const lines = text.split('\n').slice(0, 20);
+  const diffLines = lines.filter(
+    l => /^(\+\+\+|---|@@ )/.test(l) || /^[+-](?![+-])/.test(l)
+  );
+  return diffLines.length >= 2;
+}
+
+export function DiffBlockBody({ code, theme }: { code: string; theme: ThemeColors }) {
+  const lines = code.split('\n');
+  return (
+    <>
+      {lines.map((line, idx) => {
+        let color = theme.textPrimary;
+        let backgroundColor: string | undefined;
+        if (line.startsWith('+++') || line.startsWith('---')) {
+          color = theme.textSecondary;
+        } else if (line.startsWith('@@')) {
+          color = theme.link;
+        } else if (line.startsWith('+')) {
+          color = theme.success;
+          backgroundColor = theme.isDark ? 'rgba(148, 199, 160, 0.12)' : 'rgba(50, 107, 64, 0.08)';
+        } else if (line.startsWith('-')) {
+          color = theme.error;
+          backgroundColor = theme.isDark ? 'rgba(255, 145, 152, 0.12)' : 'rgba(181, 38, 62, 0.08)';
+        }
+        return (
+          <Text
+            key={idx}
+            style={[styles.codeText, { color, backgroundColor }]}>
+            {line + (idx < lines.length - 1 ? '\n' : '')}
+          </Text>
+        );
+      })}
+    </>
+  );
 }
 
 function CodeBlockItem({
   code,
   language,
   theme,
+  compact,
 }: {
   code: string;
   language: string;
   theme: ThemeColors;
+  compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
+    NativeClipboard.setString(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const normalizedLang = language ? language.toLowerCase().trim() : '';
+  const isDiff = normalizedLang === 'diff' || normalizedLang === 'patch';
   const displayLang = language ? language.toUpperCase() : 'CODE';
+  const tokenizedLines = !isDiff ? tokenizeCode(code, language) : null;
+
+  const codeContent = isDiff ? (
+    <DiffBlockBody code={code} theme={theme} />
+  ) : tokenizedLines ? (
+    <Text>
+      {tokenizedLines.map((line, idx) => (
+        <HighlightedLine key={idx} line={line} theme={theme} />
+      ))}
+    </Text>
+  ) : (
+    <Text style={[styles.codeText, { color: theme.textPrimary }]}>{code}</Text>
+  );
+
+  if (compact) {
+    return (
+      <View
+        style={[
+          styles.codeBlock,
+          styles.codeBlockCompact,
+          { backgroundColor: theme.codeBackground, borderColor: theme.outline },
+        ]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.codeScrollContent, styles.codeScrollCompact]}>
+          {codeContent}
+        </ScrollView>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy"
+          onPress={handleCopy}
+          style={styles.codeCopyFloating}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          {copied ? (
+            <CheckmarkIcon size={15} color={theme.primary} />
+          ) : (
+            <CopyIcon size={15} color={theme.textSecondary} />
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -145,20 +340,28 @@ function CodeBlockItem({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.codeScrollContent}>
-        <Text style={[styles.codeText, { color: theme.textPrimary }]}>
-          {code}
-        </Text>
+        {codeContent}
       </ScrollView>
     </View>
   );
 }
 
-export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
-  if (!content) return null;
+export function MarkdownRenderer({ content, theme, cliColors }: MarkdownRendererProps) {
+  const fmt = (text: string, style: any) => renderFormattedText(text, style, theme, cliColors);
 
-  const lines = content.split('\n');
-  const elements: React.ReactNode[] = [];
-  let i = 0;
+  const textContent =
+    typeof content === 'string'
+      ? content
+      : content && typeof content === 'object'
+      ? (content as any).text || (content as any).message || JSON.stringify(content)
+      : String(content || '');
+
+  if (!textContent.trim()) return null;
+
+  try {
+    const lines = textContent.split('\n');
+    const elements: React.ReactNode[] = [];
+    let i = 0;
 
   while (i < lines.length) {
     const rawLine = lines[i];
@@ -180,6 +383,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
           code={codeLines.join('\n')}
           language={language}
           theme={theme}
+          compact={!!cliColors}
         />
       );
       continue;
@@ -239,7 +443,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
                         styles.tableHeaderCellText,
                         { color: theme.textPrimary },
                       ]}>
-                      {renderFormattedText(cell, styles.tableHeaderCellText, theme)}
+                      {fmt(cell, styles.tableHeaderCellText)}
                     </Text>
                   </View>
                 ))}
@@ -271,7 +475,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
                             styles.tableCellText,
                             { color: theme.textPrimary },
                           ]}>
-                          {renderFormattedText(cell, styles.tableCellText, theme)}
+                          {fmt(cell, styles.tableCellText)}
                         </Text>
                       </View>
                     ))}
@@ -290,7 +494,9 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
       const levelMatch = trimmed.match(/^#+/);
       const level = levelMatch ? levelMatch[0].length : 1;
       const headingText = trimmed.replace(/^#+\s*/, '');
-      const fontSize = level === 1 ? 20 : level === 2 ? 18 : 16;
+      const fontSize = cliColors
+        ? level === 1 ? 22 : level === 2 ? 18 : 16
+        : level === 1 ? 20 : level === 2 ? 18 : 16;
       elements.push(
         <Text
           key={`h_${i}`}
@@ -303,11 +509,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
               marginBottom: 4,
             },
           ]}>
-          {renderFormattedText(
-            headingText,
-            [styles.heading, { fontSize, color: theme.textPrimary }],
-            theme
-          )}
+          {fmt(headingText, [styles.heading, { fontSize, color: theme.textPrimary }])}
         </Text>
       );
       i++;
@@ -315,7 +517,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
     }
 
     // 4. Bullet Points (• , - , * )
-    const bulletMatch = trimmed.match(/^([•\-\*])\s+(.*)/);
+    const bulletMatch = trimmed.match(/^([•\-*])\s+(.*)/);
     if (bulletMatch) {
       const itemContent = bulletMatch[2];
       elements.push(
@@ -324,11 +526,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
             •{' '}
           </Text>
           <Text style={[styles.bulletContent, { color: theme.textPrimary }]}>
-            {renderFormattedText(
-              itemContent,
-              [styles.bulletContent, { color: theme.textPrimary }],
-              theme
-            )}
+            {fmt(itemContent, [styles.bulletContent, { color: theme.textPrimary }])}
           </Text>
         </View>
       );
@@ -351,11 +549,7 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
             {prefix}
           </Text>
           <Text style={[styles.bulletContent, { color: theme.textPrimary }]}>
-            {renderFormattedText(
-              itemContent,
-              [styles.bulletContent, { color: theme.textPrimary }],
-              theme
-            )}
+            {fmt(itemContent, [styles.bulletContent, { color: theme.textPrimary }])}
           </Text>
         </View>
       );
@@ -375,17 +569,22 @@ export function MarkdownRenderer({ content, theme }: MarkdownRendererProps) {
       <Text
         key={`p_${i}`}
         style={[styles.paragraph, { color: theme.textPrimary }]}>
-        {renderFormattedText(
-          rawLine,
-          [styles.paragraph, { color: theme.textPrimary }],
-          theme
-        )}
+        {fmt(rawLine, [styles.paragraph, { color: theme.textPrimary }])}
       </Text>
     );
     i++;
   }
 
-  return <View style={styles.container}>{elements}</View>;
+    return <View style={styles.container}>{elements}</View>;
+  } catch (err) {
+    return (
+      <View style={styles.container}>
+        <Text style={[styles.paragraph, { color: theme.textPrimary }]}>
+          {textContent}
+        </Text>
+      </View>
+    );
+  }
 }
 
 const styles = StyleSheet.create({
@@ -435,6 +634,18 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     overflow: 'hidden',
   },
+  codeBlockCompact: {
+    borderRadius: 10,
+    position: 'relative',
+  },
+  codeScrollCompact: {
+    paddingRight: 40,
+  },
+  codeCopyFloating: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
   codeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -468,7 +679,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   codeText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: monoFamily,
     fontSize: 13,
     lineHeight: 20,
   },

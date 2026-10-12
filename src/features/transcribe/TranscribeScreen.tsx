@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { AppHeader } from '../../components/common/AppHeader';
 import {
   CheckmarkIcon,
@@ -16,17 +17,24 @@ import {
 } from '../../components/common/Icons';
 import { useApp } from '../../store/AppContext';
 import { NativeClipboard, NativeSpeech } from '../../services/nativeModules';
+import { ignore } from '../../utils/devLog';
 
 export function TranscribeScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { theme, sendMessage, navigate } = useApp();
 
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
-  const [transcript, setTranscript] = useState(
-    'Press the microphone below to speak and transcribe your voice to text in real-time.'
-  );
+  const [hasTranscript, setHasTranscript] = useState(false);
+  const [transcript, setTranscript] = useState('');
+
+  const displayedTranscript = hasTranscript
+    ? transcript
+    : isRecording
+    ? t('transcribe.listening')
+    : t('transcribe.placeholder');
 
   useEffect(() => {
     let interval: any = null;
@@ -43,9 +51,8 @@ export function TranscribeScreen() {
   useEffect(() => {
     const unsubResults = NativeSpeech.onSpeechResults(text => {
       if (text) {
-        setTranscript(prev =>
-          prev && !prev.startsWith('Press the microphone') ? `${prev} ${text}` : text
-        );
+        setTranscript(prev => (prev ? `${prev} ${text}` : text));
+        setHasTranscript(true);
       }
       setIsRecording(false);
     });
@@ -53,6 +60,7 @@ export function TranscribeScreen() {
     const unsubPartial = NativeSpeech.onSpeechPartialResults(text => {
       if (text) {
         setTranscript(text);
+        setHasTranscript(true);
       }
     });
 
@@ -78,7 +86,6 @@ export function TranscribeScreen() {
       if (started) {
         setIsRecording(true);
         setSeconds(0);
-        setTranscript('Listening... Speak now...');
       }
     } else {
       await NativeSpeech.stopListening();
@@ -100,7 +107,7 @@ export function TranscribeScreen() {
     .filter(Boolean).length;
 
   const handleCopy = () => {
-    NativeClipboard.setString(transcript).catch(() => {});
+    NativeClipboard.setString(transcript).catch(ignore('TranscribeScreen'));
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 1500);
   };
@@ -112,7 +119,7 @@ export function TranscribeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <AppHeader showBack title="Transcribe" />
+      <AppHeader showBack title={t('transcribe.title')} />
 
       <ScrollView
         contentContainerStyle={[
@@ -132,7 +139,7 @@ export function TranscribeScreen() {
             {formatTimer(seconds)}
           </Text>
           <Text style={[styles.statusText, { color: theme.textSecondary }]}>
-            {isRecording ? 'Listening and capturing audio...' : 'Tap Mic to Start Recording'}
+            {isRecording ? t('transcribe.statusRecording') : t('transcribe.statusIdle')}
           </Text>
 
           {/* Animated visual waveform bars */}
@@ -152,7 +159,7 @@ export function TranscribeScreen() {
           </View>
 
           {/* Record Control Button */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Voice input"
             activeOpacity={0.7}
             onPress={toggleRecording}
             style={[
@@ -177,7 +184,7 @@ export function TranscribeScreen() {
           ]}>
           <View style={styles.cardHeader}>
             <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-              Transcription Result
+              {t('transcribe.resultTitle')}
             </Text>
             <View
               style={[
@@ -185,36 +192,52 @@ export function TranscribeScreen() {
                 { backgroundColor: theme.pillBackground },
               ]}>
               <Text style={[styles.badgeText, { color: theme.tagText }]}>
-                {wordCount} words
+                {t('transcribe.wordCount', { count: wordCount })}
               </Text>
             </View>
           </View>
 
           <Text style={[styles.transcriptText, { color: theme.textPrimary }]}>
-            {transcript}
+            {displayedTranscript}
           </Text>
 
           {/* Actions */}
           <View style={styles.actionsRow}>
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Copy transcript"
+              accessibilityState={{ disabled: !hasTranscript }}
+              disabled={!hasTranscript}
               onPress={handleCopy}
-              style={[styles.actionBtn, { backgroundColor: theme.buttonBackground }]}>
+              style={[
+                styles.actionBtn,
+                { backgroundColor: theme.buttonBackground },
+                !hasTranscript && styles.actionBtnDisabled,
+              ]}>
               {isCopied ? (
                 <CheckmarkIcon size={16} color={theme.success} />
               ) : (
                 <CopyIcon size={16} color={theme.tagText} />
               )}
               <Text style={[styles.actionText, { color: theme.tagText }]}>
-                {isCopied ? 'Copied' : 'Copy'}
+                {isCopied ? t('transcribe.copied') : t('transcribe.copy')}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Send transcript to chat"
+              accessibilityState={{ disabled: !hasTranscript }}
+              disabled={!hasTranscript}
               onPress={handleSendToChat}
-              style={[styles.actionBtn, { backgroundColor: theme.primary }]}>
+              style={[
+                styles.actionBtn,
+                { backgroundColor: theme.primary },
+                !hasTranscript && styles.actionBtnDisabled,
+              ]}>
               <SendIcon size={16} color="#FFFFFF" />
               <Text style={[styles.actionText, { color: '#FFFFFF' }]}>
-                Send to Chat
+                {t('transcribe.sendToChat')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -314,6 +337,9 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     gap: 8,
+  },
+  actionBtnDisabled: {
+    opacity: 0.4,
   },
   actionText: {
     fontSize: 14,

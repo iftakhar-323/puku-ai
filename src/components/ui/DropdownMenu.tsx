@@ -54,8 +54,8 @@ export function DropdownMenuGroup({ children }: { children: React.ReactNode }) {
 }
 
 export function DropdownMenuRadioGroup({
-  value,
-  onValueChange,
+  value: _value,
+  onValueChange: _onValueChange,
   children,
 }: {
   value?: string;

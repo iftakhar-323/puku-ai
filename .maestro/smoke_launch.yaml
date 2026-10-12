@@ -1,0 +1,8 @@
+appId: com.pukuai.dev
+---
+# Smoke test: the JS bundle loads and native modules register without
+# crashing, and the login screen renders its core elements.
+- launchApp
+- assertVisible: "puku"
+- assertVisible: "Sign in with Google"
+- assertVisible: "Sign in with email or access token"

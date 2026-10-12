@@ -16,12 +16,11 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { secureStorage } from '../../services/secureStorage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 import {
-  CheckmarkIcon,
   CloseIcon,
-  DownloadIcon,
   EmailIcon,
   EyeIcon,
   EyeOffIcon,
@@ -29,131 +28,26 @@ import {
   LockIcon,
   PukuLogoIcon,
 } from '../../components/common/Icons';
+import { RetroComputerIllustration } from '../../components/common/RetroComputerIllustration';
 import { pukuApi } from '../../services/api';
 import { tokenManager } from '../../services/tokenManager';
 import { useApp } from '../../store/AppContext';
 import { AppColors } from '../../theme/colors';
 import { ENV } from '../../config/env';
-import { extractJwtData, fetchAuthenticUserInfo } from '../../utils/auth';
+import {
+  extractJwtData,
+  fetchAuthenticUserInfo,
+  generatePkcePair,
+  sha256,
+  toBase64Url,
+} from '../../utils/auth';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
-
-// Standard pure JS SHA-256 for PKCE S256 challenge calculation
-function sha256(ascii: string): Uint8Array {
-  function rightRotate(value: number, amount: number) {
-    return (value >>> amount) | (value << (32 - amount));
-  }
-  let i, j;
-  const words: number[] = [];
-  const asciiBitLength = ascii.length * 8;
-
-  let hash = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-  ];
-  const k = [
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-  ];
-
-  let compositeClearLength = ((asciiBitLength + 64 >>> 9) << 4) + 15;
-  while (words.length <= compositeClearLength) {
-    words.push(0);
-  }
-  for (i = 0; i < ascii.length; i++) {
-    words[i >> 2] |= (ascii.charCodeAt(i) & 255) << 8 * (3 - (i % 4));
-  }
-  words[asciiBitLength >> 5] |= 0x80 << (24 - (asciiBitLength % 32));
-  words[compositeClearLength] = asciiBitLength;
-
-  for (i = 0; i < words.length; i += 16) {
-    const w: number[] = [];
-    for (j = 0; j < 64; j++) {
-      if (j < 16) {
-        w[j] = words[i + j];
-      } else {
-        const s0 = rightRotate(w[j - 15], 7) ^ rightRotate(w[j - 15], 18) ^ (w[j - 15] >>> 3);
-        const s1 = rightRotate(w[j - 2], 17) ^ rightRotate(w[j - 2], 19) ^ (w[j - 2] >>> 10);
-        w[j] = ((w[j - 16] + s0 + w[j - 7] + s1) & 0xffffffff) >>> 0;
-      }
-    }
-
-    let a = hash[0], b = hash[1], c = hash[2], d = hash[3];
-    let e = hash[4], f = hash[5], g = hash[6], h = hash[7];
-
-    for (j = 0; j < 64; j++) {
-      const S1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
-      const ch = (e & f) ^ (~e & g);
-      const temp1 = ((h + S1 + ch + k[j] + w[j]) & 0xffffffff) >>> 0;
-      const S0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
-      const maj = (a & b) ^ (a & c) ^ (b & c);
-      const temp2 = ((S0 + maj) & 0xffffffff) >>> 0;
-
-      h = g; g = f; f = e;
-      e = ((d + temp1) & 0xffffffff) >>> 0;
-      d = c; c = b; b = a;
-      a = ((temp1 + temp2) & 0xffffffff) >>> 0;
-    }
-
-    hash[0] = ((hash[0] + a) & 0xffffffff) >>> 0;
-    hash[1] = ((hash[1] + b) & 0xffffffff) >>> 0;
-    hash[2] = ((hash[2] + c) & 0xffffffff) >>> 0;
-    hash[3] = ((hash[3] + d) & 0xffffffff) >>> 0;
-    hash[4] = ((hash[4] + e) & 0xffffffff) >>> 0;
-    hash[5] = ((hash[5] + f) & 0xffffffff) >>> 0;
-    hash[6] = ((hash[6] + g) & 0xffffffff) >>> 0;
-    hash[7] = ((hash[7] + h) & 0xffffffff) >>> 0;
-  }
-
-  const out = new Uint8Array(32);
-  for (i = 0; i < 8; i++) {
-    out[i * 4] = (hash[i] >>> 24) & 0xff;
-    out[i * 4 + 1] = (hash[i] >>> 16) & 0xff;
-    out[i * 4 + 2] = (hash[i] >>> 8) & 0xff;
-    out[i * 4 + 3] = hash[i] & 0xff;
-  }
-  return out;
-}
-
-const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-function toBase64Url(bytes: Uint8Array): string {
-  let base64 = '';
-  const len = bytes.length;
-  for (let i = 0; i < len; i += 3) {
-    const b1 = bytes[i];
-    const b2 = i + 1 < len ? bytes[i + 1] : 0;
-    const b3 = i + 2 < len ? bytes[i + 2] : 0;
-
-    const c1 = b1 >> 2;
-    const c2 = ((b1 & 3) << 4) | (b2 >> 4);
-    const c3 = ((b2 & 15) << 2) | (b3 >> 6);
-    const c4 = b3 & 63;
-
-    base64 += B64_CHARS.charAt(c1) + B64_CHARS.charAt(c2);
-    if (i + 1 < len) base64 += B64_CHARS.charAt(c3);
-    if (i + 2 < len) base64 += B64_CHARS.charAt(c4);
-  }
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-function generateRandomString(length: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-  let res = '';
-  for (let i = 0; i < length; i++) {
-    res += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return res;
-}
+import { ignore } from '../../utils/devLog';
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { navigate, updateProfile, refreshConversations } = useApp();
   const { keyboardHeight } = useKeyboardHeight();
 
@@ -172,13 +66,13 @@ export function LoginScreen() {
 
   // OAuth State
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  const [authStatusMessage, setAuthStatusMessage] = useState('Ready to connect with Google');
+  const [authStatusMessage, setAuthStatusMessage] = useState(t('login.readyToConnectGoogle'));
   const [manualCodeInput, setManualCodeInput] = useState('');
   const [authVerifier, setAuthVerifier] = useState<string>('');
   const [authState, setAuthState] = useState<string>('');
   const [isOAuthWaiting, setIsOAuthWaiting] = useState(false);
   const [isOpeningWorkspace, setIsOpeningWorkspace] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGoogleLoading] = useState(false);
   const monoFont = Platform.OS === 'ios' ? 'Courier' : 'monospace';
 
   // Helper to get normalized OAuth redirect URI
@@ -196,12 +90,14 @@ export function LoginScreen() {
         if (isLoggedOut === 'true') return;
         const validToken = await tokenManager.ensureValidToken();
         if (validToken) {
-          refreshConversations().catch(() => {});
+          refreshConversations().catch(ignore('LoginScreen'));
           navigate('chat');
         }
       } catch {}
     }
     checkExistingSession();
+    // Launch-only check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showSnackBar = (message: string) => {
@@ -236,7 +132,7 @@ export function LoginScreen() {
     if (!urlStr) return;
 
     try {
-      setAuthStatusMessage('Signing in with Google credentials...');
+      setAuthStatusMessage(t('login.signingInWithGoogle'));
       let code = '';
       let returnedState = '';
 
@@ -250,20 +146,20 @@ export function LoginScreen() {
       }
 
       if (!code) {
-        showSnackBar('Authentication canceled or missing authorization code');
+        showSnackBar(t('login.authCanceledOrMissingCode'));
         setIsGoogleModalOpen(false);
         setIsOAuthWaiting(false);
         return;
       }
 
       const storedVerifier =
-        overrideVerifier || authVerifier || (await AsyncStorage.getItem('@puku_oauth_verifier')) || '';
+        overrideVerifier || authVerifier || (await secureStorage.getItem('@puku_oauth_verifier')) || '';
       const storedState =
-        overrideState || authState || (await AsyncStorage.getItem('@puku_oauth_state')) || '';
+        overrideState || authState || (await secureStorage.getItem('@puku_oauth_state')) || '';
       const redirectUri = overrideRedirectUri || getOAuthRedirectUri();
 
       if (storedState && returnedState && storedState !== returnedState) {
-        showSnackBar('State validation failed. Please try again.');
+        showSnackBar(t('login.stateValidationFailed'));
         setIsGoogleModalOpen(false);
         setIsOAuthWaiting(false);
         return;
@@ -310,7 +206,7 @@ export function LoginScreen() {
           let authenticEmail = '';
           let authenticName = '';
           let authenticId = '';
-          let authenticPicture: string | undefined = undefined;
+          let authenticPicture: string | undefined;
 
           // 1. Primary: fetch from /v1/me (matching Flutter ProfileService)
           try {
@@ -355,7 +251,7 @@ export function LoginScreen() {
             if (accessData?.sub && !authenticId) authenticId = accessData.sub;
           }
 
-          const resolvedName = authenticName || (authenticEmail ? authenticEmail.split('@')[0] : 'Google User');
+          const resolvedName = authenticName || (authenticEmail ? authenticEmail.split('@')[0] : t('login.googleUserFallbackName'));
 
           updateProfile({
             name: resolvedName,
@@ -368,12 +264,19 @@ export function LoginScreen() {
 
           await AsyncStorage.setItem('@puku_is_logged_in', 'true');
           await AsyncStorage.removeItem('@puku_is_logged_out');
+          // The PKCE verifier and state are single-use.
+          await secureStorage.removeItem('@puku_oauth_verifier');
+          await secureStorage.removeItem('@puku_oauth_state');
           setIsGoogleModalOpen(false);
           setIsOAuthWaiting(false);
           setIsOpeningWorkspace(true);
 
-          showSnackBar(authenticEmail ? `Signed in as ${authenticEmail}` : 'Google Sign-In successful!');
-          refreshConversations().catch(() => {});
+          showSnackBar(
+            authenticEmail
+              ? t('login.signedInAs', { email: authenticEmail })
+              : t('login.googleSignInSuccess')
+          );
+          refreshConversations().catch(ignore('LoginScreen'));
           setTimeout(() => {
             setIsOpeningWorkspace(false);
             navigate('chat');
@@ -387,12 +290,17 @@ export function LoginScreen() {
       setIsGoogleModalOpen(false);
       setIsOAuthWaiting(false);
       showSnackBar(
-        `Google Sign-In failed: ${errBody?.error_description || errBody?.error || 'Invalid authorization code'}`
+        t('login.googleSignInFailed', {
+          reason:
+            errBody?.error_description ||
+            errBody?.error ||
+            t('login.invalidAuthorizationCode'),
+        })
       );
     } catch (err: any) {
       setIsGoogleModalOpen(false);
       setIsOAuthWaiting(false);
-      showSnackBar(`Sign-In error: ${err.message || 'Network error'}`);
+      showSnackBar(t('login.signInError', { reason: err.message || t('login.networkError') }));
     }
   };
 
@@ -411,22 +319,21 @@ export function LoginScreen() {
       sub.remove();
       if (snackBarTimer.current) clearTimeout(snackBarTimer.current);
     };
+    // Re-subscribe only when the PKCE pair changes; the handler reads it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authVerifier, authState]);
 
   // Launches authentic Google OAuth (via In-App Custom Tabs matching Flutter, with browser fallback)
   const handleGoogleSignIn = async () => {
     try {
-      const verifier = generateRandomString(64);
-      const challengeBytes = sha256(verifier);
-      const challenge = toBase64Url(challengeBytes);
-      const stateVal = generateRandomString(32);
+      const { verifier, challenge, state: stateVal } = generatePkcePair();
       const redirectUri = getOAuthRedirectUri();
 
       setAuthVerifier(verifier);
       setAuthState(stateVal);
 
-      await AsyncStorage.setItem('@puku_oauth_verifier', verifier);
-      await AsyncStorage.setItem('@puku_oauth_state', stateVal);
+      await secureStorage.setItem('@puku_oauth_verifier', verifier);
+      await secureStorage.setItem('@puku_oauth_state', stateVal);
 
       const authUrl =
         `${ENV.AUTH_BASE_URL}/api/oauth/authorize?response_type=code` +
@@ -457,22 +364,22 @@ export function LoginScreen() {
         if (authResponse.type === 'success' && authResponse.url) {
           await handleOAuthCallbackUrl(authResponse.url, verifier, stateVal, redirectUri);
         } else if (authResponse.type === 'cancel') {
-          showSnackBar('Google Sign-In canceled');
+          showSnackBar(t('login.googleSignInCanceled'));
         }
       } else {
         // Fallback to external browser
         setIsGoogleModalOpen(true);
         setIsOAuthWaiting(true);
-        setAuthStatusMessage('Launching browser for Google Sign-In...');
+        setAuthStatusMessage(t('login.launchingBrowser'));
         await Linking.openURL(authUrl);
-        setAuthStatusMessage('Complete Google login in your browser. Puku AI will return automatically.');
+        setAuthStatusMessage(t('login.completeLoginInBrowser'));
       }
     } catch (err: any) {
       // In case InAppBrowser fails, open system browser
       try {
-        const verifier = authVerifier || generateRandomString(64);
+        const verifier = authVerifier || generatePkcePair().verifier;
         const challenge = toBase64Url(sha256(verifier));
-        const stateVal = authState || generateRandomString(32);
+        const stateVal = authState || generatePkcePair().state;
         const redirectUri = getOAuthRedirectUri();
         const fallbackUrl =
           `${ENV.AUTH_BASE_URL}/api/oauth/authorize?response_type=code` +
@@ -485,10 +392,12 @@ export function LoginScreen() {
 
         setIsGoogleModalOpen(true);
         setIsOAuthWaiting(true);
-        setAuthStatusMessage('Complete Google login in your browser. Puku AI will return automatically.');
+        setAuthStatusMessage(t('login.completeLoginInBrowser'));
         await Linking.openURL(fallbackUrl);
       } catch (linkErr: any) {
-        showSnackBar(`Failed to open Google Sign-In: ${err.message || linkErr.message}`);
+        showSnackBar(
+          t('login.failedToOpenGoogleSignIn', { reason: err.message || linkErr.message })
+        );
       }
     }
   };
@@ -499,11 +408,11 @@ export function LoginScreen() {
     const trimmedCredential = passwordInput.trim();
 
     if (!trimmedEmail) {
-      setEmailErrorMessage('Please enter your exact email address');
+      setEmailErrorMessage(t('login.enterExactEmail'));
       return;
     }
     if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
-      setEmailErrorMessage('Please enter a valid email address');
+      setEmailErrorMessage(t('login.enterValidEmail'));
       return;
     }
 
@@ -514,7 +423,7 @@ export function LoginScreen() {
       let activeToken = trimmedCredential;
       let finalEmail = trimmedEmail;
       let finalName = trimmedEmail.split('@')[0];
-      let userId: string | undefined = undefined;
+      let userId: string | undefined;
 
       // If user pasted a Bearer token
       if (trimmedCredential && trimmedCredential.length > 20) {
@@ -530,7 +439,7 @@ export function LoginScreen() {
         }
       } else if (!trimmedCredential) {
         // If password/token is completely empty
-        setEmailErrorMessage('Please enter your password or authentic Puku Bearer token');
+        setEmailErrorMessage(t('login.enterPasswordOrToken'));
         setIsEmailSubmitting(false);
         return;
       }
@@ -553,14 +462,14 @@ export function LoginScreen() {
       setIsEmailModalOpen(false);
       setIsOpeningWorkspace(true);
       showSnackBar(`Signed in as ${finalEmail}`);
-      refreshConversations().catch(() => {});
+      refreshConversations().catch(ignore('LoginScreen'));
       setTimeout(() => {
         setIsOpeningWorkspace(false);
         navigate('chat');
       }, 1200);
     } catch (e: any) {
       setIsEmailSubmitting(false);
-      setEmailErrorMessage(e.message || 'Login failed. Please verify credentials.');
+      setEmailErrorMessage(e.message || t('login.loginFailed'));
     }
   };
 
@@ -569,7 +478,7 @@ export function LoginScreen() {
       <View style={styles.workspaceLoadingContainer}>
         <StatusBar barStyle="light-content" />
         <Text style={[styles.workspaceLoadingText, { fontFamily: monoFont }]}>
-          Opening workspace...
+          {t('login.openingWorkspace')}
         </Text>
       </View>
     );
@@ -591,8 +500,7 @@ export function LoginScreen() {
         showsVerticalScrollIndicator={false}>
         {/* 2. Retro Computer Illustration */}
         <View style={styles.retroComputerWrap}>
-          <Image
-            source={require('../../assets/images/retro_puku_computer.png')}
+          <RetroComputerIllustration
             style={styles.retroComputerImage}
             resizeMode="contain"
           />
@@ -601,11 +509,11 @@ export function LoginScreen() {
         {/* 3. Hero Typography matching screenshot */}
         <View style={styles.heroSection}>
           <Text style={[styles.heroHeadline, { fontFamily: monoFont }]}>
-            A little{'\n'}curiosity.{'\n'}A lot of{'\n'}possibility.
+            {t('login.heroHeadline')}
           </Text>
 
           <Text style={[styles.heroSubtitle, { fontFamily: monoFont }]}>
-            A place to think, make and figure things out.
+            {t('login.heroSubtitle')}
           </Text>
         </View>
 
@@ -613,19 +521,36 @@ export function LoginScreen() {
         <TouchableOpacity
           activeOpacity={0.85}
           disabled={isGoogleLoading}
+          accessibilityRole="button"
+          accessibilityLabel={t('login.signInWithGoogleLabel')}
           onPress={handleGoogleSignIn}
-          onLongPress={() => {
-            setEmailErrorMessage(null);
-            setIsEmailModalOpen(true);
-          }}
           style={styles.primarySignInBtn}>
           {isGoogleLoading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={[styles.primarySignInText, { fontFamily: monoFont }]}>
-              Sign in to Puku ↗
-            </Text>
+            <>
+              <GoogleIcon size={18} color="#FFFFFF" />
+              <Text style={[styles.primarySignInText, { fontFamily: monoFont }]}>
+                {t('login.signInWithGoogle')}
+              </Text>
+            </>
           )}
+        </TouchableOpacity>
+
+        {/* 5. Secondary: email / access-token sign-in */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={t('login.signInWithEmailOrToken')}
+          onPress={() => {
+            setEmailErrorMessage(null);
+            setIsEmailModalOpen(true);
+          }}
+          style={styles.secondarySignInBtn}>
+          <EmailIcon size={15} color="#A0A0A8" />
+          <Text style={[styles.secondarySignInText, { fontFamily: monoFont }]}>
+            {t('login.signInWithEmailOrToken')}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -666,9 +591,9 @@ export function LoginScreen() {
               <View style={styles.modalHeaderRow}>
                 <View style={styles.modalTitleBadge}>
                   <EmailIcon size={18} color={AppColors.blueLite} />
-                  <Text style={styles.modalTitleText}>Sign in with Email</Text>
+                  <Text style={styles.modalTitleText}>{t('login.signInWithEmailTitle')}</Text>
                 </View>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.close')}
                   onPress={() => setIsEmailModalOpen(false)}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   <CloseIcon size={20} color={AppColors.coolGrey} />
@@ -676,7 +601,7 @@ export function LoginScreen() {
               </View>
 
               <Text style={styles.modalSubtitleText}>
-                Enter your account email to access your Puku workspace and AI models.
+                {t('login.emailModalSubtitle')}
               </Text>
 
               {/* Error Message */}
@@ -688,17 +613,17 @@ export function LoginScreen() {
 
               {/* Email Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+                <Text style={styles.inputLabel}>{t('login.emailAddressLabel')}</Text>
                 <View style={styles.inputWrapper}>
                   <EmailIcon size={18} color={AppColors.coolGrey} />
                   <TextInput
                     style={styles.textInputField}
                     value={emailInput}
-                    onChangeText={t => {
-                      setEmailInput(t);
+                    onChangeText={text => {
+                      setEmailInput(text);
                       if (emailErrorMessage) setEmailErrorMessage(null);
                     }}
-                    placeholder="you@domain.com"
+                    placeholder={t('login.emailPlaceholder')}
                     placeholderTextColor={AppColors.coolGrey}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -709,19 +634,19 @@ export function LoginScreen() {
 
               {/* Password / Access Token Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PASSWORD OR ACCESS TOKEN</Text>
+                <Text style={styles.inputLabel}>{t('login.passwordOrTokenLabel')}</Text>
                 <View style={styles.inputWrapper}>
                   <LockIcon size={18} color={AppColors.coolGrey} />
                   <TextInput
                     style={[styles.textInputField, { flex: 1 }]}
                     value={passwordInput}
                     onChangeText={setPasswordInput}
-                    placeholder="Enter password or token"
+                    placeholder={t('login.passwordPlaceholder')}
                     placeholderTextColor={AppColors.coolGrey}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                   />
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('login.showHidePassword')}
                     onPress={() => setShowPassword(p => !p)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     {showPassword ? (
@@ -742,7 +667,7 @@ export function LoginScreen() {
                 {isEmailSubmitting ? (
                   <ActivityIndicator size="small" color={AppColors.white} />
                 ) : (
-                  <Text style={styles.primaryModalBtnText}>Sign In with Email</Text>
+                  <Text style={styles.primaryModalBtnText}>{t('login.signInWithEmailButton')}</Text>
                 )}
               </TouchableOpacity>
 
@@ -750,11 +675,11 @@ export function LoginScreen() {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
-                  Linking.openURL(`${ENV.AUTH_BASE_URL}/email-login`).catch(() => {});
+                  Linking.openURL(`${ENV.AUTH_BASE_URL}/email-login`).catch(ignore('LoginScreen'));
                 }}
                 style={styles.webEmailLinkBtn}>
                 <Text style={styles.webEmailLinkText}>
-                  Need one-time magic link? Open Puku Web Email →
+                  {t('login.magicLinkPrompt')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -788,7 +713,7 @@ export function LoginScreen() {
                 <GoogleIcon size={32} color={AppColors.black} />
               </View>
 
-              <Text style={styles.browserDialogTitle}>Google Sign-In</Text>
+              <Text style={styles.browserDialogTitle}>{t('login.googleSignInTitle')}</Text>
 
               <Text style={styles.browserDialogDesc}>
                 {authStatusMessage}
@@ -804,13 +729,13 @@ export function LoginScreen() {
 
               {/* Direct manual paste fallback in case browser does not auto-redirect */}
               <View style={{ width: '100%', marginTop: 6, marginBottom: 12 }}>
-                <Text style={styles.inputLabel}>OR PASTE REDIRECT URL / AUTH CODE</Text>
+                <Text style={styles.inputLabel}>{t('login.redirectUrlLabel')}</Text>
                 <View style={styles.inputWrapper}>
                   <TextInput
                     style={styles.textInputField}
                     value={manualCodeInput}
                     onChangeText={setManualCodeInput}
-                    placeholder="Paste callback URL or code here"
+                    placeholder={t('login.redirectUrlPlaceholder')}
                     placeholderTextColor={AppColors.coolGrey}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -825,7 +750,7 @@ export function LoginScreen() {
                       handleOAuthCallbackUrl(inputVal);
                     }}
                     style={[styles.primaryModalBtn, { marginTop: 8, height: 42 }]}>
-                    <Text style={styles.primaryModalBtnText}>Verify & Sign In</Text>
+                    <Text style={styles.primaryModalBtnText}>{t('login.verifyAndSignIn')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -835,7 +760,7 @@ export function LoginScreen() {
                 onPress={handleGoogleSignIn}
                 style={styles.openBrowserBtn}>
                 <Text style={styles.openBrowserBtnText}>
-                  🌐 Re-open Google OAuth
+                  {t('login.reopenGoogleOAuth')}
                 </Text>
               </TouchableOpacity>
 
@@ -848,7 +773,7 @@ export function LoginScreen() {
                 }}
                 style={styles.switchModalBtn}>
                 <Text style={styles.switchModalText}>
-                  Prefer Token or Email? Sign in manually instead
+                  {t('login.preferTokenOrEmail')}
                 </Text>
               </TouchableOpacity>
 
@@ -859,7 +784,7 @@ export function LoginScreen() {
                   setIsOAuthWaiting(false);
                 }}
                 style={styles.cancelAuthBtn}>
-                <Text style={styles.cancelAuthText}>Cancel</Text>
+                <Text style={styles.cancelAuthText}>{t('login.cancel')}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -906,15 +831,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
-  aboutPukuBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-  },
-  aboutPukuText: {
-    fontSize: 13,
-    color: '#A0A0A8',
-    fontWeight: '500',
-  },
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
@@ -924,10 +840,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 20,
     marginBottom: 24,
+    alignSelf: 'center',
+    padding: 16,
+    borderRadius: 12, // official Puku "panelRadius" token
+    borderWidth: 1,
+    borderColor: '#34362e', // official Puku dark "border"
+    backgroundColor: '#1c1d1a', // official Puku dark "panel"
   },
   retroComputerImage: {
     width: 220,
-    height: 190,
+    height: 210, // matches the asset's native 520:496 aspect ratio
   },
   heroSection: {
     marginBottom: 28,
@@ -947,51 +869,30 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   primarySignInBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
     backgroundColor: '#4A54E8',
     borderRadius: 10,
     height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   primarySignInText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  legalBase: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#8E8E93',
-    textAlign: 'left',
-    marginBottom: 14,
-  },
-  legalLink: {
-    textDecorationLine: 'underline',
-    color: '#E0E0E6',
-    fontWeight: '600',
-  },
-  devTokenOptionBtn: {
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  devTokenOptionText: {
-    color: '#7B61FF',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  getLocallyRow: {
+  secondarySignInBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 8,
-    paddingVertical: 8,
+    height: 44,
+    marginBottom: 16,
   },
-  getLocallyText: {
-    color: '#8E8E93',
+  secondarySignInText: {
+    color: '#A0A0A8',
     fontSize: 13,
     fontWeight: '500',
   },
@@ -1124,22 +1025,6 @@ const styles = StyleSheet.create({
     color: AppColors.white,
     fontSize: 14,
     fontWeight: '700',
-  },
-  quickDevBtn: {
-    width: '100%',
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(43, 127, 255, 0.35)',
-    backgroundColor: 'rgba(43, 127, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  quickDevBtnText: {
-    color: AppColors.blueLite,
-    fontSize: 13,
-    fontWeight: '600',
   },
   webEmailLinkBtn: {
     marginTop: 14,

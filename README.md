@@ -57,8 +57,8 @@
 - **Core**: React Native `0.87.1`, React `19.2.3`, TypeScript `6.0.3`
 - **Native Frameworks**: Expo `57.0.25`, Expo Updates (`expo-updates`), New Architecture enabled
 - **Authentication**: `react-native-inappbrowser-reborn` (Chrome Custom Tabs & Safari View Controller with PKCE S256)
-- **State Management**: Centralized React Context (`AppContext.tsx`) with zero unnecessary third-party boilerplate
-- **Persistence**: `@react-native-async-storage/async-storage` for tokens, active conversation state, and preferences
+- **State Management**: React Context: `AppContext.tsx` for app state, `RemoteSessionContext.tsx` for the laptop relay (kept separate so streamed output doesn't re-render the whole app)
+- **Persistence**: `expo-secure-store` for auth tokens; `@react-native-async-storage/async-storage` for conversations and preferences
 - **Vector Graphics**: `react-native-svg` with scalable icon component registry
 - **Layout & Animations**: `react-native-safe-area-context` + Native `LayoutAnimation` hardware driver
 
@@ -90,7 +90,7 @@ puku-app-rn/
 │   │   ├── remote_session/    # Desktop pairing & tool approvals
 │   │   └── settings/          # Profile, usage metrics & custom tokens
 │   ├── services/              # API client, token storage & OTA updates
-│   ├── store/                 # Global AppContext store
+│   ├── store/                 # AppContext and RemoteSessionContext
 │   ├── theme/                 # Cream / Dark theme color tokens
 │   └── utils/                 # Auth utils, date formatters, useKeyboardHeight
 ├── app.json                   # Expo & EAS configuration
@@ -163,7 +163,7 @@ Puku AI is configured with **EAS Updates** on channel `main`.
 
 Whenever code is merged or pushed to the `main` branch, the GitHub Actions workflow `.github/workflows/eas-update.yml` automatically bundles and publishes the update to the Expo cloud. User devices receive the new version instantly on cold boot or background refresh without reinstalling the APK.
 
-For full setup and troubleshooting, refer to [**docs/OTA_UPDATES.md**](<file:///home/iftakhar/Poridhi/puku%20ai/docs/OTA_UPDATES.md>).
+For full setup and troubleshooting, refer to [**docs/OTA_UPDATES.md**](<docs/OTA_UPDATES.md>).
 
 ---
 
@@ -184,14 +184,14 @@ cd ..
 # android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
 ```
 
-For more details on Android architecture, signing, and permissions, see [**android/README.md**](<file:///home/iftakhar/Poridhi/puku%20ai/android/README.md>).
+For more details on Android architecture, signing, and permissions, see [**android/README.md**](<android/README.md>).
 
 ---
 
 ## 📚 Documentation Index
 
-- [**System Architecture & Components**](<file:///home/iftakhar/Poridhi/puku%20ai/docs/ARCHITECTURE.md>) — State management, keyboard avoidance engine, routing, and UI design tokens.
-- [**Over-The-Air (OTA) Updates Guide**](<file:///home/iftakhar/Poridhi/puku%20ai/docs/OTA_UPDATES.md>) — EAS configuration, GitHub Actions workflow, and device update lifecycles.
-- [**API, Authentication & Desktop Relay**](<file:///home/iftakhar/Poridhi/puku%20ai/docs/API_AND_AUTH.md>) — OAuth PKCE protocol, session tokens, and desktop command-line pairing.
-- [**Android Native Guide**](<file:///home/iftakhar/Poridhi/puku%20ai/android/README.md>) — Gradle build commands, APK generation, and soft-keyboard IME handling.
-- [**iOS Native Guide**](<file:///home/iftakhar/Poridhi/puku%20ai/ios/README.md>) — CocoaPods setup, URL schemes, and Simulator execution.
+- [**System Architecture & Components**](<docs/ARCHITECTURE.md>) — State management, keyboard avoidance engine, routing, and UI design tokens.
+- [**Over-The-Air (OTA) Updates Guide**](<docs/OTA_UPDATES.md>) — EAS configuration, GitHub Actions workflow, and device update lifecycles.
+- [**API, Authentication & Desktop Relay**](<docs/API_AND_AUTH.md>) — OAuth PKCE protocol, session tokens, and desktop command-line pairing.
+- [**Android Native Guide**](<android/README.md>) — Gradle build commands, APK generation, and soft-keyboard IME handling.
+- [**iOS Native Guide**](<ios/README.md>) — CocoaPods setup, URL schemes, and Simulator execution.

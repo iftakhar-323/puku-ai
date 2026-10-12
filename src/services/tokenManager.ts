@@ -7,11 +7,13 @@
  * - Single-flight refresh coordination (prevents concurrent duplicate refresh requests)
  * - Refresh token rotation support
  * - Session expiration notification
- * - Atomic AsyncStorage persistence
+ * - Access/refresh tokens in encrypted storage (secureStorage); flags in AsyncStorage
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ENV } from '../config/env';
+import { secureStorage } from './secureStorage';
+import { ignore } from '../utils/devLog';
 import { extractJwtData } from '../utils/auth';
 
 export const TOKEN_KEYS = {
@@ -93,8 +95,8 @@ export class TokenManager {
   }> {
     try {
       const [token, refresh, exp] = await Promise.all([
-        AsyncStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN),
-        AsyncStorage.getItem(TOKEN_KEYS.REFRESH_TOKEN),
+        secureStorage.getItem(TOKEN_KEYS.ACCESS_TOKEN),
+        secureStorage.getItem(TOKEN_KEYS.REFRESH_TOKEN),
         AsyncStorage.getItem(TOKEN_KEYS.EXPIRES_AT),
       ]);
 
@@ -107,7 +109,9 @@ export class TokenManager {
       if (this.accessToken && !this.expiresAt) {
         this.expiresAt = this.computeExpiresAt(this.accessToken);
         if (this.expiresAt) {
-          AsyncStorage.setItem(TOKEN_KEYS.EXPIRES_AT, this.expiresAt.toString()).catch(() => {});
+          AsyncStorage.setItem(TOKEN_KEYS.EXPIRES_AT, this.expiresAt.toString()).catch(
+            ignore('tokenManager.expiresAt')
+          );
         }
       }
 
@@ -144,12 +148,12 @@ export class TokenManager {
     this.isLoaded = true;
 
     const ops: Promise<void>[] = [
-      AsyncStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, bundle.accessToken),
+      secureStorage.setItem(TOKEN_KEYS.ACCESS_TOKEN, bundle.accessToken),
       AsyncStorage.setItem(TOKEN_KEYS.IS_LOGGED_IN, 'true'),
     ];
 
     if (this.refreshTokenVal) {
-      ops.push(AsyncStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, this.refreshTokenVal));
+      ops.push(secureStorage.setItem(TOKEN_KEYS.REFRESH_TOKEN, this.refreshTokenVal));
     }
     if (this.expiresAt) {
       ops.push(AsyncStorage.setItem(TOKEN_KEYS.EXPIRES_AT, this.expiresAt.toString()));
@@ -170,8 +174,8 @@ export class TokenManager {
     this.isLoaded = true;
 
     await Promise.all([
-      AsyncStorage.removeItem(TOKEN_KEYS.ACCESS_TOKEN),
-      AsyncStorage.removeItem(TOKEN_KEYS.REFRESH_TOKEN),
+      secureStorage.removeItem(TOKEN_KEYS.ACCESS_TOKEN),
+      secureStorage.removeItem(TOKEN_KEYS.REFRESH_TOKEN),
       AsyncStorage.removeItem(TOKEN_KEYS.EXPIRES_AT),
       AsyncStorage.removeItem(TOKEN_KEYS.IS_LOGGED_IN),
       AsyncStorage.setItem(TOKEN_KEYS.IS_LOGGED_OUT, 'true'),
@@ -327,6 +331,13 @@ export class TokenManager {
     }
 
     return this.accessToken;
+  }
+
+  /**
+   * Convenience alias for ensureValidToken
+   */
+  async getValidAccessToken(): Promise<string | null> {
+    return this.ensureValidToken();
   }
 
   private async handleAuthFailure() {

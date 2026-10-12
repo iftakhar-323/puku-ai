@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Puku AI</string>
+    <!-- app_name comes from each product flavor's resValue in app/build.gradle -->
     <string name="expo_runtime_version">1.0.0</string>
 </resources>
 
