@@ -133,4 +133,23 @@ describe('Puku Bot Workspace', () => {
     await ReactTestRenderer.act(async () => app!.clearBotWorkspaceRequest());
     expect(app!.botWorkspaceRequest).toBeNull();
   });
+
+  test('the drawer lists the real Bots, and an explicit pick is its own signal', async () => {
+    let app: ReturnType<typeof useApp> | null = null;
+    function Probe() {
+      app = useApp();
+      return null;
+    }
+    await render(<Probe />);
+    await ReactTestRenderer.act(async () =>
+      app!.setAvailableBots([{ id: 'research-desk', name: 'Research Desk' }])
+    );
+    expect(app!.availableBots.map(b => b.id)).toEqual(['research-desk']);
+
+    // Opening a conversation does not count as picking its Bot.
+    expect(app!.botPick).toBeNull();
+    await ReactTestRenderer.act(async () => app!.selectBot('research-desk'));
+    expect(app!.botPick?.botId).toBe('research-desk');
+    expect(app!.activeBotId).toBe('research-desk');
+  });
 });

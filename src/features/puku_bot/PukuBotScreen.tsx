@@ -440,6 +440,8 @@ export function PukuBotScreen() {
     botWorkspaceRequest,
     clearBotWorkspaceRequest,
     isDrawerOpen,
+    botPick,
+    setAvailableBots: setDrawerBots,
   } = useApp();
   const { isActive: isRemoteActive, liveRelaySessions } = useRemoteSession();
   const isTerminalLive = isRemoteActive || liveRelaySessions.length > 0;
@@ -649,6 +651,15 @@ export function PukuBotScreen() {
     const timer = setTimeout(
       () => {
         clearBotWorkspaceRequest();
+        // Every Workspace panel is the person's own data: sign in first.
+        if (!pukuBotApi.isAuthenticated()) {
+          const name = { skills: 'Skills', memory: 'Memory', agents: 'Agents', marketplace: 'the Marketplace' }[panel];
+          Alert.alert('Sign in to Puku Bot', `Sign in to use ${name}.`, [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Sign in', onPress: () => handleConnectAuth() },
+          ]);
+          return;
+        }
         if (panel === 'skills' || panel === 'memory') {
           setWorkspaceSheet(null);
           setActiveSettingsTab(panel);
@@ -674,8 +685,29 @@ export function PukuBotScreen() {
     const bots = await pukuBotApi.getBots().catch(() => null);
     if (bots && bots.length > 0) setAvailableBots(bots);
     setSelectedBotId(botId);
+    setBotPickedByUser(true);
     handleNewConversation();
   };
+
+  // The drawer shows the real roster, not placeholders.
+  useEffect(() => {
+    if (availableBots.length > 0) {
+      setDrawerBots(availableBots.map(b => ({ id: b.id, name: b.name, description: b.title || b.description })));
+    }
+    // setDrawerBots is a state setter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableBots]);
+
+  // A Bot picked in the drawer is the one the next message goes to.
+  useEffect(() => {
+    if (!botPick || !availableBots.some(b => b.id === botPick.botId)) return;
+    setSelectedBotId(botPick.botId);
+    setBotPickedByUser(true);
+    // A conversation belongs to its Bot: picking another starts a new one.
+    if (activeConversation && activeConversation.botId !== botPick.botId) handleNewConversation();
+    // Runs on the drawer's pick only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botPick]);
 
   // Initialize Puku Bot API
   useEffect(() => {
@@ -1100,7 +1132,9 @@ export function PukuBotScreen() {
       if (!conv) {
         // No Bot picked: let the deployment route the first message.
         conv = await pukuBotApi.createConversation(
-          botPickedByUser && serverBotId ? { botId: serverBotId } : { text: body || raw || displayText }
+          botPickedByUser && (serverBotId || selectedBotId)
+            ? { botId: serverBotId || selectedBotId }
+            : { text: body || raw || displayText }
         );
         const created = conv;
         openingConvIdRef.current = created.id;
@@ -1123,8 +1157,10 @@ export function PukuBotScreen() {
         conv.botIds && conv.botIds.length > 1 && serverBotId && conv.botIds.includes(serverBotId)
           ? serverBotId
           : undefined;
-      // A skill with nothing after it still needs some text to send.
-      const text = skill ? body || raw : raw;
+      // The text keeps the `/slug` as typed, as the web sends it: a server that
+      // takes `skills` adds the skill's instructions from that, and one that
+      // does not (production) still sees the command the Bot's skills answer to.
+      const text = raw;
 
       await followReply(conversationId, onEvent =>
         pukuBotApi.sendMessageStream(conversationId, text, uploaded, onEvent, {

@@ -91,6 +91,8 @@ interface AppContextValue {
   activeBotConversationId: string | null;
   activeBotId: string;
   availableBots: BotItem[];
+  /** The Bot screen's real roster (GET /bots), for the drawer's Bot switcher. */
+  setAvailableBots: (bots: BotItem[]) => void;
   selectBotConversation: (id: string | null) => void;
   /** Mirrors the server's conversation list (keeps any messages already loaded). */
   replaceBotConversations: (convs: BotConversation[]) => void;
@@ -98,6 +100,8 @@ interface AppContextValue {
   deleteBotConversation: (id: string) => void;
   renameBotConversation: (id: string, title: string) => void;
   selectBot: (botId: string) => void;
+  /** The last Bot the person explicitly picked in the drawer; `at` tells repeat picks apart. */
+  botPick: { botId: string; at: number } | null;
   /** The Workspace panel the drawer last asked the Bot screen to open; `at` tells repeat taps apart. */
   botWorkspaceRequest: { panel: BotWorkspacePanel; at: number } | null;
   openBotWorkspace: (panel: BotWorkspacePanel) => void;
@@ -185,7 +189,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [botConversations, setBotConversations] = useState<BotConversation[]>(INITIAL_BOT_CONVERSATIONS);
   const [activeBotConversationId, setActiveBotConversationId] = useState<string | null>(null);
   const [activeBotId, setActiveBotId] = useState<string>('general-assistant');
-  const [availableBots, _setAvailableBots] = useState<BotItem[]>(DEFAULT_AVAILABLE_BOTS);
+  const [availableBots, setAvailableBots] = useState<BotItem[]>(DEFAULT_AVAILABLE_BOTS);
   const logoutRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -1444,8 +1448,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const [botPick, setBotPick] = useState<{ botId: string; at: number } | null>(null);
   const selectBot = useCallback((botId: string) => {
     setActiveBotId(botId);
+    setBotPick({ botId, at: Date.now() });
   }, []);
 
   const [botWorkspaceRequest, setBotWorkspaceRequest] =
@@ -1535,12 +1541,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeBotConversationId,
         activeBotId,
         availableBots,
+        setAvailableBots,
         selectBotConversation,
         replaceBotConversations,
         createBotConversation,
         deleteBotConversation,
         renameBotConversation,
         selectBot,
+        botPick,
         botWorkspaceRequest,
         openBotWorkspace,
         clearBotWorkspaceRequest,
