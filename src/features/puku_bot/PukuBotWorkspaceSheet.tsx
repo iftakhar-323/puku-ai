@@ -97,7 +97,7 @@ export function PukuBotWorkspaceSheet({
     try {
       setAgents(await pukuBotApi.getAgents());
     } catch (err: any) {
-      setAgentsError(err?.message || 'Your agents could not be loaded.');
+      setAgentsError(err?.message || "Your agents couldn't be loaded.");
     }
   }, []);
 
@@ -107,7 +107,7 @@ export function PukuBotWorkspaceSheet({
     try {
       setTemplates(await pukuBotApi.getMarketplace(which ?? undefined));
     } catch (err: any) {
-      setTemplatesError(err?.message || 'The Marketplace could not be loaded.');
+      setTemplatesError(err?.message || "The Marketplace couldn't be loaded.");
     }
   }, []);
 

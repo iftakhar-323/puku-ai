@@ -245,6 +245,10 @@ export class PukuBotApiClient {
     return !!this.token;
   }
 
+  public hasServerToken(): boolean {
+    return !!this.token;
+  }
+
   public async setToken(token: string | null, user?: PukuBotUser | null): Promise<void> {
     this.token = token;
     this.user = user || null;

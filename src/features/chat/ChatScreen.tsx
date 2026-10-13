@@ -199,8 +199,8 @@ export function ChatScreen() {
           paddingTop: Math.max(insets.top, 12),
           paddingBottom:
             Platform.OS === 'android'
-              ? (keyboardHeight > 0 ? keyboardHeight : Math.max(insets.bottom, 12))
-              : Math.max(insets.bottom, 12),
+              ? Math.max(insets.bottom, 12)
+              : (keyboardHeight > 0 ? keyboardHeight : Math.max(insets.bottom, 12)),
         },
       ]}>
       {/* 1:1 Authentic Header with SidebarToggle, Terminal, Bot, and Theme toggle */}
@@ -253,13 +253,16 @@ export function ChatScreen() {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             contentContainerStyle={styles.listContent}
+            removeClippedSubviews={Platform.OS === 'android'}
+            maxToRenderPerBatch={10}
+            windowSize={11}
             onLayout={() => {
               if (messages.length > 0) {
                 flatListRef.current?.scrollToEnd({ animated: false });
               }
             }}
             onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: isGenerating })
+              flatListRef.current?.scrollToEnd({ animated: false })
             }
             renderItem={({ item, index }) => (
               <MessageBubble

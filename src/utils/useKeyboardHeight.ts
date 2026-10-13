@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { Keyboard, Platform, UIManager } from 'react-native';
 
 if (
   Platform.OS === 'android' &&
@@ -16,22 +16,12 @@ export function useKeyboardHeight() {
     const onShow = (e: any) => {
       const height = e?.endCoordinates?.height || 0;
       if (height > 0) {
-        if (Platform.OS === 'android') {
-          try {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          } catch {}
-        }
         setKeyboardHeight(height);
         setIsKeyboardVisible(true);
       }
     };
 
     const onHide = () => {
-      if (Platform.OS === 'android') {
-        try {
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        } catch {}
-      }
       setKeyboardHeight(0);
       setIsKeyboardVisible(false);
     };

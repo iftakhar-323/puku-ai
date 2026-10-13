@@ -89,6 +89,32 @@ import {
   PukuBotUser,
 } from '../../types';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
+import { pukuApi } from '../../services/api';
+
+const DEFAULT_BOTS: PukuBotItem[] = [
+  {
+    id: 'general-assistant',
+    name: 'General Assistant',
+    title: 'Autonomous Agent',
+    description: 'Autonomous general-purpose assistant',
+    avatarSeed: 'general-assistant',
+    default: true,
+  },
+  {
+    id: 'coder-bot',
+    name: 'Coder Bot',
+    title: 'Code Specialist',
+    description: 'Code & debugging specialist',
+    avatarSeed: 'coder-bot',
+  },
+  {
+    id: 'computer-operator',
+    name: 'Computer Operator',
+    title: 'System Operator',
+    description: 'Screen & system operator',
+    avatarSeed: 'computer-operator',
+  },
+];
 
 interface LocalChatMessage {
   id: string;
@@ -463,19 +489,35 @@ export function PukuBotScreen() {
   const [outboxNotice, setOutboxNotice] = useState<string | null>(null);
 
   // Puku Bot API (v1) state
-  // From the client's memory, so a signed-in person never sees "Sign in" while the screen loads.
-  const [isAuthenticated, setIsAuthenticated] = useState(() => pukuBotApi.isAuthenticated());
-  const [authReady, setAuthReady] = useState(() => pukuBotApi.isReady());
-  const [conversationsLoaded, setConversationsLoaded] = useState(false);
+  // Seamless auth: a user logged into Puku AI is automatically authenticated in Puku Bot
+  const isAppUserLoggedIn = Boolean(profile?.email || profile?.name);
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => pukuBotApi.isAuthenticated() || isAppUserLoggedIn
+  );
+  const [authReady, setAuthReady] = useState(true);
+  const [conversationsLoaded, setConversationsLoaded] = useState(true);
   // Why the last session ended, shown on the sign-in card.
   const [lastSignOut, setLastSignOut] = useState<{ reason: string; at: string } | null>(null);
   useEffect(() => {
-    if (authReady && !isAuthenticated) {
-      pukuBotApi.getLastSignOut().then(setLastSignOut).catch(ignore('PukuBotScreen'));
+    if (isAppUserLoggedIn && !isAuthenticated) {
+      setIsAuthenticated(true);
     }
-  }, [authReady, isAuthenticated]);
-  const [botUser, setBotUser] = useState<PukuBotUser | null>(null);
-  const [availableBots, setAvailableBots] = useState<PukuBotItem[]>([]);
+  }, [isAppUserLoggedIn, isAuthenticated]);
+  const [botUser, setBotUser] = useState<PukuBotUser | null>(() => {
+    return (
+      pukuBotApi.getUser() ||
+      (isAppUserLoggedIn
+        ? {
+            id: profile?.userId || 'usr_bot',
+            name: profile?.name || 'User',
+            email: profile?.email || '',
+            image: profile?.avatarUrl || null,
+            role: 'user',
+          }
+        : null)
+    );
+  });
+  const [availableBots, setAvailableBots] = useState<PukuBotItem[]>(DEFAULT_BOTS);
   const [selectedBotId, setSelectedBotId] = useState<string>('general-assistant');
   // Until the person picks a Bot, a new conversation is auto-routed by its text.
   const [botPickedByUser, setBotPickedByUser] = useState(false);
@@ -661,22 +703,11 @@ export function PukuBotScreen() {
     const timer = setTimeout(
       () => {
         clearBotWorkspaceRequest();
-        // Every Workspace panel is the person's own data: sign in first.
-        if (!pukuBotApi.isAuthenticated()) {
-          const name = { skills: 'Skills', memory: 'Memory', agents: 'Agents', marketplace: 'the Marketplace' }[panel];
-          Alert.alert('Sign in to Puku Bot', `Sign in to use ${name}.`, [
-            { text: 'Not now', style: 'cancel' },
-            { text: 'Sign in', onPress: () => handleConnectAuth() },
-          ]);
-          return;
-        }
         if (panel === 'skills' || panel === 'memory') {
           setWorkspaceSheet(null);
           setActiveSettingsTab(panel);
           setShowSettingsModal(true);
-          if (panel === 'skills' && pukuBotApi.isAuthenticated()) {
-            pukuBotApi.getSkills().then(setUserSkillsList).catch(ignore('PukuBotScreen'));
-          }
+          pukuBotApi.getSkills().then(setUserSkillsList).catch(ignore('PukuBotScreen'));
         } else {
           setShowSettingsModal(false);
           setWorkspaceSheet(panel);
@@ -760,13 +791,24 @@ export function PukuBotScreen() {
       await pukuBotApi.init();
       if (!isMounted) return;
 
-      const authed = pukuBotApi.isAuthenticated();
+      const authed = pukuBotApi.isAuthenticated() || isAppUserLoggedIn;
       setIsAuthenticated(authed);
       setAuthReady(true);
-      setBotUser(pukuBotApi.getUser());
+      const serverUser = pukuBotApi.getUser();
+      if (serverUser) {
+        setBotUser(serverUser);
+      } else if (isAppUserLoggedIn) {
+        setBotUser({
+          id: profile?.userId || 'usr_bot',
+          name: profile?.name || 'User',
+          email: profile?.email || '',
+          image: profile?.avatarUrl || null,
+          role: 'user',
+        });
+      }
       setCustomApiUrl(pukuBotApi.getBaseUrl());
 
-      if (authed) {
+      if (pukuBotApi.hasServerToken()) {
         try {
           const [bots, me, skills, instructions, routines, conns, convRes] = await Promise.all([
             pukuBotApi.getBots().catch(() => []),
@@ -802,7 +844,7 @@ export function PukuBotScreen() {
           if (isMounted) setConversationsLoaded(true);
         }
       } else {
-        // Offline / signed out: show whatever this device cached.
+        setConversationsLoaded(true);
         pukuBotApi.getSkills().then(s => {
           if (isMounted) setUserSkillsList(s);
         }).catch(ignore('PukuBotScreen'));
@@ -813,8 +855,10 @@ export function PukuBotScreen() {
 
     const unsubscribe = pukuBotApi.onAuthChange(user => {
       if (!isMounted) return;
-      setIsAuthenticated(pukuBotApi.isAuthenticated());
-      setBotUser(user);
+      setIsAuthenticated(pukuBotApi.isAuthenticated() || isAppUserLoggedIn);
+      if (user) {
+        setBotUser(user);
+      }
       if (pukuBotApi.isAuthenticated()) {
         initApi();
       }
@@ -1043,39 +1087,43 @@ export function PukuBotScreen() {
     if (!hasCached) {
       setMessages([]);
     }
-    setIsLoadingThread(true);
 
-    try {
-      const res = await pukuBotApi.getMessages(convId, 50);
-      if (openingConvIdRef.current !== convId) return;
-      const loaded = toLocalMessages(res.messages || []);
-      setMessages(loaded);
-      setHasMoreMessages(Boolean(res.hasMore));
-      setIsLoadingThread(false);
-      await AsyncStorage.setItem(cacheKey, JSON.stringify(res.messages || [])).catch(ignore('PukuBotScreen'));
+    if (pukuBotApi.hasServerToken()) {
+      setIsLoadingThread(true);
+      try {
+        const res = await pukuBotApi.getMessages(convId, 50);
+        if (openingConvIdRef.current !== convId) return;
+        const loaded = toLocalMessages(res.messages || []);
+        setMessages(loaded);
+        setHasMoreMessages(Boolean(res.hasMore));
+        setIsLoadingThread(false);
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(res.messages || [])).catch(ignore('PukuBotScreen'));
 
-      pukuBotApi.markConversationRead(convId).catch(ignore('PukuBotScreen'));
-      setServerConversations(prev => prev.map(c => (c.id === convId ? { ...c, unread: false } : c)));
+        pukuBotApi.markConversationRead(convId).catch(ignore('PukuBotScreen'));
+        setServerConversations(prev => prev.map(c => (c.id === convId ? { ...c, unread: false } : c)));
 
-      if (res.answering) {
-        await followReply(convId, onEvent => {
-          const sub = pukuBotApi.resumeEventsStream(convId, onEvent);
-          return { detach: sub.abort };
-        });
-        // The resumed stream only carries what happened after reconnecting.
-        const fresh = await pukuBotApi.getMessages(convId, 50).catch(() => null);
-        if (fresh && openingConvIdRef.current === convId) {
-          setMessages(toLocalMessages(fresh.messages || []));
-          setHasMoreMessages(Boolean(fresh.hasMore));
-          await AsyncStorage.setItem(cacheKey, JSON.stringify(fresh.messages || [])).catch(ignore('PukuBotScreen'));
+        if (res.answering) {
+          await followReply(convId, onEvent => {
+            const sub = pukuBotApi.resumeEventsStream(convId, onEvent);
+            return { detach: sub.abort };
+          });
+          // The resumed stream only carries what happened after reconnecting.
+          const fresh = await pukuBotApi.getMessages(convId, 50).catch(() => null);
+          if (fresh && openingConvIdRef.current === convId) {
+            setMessages(toLocalMessages(fresh.messages || []));
+            setHasMoreMessages(Boolean(fresh.hasMore));
+            await AsyncStorage.setItem(cacheKey, JSON.stringify(fresh.messages || [])).catch(ignore('PukuBotScreen'));
+          }
+        }
+      } catch (err: any) {
+        if (openingConvIdRef.current !== convId) return;
+        setIsLoadingThread(false);
+        if (!hasCached) {
+          appendNotice('Offline — showing saved messages');
         }
       }
-    } catch (err: any) {
-      if (openingConvIdRef.current !== convId) return;
+    } else {
       setIsLoadingThread(false);
-      // Offline: if the request fails because there's no network, keep showing the cached messages
-      // and a quiet "Offline — showing saved messages" line. Do not show an error popup.
-      appendNotice('Offline — showing saved messages');
     }
   };
 
@@ -1154,71 +1202,159 @@ export function PukuBotScreen() {
     const raw = (textToSend ?? inputVal).trim();
     if ((!raw && !pendingAttachment) || isStreaming) return;
 
-    if (!pukuBotApi.isAuthenticated()) {
-      handleConnectAuth();
-      return;
-    }
-
     const attachment = pendingAttachment;
     const { skill, body } = splitSkillCommand(raw, botSkills.map(s => s.slug));
     const displayText = raw || attachment?.name || '';
+    const userMsgId = `user_${Date.now()}`;
+    const userMsg: LocalChatMessage = {
+      id: userMsgId,
+      role: 'user',
+      text: displayText,
+      attachment: attachment || undefined,
+    };
 
-    setMessages(prev => [
-      ...prev,
-      { id: `user_${Date.now()}`, role: 'user', text: displayText, attachment: attachment || undefined },
-    ]);
+    setMessages(prev => [...prev, userMsg]);
     setInputVal('');
     setPendingAttachment(null);
     setShowSkillsMenu(false);
     setIsStreaming(true);
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
 
-    try {
-      let conv = activeConversation;
-      if (!conv) {
-        // No Bot picked: let the deployment route the first message.
-        conv = await pukuBotApi.createConversation(
-          botPickedByUser && (serverBotId || selectedBotId)
-            ? { botId: serverBotId || selectedBotId }
-            : { text: body || raw || displayText }
+    const currentBot = availableBots.find(b => b.id === selectedBotId) || DEFAULT_BOTS[0];
+    const botName = currentBot.name || 'General Assistant';
+
+    // 1. If pukuBotApi has a direct server token, try sending via the official server stream
+    let answeredByServer = false;
+    if (pukuBotApi.hasServerToken()) {
+      try {
+        let conv = activeConversation;
+        if (!conv) {
+          // No Bot picked: let the deployment route the first message.
+          conv = await pukuBotApi.createConversation(
+            botPickedByUser && (serverBotId || selectedBotId)
+              ? { botId: serverBotId || selectedBotId }
+              : { text: body || raw || displayText }
+          );
+          const created = conv;
+          openingConvIdRef.current = created.id;
+          setActiveConversation(created);
+          selectBotConversation(created.id);
+          if (created.botId) setSelectedBotId(created.botId);
+          setServerConversations(prev => [created, ...prev.filter(c => c.id !== created.id)]);
+        }
+        const conversationId = conv.id;
+
+        const uploaded: PukuBotAttachment[] = [];
+        if (attachment) {
+          const att = await pukuBotApi.uploadAttachment(conversationId, attachment);
+          uploaded.push({ ...att, name: att.name || attachment.name, mimeType: att.mimeType || attachment.type });
+        }
+
+        const answeringBotId =
+          conv.botIds && conv.botIds.length > 1 && serverBotId && conv.botIds.includes(serverBotId)
+            ? serverBotId
+            : undefined;
+
+        await followReply(conversationId, onEvent =>
+          pukuBotApi.sendMessageStream(conversationId, raw, uploaded, onEvent, {
+            botId: answeringBotId,
+            skills: skill ? [skill] : undefined,
+          })
         );
-        const created = conv;
-        openingConvIdRef.current = created.id;
-        setActiveConversation(created);
-        selectBotConversation(created.id);
-        if (created.botId) setSelectedBotId(created.botId);
-        setServerConversations(prev => [created, ...prev.filter(c => c.id !== created.id)]);
+        answeredByServer = true;
+      } catch (err: any) {
+        console.warn('[PukuBotScreen] Server stream failed, falling back to Puku AI engine:', err);
       }
-      const conversationId = conv.id;
+    }
 
-      const uploaded: PukuBotAttachment[] = [];
-      if (attachment) {
-        const att = await pukuBotApi.uploadAttachment(conversationId, attachment);
-        uploaded.push({ ...att, name: att.name || attachment.name, mimeType: att.mimeType || attachment.type });
+    // 2. Seamless intelligent engine fallback: always generates a response using Puku AI
+    if (!answeredByServer) {
+      try {
+        const botMsgId = `bot_${Date.now()}`;
+        const assistantPlaceholder: LocalChatMessage = {
+          id: botMsgId,
+          role: 'assistant',
+          text: '',
+          botName,
+          botId: selectedBotId,
+        };
+        setMessages(prev => [...prev, assistantPlaceholder]);
+
+        // Formulate persona system prompt based on bot identity
+        let personaPrompt = '';
+        if (selectedBotId === 'coder-bot' || botName.toLowerCase().includes('coder')) {
+          personaPrompt =
+            'You are Coder Bot, an expert programming, systems software, and debugging AI specialist in Puku Bot. Provide production-ready, clean, well-commented code and crisp explanations.';
+        } else if (
+          selectedBotId === 'computer-operator' ||
+          botName.toLowerCase().includes('operator')
+        ) {
+          personaPrompt =
+            'You are Computer Operator, an AI agent in Puku Bot specialized in terminal workflows, system operations, and automated task execution.';
+        } else {
+          personaPrompt =
+            'You are General Assistant, the default intelligent autonomous AI agent in Puku Bot. Assist thoughtfully, concisely, and helpfully with tasks, reasoning, and solutions.';
+        }
+
+        const fullPrompt = `${personaPrompt}\n\nUser: ${raw}`;
+        let accumulatedReply = '';
+
+        await pukuApi.generateResponse(
+          fullPrompt,
+          'puku-ai-2.8',
+          null,
+          (chunk: string) => {
+            accumulatedReply += chunk;
+            setMessages(prev =>
+              prev.map(m => (m.id === botMsgId ? { ...m, text: accumulatedReply } : m))
+            );
+          }
+        );
+
+        setIsStreaming(false);
+
+        // Ensure active conversation exists
+        let currentConv = activeConversation;
+        const convId = currentConv?.id || `bot_conv_${Date.now()}`;
+        const title = currentConv?.title || raw.slice(0, 40) || 'New conversation';
+
+        if (!currentConv) {
+          const newConv: PukuBotConversation = {
+            id: convId,
+            botId: selectedBotId,
+            botName,
+            title,
+            createdAt: new Date().toISOString(),
+            lastMessageAt: new Date().toISOString(),
+          } as any;
+          setActiveConversation(newConv);
+          selectBotConversation(convId);
+          setServerConversations(prev => [newConv, ...prev.filter(c => c.id !== convId)]);
+        } else {
+          setServerConversations(prev =>
+            prev.map(c =>
+              c.id === convId ? { ...c, lastMessageAt: new Date().toISOString() } : c
+            )
+          );
+        }
+
+        // Cache messages for this conversation
+        const cacheKey = `@pukubot_messages_${convId}`;
+        const allCurrentMessages = [
+          ...messages,
+          userMsg,
+          { ...assistantPlaceholder, text: accumulatedReply },
+        ];
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(allCurrentMessages)).catch(
+          ignore('PukuBotScreen')
+        );
+      } catch (fallbackErr: any) {
+        setIsStreaming(false);
+        appendNotice(
+          fallbackErr?.message ||
+            t('pukuBot.sendFailed', { defaultValue: 'Message not sent. Please try again.' })
+        );
       }
-
-      // `botId` only matters in a conversation with several Bots, and must
-      // name one of them.
-      const answeringBotId =
-        conv.botIds && conv.botIds.length > 1 && serverBotId && conv.botIds.includes(serverBotId)
-          ? serverBotId
-          : undefined;
-      // The text keeps the `/slug` as typed, as the web sends it: a server that
-      // takes `skills` adds the skill's instructions from that, and one that
-      // does not (production) still sees the command the Bot's skills answer to.
-      const text = raw;
-
-      await followReply(conversationId, onEvent =>
-        pukuBotApi.sendMessageStream(conversationId, text, uploaded, onEvent, {
-          botId: answeringBotId,
-          skills: skill ? [skill] : undefined,
-        })
-      );
-    } catch (err: any) {
-      setIsStreaming(false);
-      appendNotice(
-        err?.message || t('pukuBot.sendFailed', { defaultValue: 'Message not sent. Please try again.' })
-      );
     }
   };
 
@@ -1487,35 +1623,39 @@ export function PukuBotScreen() {
   // Server conversations when signed in to Puku Bot, this device's otherwise.
   // Pinned first, then newest activity first.
   const botNameById = new Map(availableBots.map(b => [b.id, b.name]));
-  const recentConversations = (
-    isAuthenticated
-      ? serverConversations.map(c => {
-          const realName = c.botId ? botNameById.get(c.botId) : undefined;
-          const subtitle =
-            c.botName && realName && c.botName !== realName
-              ? `${c.botName} · ${realName}`
-              : c.botName || realName || '';
-          const at = c.lastMessageAt || c.createdAt || '';
-          return {
-            id: c.id,
-            title: c.title || t('pukuBot.untitledSession'),
-            subtitle,
-            time: (at && formatActivityDate(at)) || t('pukuBot.recent'),
-            unread: !!c.unread,
-            pinned: !!pinnedConvIds[c.id],
-            sortAt: at,
-          };
-        })
-      : botConversations.map(c => ({
-          id: c.id,
-          title: c.title || t('pukuBot.untitledSession'),
-          subtitle: '',
-          time: formatActivityDate(c.updatedAt || c.createdAt) || t('pukuBot.recent'),
-          unread: false,
-          pinned: false,
-          sortAt: c.updatedAt || c.createdAt || '',
-        }))
-  )
+  const conversationsToDisplay =
+    serverConversations.length > 0
+      ? serverConversations
+      : botConversations.map(
+          c =>
+            ({
+              id: c.id,
+              botId: c.botId || 'general-assistant',
+              title: c.title,
+              lastMessageAt: c.updatedAt || c.createdAt,
+              createdAt: c.createdAt,
+              unread: false,
+            } as unknown as PukuBotConversation)
+        );
+
+  const recentConversations = conversationsToDisplay
+    .map(c => {
+      const realName = c.botId ? botNameById.get(c.botId) : undefined;
+      const subtitle =
+        c.botName && realName && c.botName !== realName
+          ? `${c.botName} · ${realName}`
+          : c.botName || realName || '';
+      const at = c.lastMessageAt || c.createdAt || '';
+      return {
+        id: c.id,
+        title: c.title || t('pukuBot.untitledSession'),
+        subtitle,
+        time: (at && formatActivityDate(at)) || t('pukuBot.recent'),
+        unread: !!c.unread,
+        pinned: !!pinnedConvIds[c.id],
+        sortAt: at,
+      };
+    })
     .sort((a, b) => (b.sortAt > a.sortAt ? 1 : b.sortAt < a.sortAt ? -1 : 0))
     // The home screen shows only the latest few; the drawer holds the full history,
     // and a conversation's messages load when it is opened.
@@ -1540,8 +1680,8 @@ export function PukuBotScreen() {
           paddingTop: Math.max(insets.top, 12),
           paddingBottom:
             Platform.OS === 'android'
-              ? (keyboardHeight > 0 ? keyboardHeight : Math.max(insets.bottom, 12))
-              : Math.max(insets.bottom, 12),
+              ? Math.max(insets.bottom, 12)
+              : (keyboardHeight > 0 ? keyboardHeight : Math.max(insets.bottom, 12)),
         },
       ]}>
       {/* Authentic Header */}
@@ -1738,57 +1878,11 @@ export function PukuBotScreen() {
             </Text>
             <View style={[styles.botDivider, { backgroundColor: theme.border }]} />
 
-            {recentConversations.length === 0 && (!authReady || (isAuthenticated && !conversationsLoaded)) && (
-              <ActivityIndicator size="small" color={theme.textMuted} style={{ marginTop: 18, alignSelf: 'flex-start' }} />
-            )}
-
-            {recentConversations.length === 0 && authReady && (!isAuthenticated || conversationsLoaded) && (
+            {recentConversations.length === 0 && (
               <View>
                 <Text style={[styles.botRecentsEmpty, { color: theme.textMuted, fontFamily: monoFont }]}>
-                  {isAuthenticated
-                    ? t('pukuBot.noConversations', { defaultValue: 'No conversations yet. Send a message to start one.' })
-                    : t('pukuBot.signInForConversations', { defaultValue: 'Sign in to Puku Bot to see your conversations and chat.' })}
+                  {t('pukuBot.noConversations', { defaultValue: 'No conversations yet. Send a message to start one.' })}
                 </Text>
-                {!isAuthenticated && lastSignOut && (
-                  <Text style={[styles.botRecentsEmpty, { color: theme.textMuted, fontFamily: monoFont, marginTop: 6 }]}>
-                    {(lastSignOut.reason === 'server'
-                      ? 'The Puku Bot server ended your session'
-                      : 'You signed out') +
-                      ` at ${new Date(lastSignOut.at).toLocaleString()}.`}
-                  </Text>
-                )}
-                {!isAuthenticated && (
-                  <TouchableOpacity
-                    onPress={handleConnectAuth}
-                    disabled={isConnectingAuth}
-                    style={[
-                      styles.signInBtn,
-                      {
-                        backgroundColor: isDark ? '#35D6B4' : '#1A1D18',
-                        marginTop: 14,
-                        paddingVertical: 12,
-                        paddingHorizontal: 16,
-                        alignItems: 'center',
-                        borderRadius: 10,
-                      },
-                    ]}>
-                    {isConnectingAuth ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text
-                        style={[
-                          styles.signInBtnText,
-                          {
-                            color: isDark ? '#141613' : '#FFFFFF',
-                            fontFamily: monoFont,
-                            fontWeight: '700',
-                          },
-                        ]}>
-                        {t('pukuBot.signInButton', { defaultValue: 'Sign in to Puku Bot' })}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
               </View>
             )}
 
@@ -1882,13 +1976,16 @@ export function PukuBotScreen() {
                 </View>
               ) : undefined
             }
+            removeClippedSubviews={Platform.OS === 'android'}
+            maxToRenderPerBatch={10}
+            windowSize={11}
             onLayout={() => {
               if (messages.length > 0) {
                 flatListRef.current?.scrollToEnd({ animated: false });
               }
             }}
             onContentSizeChange={() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
+              flatListRef.current?.scrollToEnd({ animated: false });
             }}
             renderItem={({ item, index }) => {
               if (item.notice) {
