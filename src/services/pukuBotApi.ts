@@ -378,12 +378,13 @@ export class PukuBotApiClient {
       if (savedUrl && __DEV__) {
         this.baseUrl = savedUrl.replace(/\/+$/, '');
       }
-      if (savedToken) {
+      const appToken = tokenManager.getAccessTokenSync();
+      if (savedToken && savedToken !== appToken) {
         this.token = savedToken;
       } else {
-        const appToken = tokenManager.getAccessTokenSync();
-        if (appToken) {
-          this.token = appToken;
+        this.token = null;
+        if (savedToken && savedToken === appToken) {
+          await secureStorage.removeItem(STORAGE_KEYS.TOKEN).catch(() => {});
         }
       }
       if (savedUser) {
@@ -422,7 +423,7 @@ export class PukuBotApiClient {
   }
 
   public getToken(): string | null {
-    return this.token || tokenManager.getAccessTokenSync();
+    return this.token;
   }
 
   public getUser(): PukuBotUser | null {
@@ -430,11 +431,12 @@ export class PukuBotApiClient {
   }
 
   public isAuthenticated(): boolean {
-    return !!this.getToken();
+    return Boolean(this.token || tokenManager.getAccessTokenSync());
   }
 
   public hasServerToken(): boolean {
-    return !!this.getToken();
+    const appToken = tokenManager.getAccessTokenSync();
+    return Boolean(this.token && this.token !== appToken);
   }
 
   public async setToken(token: string | null, user?: PukuBotUser | null): Promise<void> {
@@ -684,7 +686,7 @@ export class PukuBotApiClient {
    * session has ended.
    */
   public async sessionRejected(): Promise<boolean> {
-    if (!this.token) return true;
+    if (!this.token) return false;
     if (!this.rejecting) {
       this.rejecting = (async () => {
         const res = await fetch(`${this.baseUrl}/me`, { headers: this.getAuthHeaders() }).catch(

@@ -881,9 +881,14 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     jest.spyOn(tokenManager, 'getAccessTokenSync').mockReturnValue('app_token_123');
     (client as any).token = null;
 
-    expect(client.getToken()).toBe('app_token_123');
-    expect(client.hasServerToken()).toBe(true);
+    expect(client.getToken()).toBeNull();
+    expect(client.hasServerToken()).toBe(false);
     expect(client.isAuthenticated()).toBe(true);
+
+    (client as any).token = 'server_token_456';
+    expect(client.getToken()).toBe('server_token_456');
+    expect(client.hasServerToken()).toBe(true);
+    (client as any).token = null;
 
     expect(DEFAULT_AGENTS.length).toBeGreaterThanOrEqual(3);
     expect(DEFAULT_TEMPLATES.length).toBeGreaterThanOrEqual(8);
