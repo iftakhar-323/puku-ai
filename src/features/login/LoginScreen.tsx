@@ -44,6 +44,7 @@ import {
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { useKeyboardHeight } from '../../utils/useKeyboardHeight';
 import { ignore } from '../../utils/devLog';
+import * as Sentry from '@sentry/react-native';
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -289,17 +290,26 @@ export function LoginScreen() {
       const errBody = await response.json().catch(() => null);
       setIsGoogleModalOpen(false);
       setIsOAuthWaiting(false);
+      const failReason =
+        errBody?.error_description ||
+        errBody?.error ||
+        t('login.invalidAuthorizationCode');
+      Sentry.captureMessage(`Google OAuth token exchange failed: ${failReason}`, {
+        level: 'error',
+        tags: { feature: 'auth', flow: 'google_oauth' },
+        extra: { status: response.status, errBody },
+      });
       showSnackBar(
         t('login.googleSignInFailed', {
-          reason:
-            errBody?.error_description ||
-            errBody?.error ||
-            t('login.invalidAuthorizationCode'),
+          reason: failReason,
         })
       );
     } catch (err: any) {
       setIsGoogleModalOpen(false);
       setIsOAuthWaiting(false);
+      Sentry.captureException(err, {
+        tags: { feature: 'auth', flow: 'google_oauth_callback' },
+      });
       showSnackBar(t('login.signInError', { reason: err.message || t('login.networkError') }));
     }
   };
@@ -395,6 +405,10 @@ export function LoginScreen() {
         setAuthStatusMessage(t('login.completeLoginInBrowser'));
         await Linking.openURL(fallbackUrl);
       } catch (linkErr: any) {
+        Sentry.captureException(linkErr, {
+          tags: { feature: 'auth', flow: 'google_signin_browser_fallback' },
+          extra: { initialError: err?.message },
+        });
         showSnackBar(
           t('login.failedToOpenGoogleSignIn', { reason: err.message || linkErr.message })
         );
@@ -469,6 +483,10 @@ export function LoginScreen() {
       }, 1200);
     } catch (e: any) {
       setIsEmailSubmitting(false);
+      Sentry.captureException(e, {
+        tags: { feature: 'auth', flow: 'email_submit' },
+        extra: { email: emailInput.trim() },
+      });
       setEmailErrorMessage(e.message || t('login.loginFailed'));
     }
   };

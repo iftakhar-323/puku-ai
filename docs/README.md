@@ -35,3 +35,4 @@ Welcome to the comprehensive technical documentation for **Puku AI Mobile** (`pu
 ### 📁 Project Architecture & File Hierarchy
 - Complete file tree: [PROJECT_STRUCTURE.md#full-directory-tree](./PROJECT_STRUCTURE.md#full-directory-tree)
 - State management flow: [SERVICES_AND_STATE.md#1-react-context-architecture](./SERVICES_AND_STATE.md#1-react-context-architecture)
+

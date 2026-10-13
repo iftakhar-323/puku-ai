@@ -168,3 +168,4 @@ src/components/
 | `devLog.ts` | Safe conditional logging utility avoiding console spam in production builds. |
 | `sourceExtractor.ts` | Parses assistant text and tool call results to extract clean source citations and URLs. |
 | `useKeyboardHeight.ts` | Custom hook calculating accurate keyboard height across both iOS and Android. |
+

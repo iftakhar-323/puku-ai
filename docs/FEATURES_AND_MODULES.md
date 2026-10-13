@@ -90,3 +90,4 @@ Comprehensive settings center to customize the app appearance, developer options
 - **Font Selection:** Toggle between standard system typography and monospace programming fonts.
 - **Language Localization:** Multi-language support (English, Bengali) via `react-i18next`.
 - **Usage & Quotas:** Token usage meters and subscription tier management.
+

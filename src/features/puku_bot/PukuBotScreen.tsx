@@ -73,6 +73,8 @@ export { parseBotContent, formatToolDisplay };
 import { PukuBotComposer } from './PukuBotComposer';
 import { PukuBotSettingsModal, SettingsTab, MAX_INSTRUCTIONS_LENGTH } from './PukuBotSettingsModal';
 import { PukuBotSelectModal } from './PukuBotSelectModal';
+import * as Sentry from '@sentry/react-native';
+import { langfuse } from '../../services/langfuse';
 
 const DEFAULT_BOTS: PukuBotItem[] = [
   {
@@ -731,7 +733,7 @@ export function PukuBotScreen() {
   const followReply = (
     conversationId: string,
     start: (onEvent: (event: PukuBotTurnEvent) => void) => { detach: () => void }
-  ): Promise<void> =>
+  ): Promise<{ text: string; toolCalls: PukuBotToolCall[] }> =>
     new Promise((resolve, reject) => {
       const assistantMsgId = `reply_${Date.now()}`;
       let text = '';
@@ -757,7 +759,7 @@ export function PukuBotScreen() {
           )
         );
         if (text.trim().length > 0 || (toolCalls && toolCalls.length > 0)) {
-          resolve();
+          resolve({ text, toolCalls: [...toolCalls] });
         } else {
           reject(new Error('Server returned empty reply'));
         }
@@ -1040,6 +1042,7 @@ export function PukuBotScreen() {
   const handleSend = async (textToSend?: string) => {
     const raw = (textToSend ?? inputVal).trim();
     if ((!raw && !pendingAttachment) || isStreaming) return;
+    const sendStartTime = Date.now();
 
     const attachment = pendingAttachment;
     const { skill, body } = splitSkillCommand(raw, botSkills.map(s => s.slug));
@@ -1112,7 +1115,7 @@ export function PukuBotScreen() {
           setTimeout(() => reject(new Error('Server reply timeout')), 5000)
         );
 
-        await Promise.race([
+        const result = await Promise.race([
           followReply(conversationId, onEvent =>
             pukuBotApi.sendMessageStream(conversationId, raw, uploaded, onEvent, {
               botId: answeringBotId,
@@ -1122,8 +1125,33 @@ export function PukuBotScreen() {
           serverTimeout,
         ]);
         answeredByServer = true;
+
+        langfuse.traceGeneration({
+          name: 'puku-bot-turn',
+          userId: profile?.email || profile?.name || 'anonymous',
+          sessionId: conversationId,
+          model: `puku-bot-${selectedBotId}`,
+          prompt: [{ role: 'user', content: raw }],
+          completion: result?.text || '',
+          metadata: {
+            botId: selectedBotId,
+            botName,
+            toolCalls: result?.toolCalls,
+            hasAttachments: uploaded.length > 0,
+            channel: 'server-stream',
+          },
+          startTime: sendStartTime,
+          endTime: Date.now(),
+          level: 'DEFAULT',
+        }).catch(ignore('PukuBotScreen:Langfuse'));
       } catch (err: any) {
         console.warn('[PukuBotScreen] Server stream failed or timed out, falling back to Puku AI engine:', err);
+        Sentry.addBreadcrumb({
+          category: 'puku_bot',
+          message: 'Server stream failed, falling back to Puku AI engine',
+          level: 'warning',
+          data: { error: err?.message, conversationId: convId, botId: selectedBotId },
+        });
       }
     }
 
@@ -1200,6 +1228,29 @@ export function PukuBotScreen() {
 
         setIsStreaming(false);
 
+        // Langfuse trace for Puku AI fallback generation
+        langfuse.traceGeneration({
+          name: 'puku-bot-fallback-generation',
+          userId: profile?.email || profile?.name || 'anonymous',
+          sessionId: convId,
+          model: activeModelToUse,
+          prompt: [
+            { role: 'system', content: personaPrompt },
+            { role: 'user', content: raw },
+          ],
+          completion: accumulatedReply,
+          metadata: {
+            botId: selectedBotId,
+            botName,
+            isSearchQuery,
+            toolCalls: searchToolCall ? [searchToolCall] : undefined,
+            channel: 'local-fallback',
+          },
+          startTime: sendStartTime,
+          endTime: Date.now(),
+          level: 'DEFAULT',
+        }).catch(ignore('PukuBotScreen:Langfuse'));
+
         // Save assistant reply to AppContext and cache
         addBotMessage(convId, { role: 'assistant', text: accumulatedReply });
 
@@ -1217,6 +1268,24 @@ export function PukuBotScreen() {
         );
       } catch (fallbackErr: any) {
         setIsStreaming(false);
+        Sentry.captureException(fallbackErr, {
+          tags: { feature: 'puku_bot', botId: selectedBotId },
+          extra: { prompt: raw, convId },
+        });
+        langfuse.traceGeneration({
+          name: 'puku-bot-fallback-generation-failed',
+          userId: profile?.email || profile?.name || 'anonymous',
+          sessionId: convId,
+          model: (selectedModel as ChatModelType) || settings.activeModel || 'puku-ai-2.7',
+          prompt: [{ role: 'user', content: raw }],
+          completion: fallbackErr?.message || 'Error generating response',
+          metadata: { error: String(fallbackErr) },
+          startTime: sendStartTime,
+          endTime: Date.now(),
+          level: 'ERROR',
+          statusMessage: fallbackErr?.message || 'Failed',
+        }).catch(ignore('PukuBotScreen:Langfuse'));
+
         appendNotice(
           fallbackErr?.message ||
             t('pukuBot.sendFailed', { defaultValue: 'Message not sent. Please try again.' })

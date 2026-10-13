@@ -23,6 +23,7 @@ import { extractJwtData } from '../utils/auth';
 import { formatActivityDate, getConversationTimestamp } from '../utils/date';
 import { ignore } from '../utils/devLog';
 import { extractFencedCodeBlocks, titleForLanguage } from '../utils/codeBlocks';
+import { langfuse } from '../services/langfuse';
 import { formatFileSize } from '../utils/fileSize';
 
 interface AppContextValue {
@@ -868,6 +869,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!trimmed && !attachment) return;
     const effectiveText = trimmed || (attachment ? `Analyze this attachment: ${attachment.name}` : '');
     const modelToUse = modelOverride || selectedModel;
+    const startTime = Date.now();
 
     const chatAttachment: ChatAttachment | undefined = attachment
       ? {
@@ -918,9 +920,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
+      const incogId = incognitoConversationIdRef.current || incognitoConversationId || undefined;
       try {
         let uploadedList: any[] = [];
-        const incogId = incognitoConversationIdRef.current || incognitoConversationId;
         if (attachment && incogId) {
           try {
             const up = await pukuApi.uploadAttachment(incogId, attachment);
@@ -930,7 +932,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const response = await pukuApi.generateResponse(
           effectiveText,
           modelToUse,
-          incogId,
+          incogId || null,
           handleDelta,
           true,
           uploadedList
@@ -938,14 +940,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         accumulatedText = response.text;
         flushIncog();
 
+        langfuse.traceGeneration({
+          name: 'chat-generation-incognito',
+          userId: profile?.userId || profile?.email || 'guest',
+          sessionId: incogId,
+          model: modelToUse,
+          prompt: effectiveText,
+          completion: accumulatedText,
+          startTime,
+          endTime: Date.now(),
+          tags: ['chat', 'incognito'],
+        });
+
         if (response.conversationId) {
           incognitoConversationIdRef.current = response.conversationId;
           setIncognitoConversationId(response.conversationId);
         }
       } catch (err: any) {
+        Sentry.captureException(err, { tags: { feature: 'chat_incognito', model: modelToUse } });
         const errorMsg =
           err?.message ||
           'Failed to get response from Puku AI. Please check your connection or sign in again.';
+        langfuse.traceGeneration({
+          name: 'chat-generation-incognito',
+          userId: profile?.userId || profile?.email || 'guest',
+          sessionId: incogId,
+          model: modelToUse,
+          prompt: effectiveText,
+          completion: '',
+          startTime,
+          endTime: Date.now(),
+          tags: ['chat', 'incognito'],
+          level: 'ERROR',
+          statusMessage: errorMsg,
+        });
         setIncognitoMessages(prev =>
           prev.map(m =>
             m.id === aiMsgId
@@ -1113,6 +1141,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setActiveConversationId(finalServerId);
       }
 
+      langfuse.traceGeneration({
+        name: 'chat-generation-persistent',
+        userId: profile?.userId || profile?.email || 'guest',
+        sessionId: finalServerId || targetConvId,
+        model: modelToUse,
+        prompt: effectiveText,
+        completion: accumulatedText,
+        startTime,
+        endTime: Date.now(),
+        tags: ['chat', 'persistent'],
+      });
+
       // Best-effort: mirror Flutter's auto-persistence of fenced code blocks
       // from assistant replies as Artifacts. Never blocks the chat flow.
       try {
@@ -1125,9 +1165,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       } catch {}
     } catch (err: any) {
+      Sentry.captureException(err, {
+        tags: { feature: 'chat_persistent', model: modelToUse, conversationId: targetConvId },
+      });
       const errorMsg =
         err?.message ||
         'Failed to get response from Puku AI. Please check your connection or sign in again.';
+      langfuse.traceGeneration({
+        name: 'chat-generation-persistent',
+        userId: profile?.userId || profile?.email || 'guest',
+        sessionId: targetConvId,
+        model: modelToUse,
+        prompt: effectiveText,
+        completion: '',
+        startTime,
+        endTime: Date.now(),
+        tags: ['chat', 'persistent'],
+        level: 'ERROR',
+        statusMessage: errorMsg,
+      });
       setConversations(prev =>
         prev.map(c =>
           c.id === targetConvId || (localTempId && c.id === localTempId)

@@ -84,3 +84,4 @@ When the user sends a message without network connectivity:
 1. `PukuBotComposer` checks `isOnline()`.
 2. If offline, the message is immediately committed to local state and added to `pukuBotOutbox`.
 3. When network connectivity restores (`addConnectivityListener`), the outbox automatically drains and syncs all pending entries with the server in chronological order.
+

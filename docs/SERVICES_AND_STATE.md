@@ -71,3 +71,24 @@ Provides resilient offline messaging capabilities:
 - Persists unsent messages to local storage under `puku_bot_outbox_queue`.
 - Subscribes to network connectivity events via `addConnectivityListener`.
 - When network connectivity is re-established, the queue is processed sequentially, updating UI message states from pending to delivered.
+
+---
+
+## 6. Observability & Telemetry (Sentry & Langfuse)
+
+### 6.1 Crash Reporting & Error Tracking (Sentry)
+- **SDK:** `@sentry/react-native` initialized in `App.tsx` via `src/config/sentryConfig.ts`.
+- **DSN Configuration:** Centralized in `src/config/env.ts` with multi-environment support (`.env.dev`, `.env.prod`, `.env.qa`).
+- **Telemetry Boundaries:**
+  - `src/utils/devLog.ts`: `devWarn` attaches Sentry breadcrumbs; `captureError` and `ignore` record exceptions with tagged features (`puku_bot`, `chat`, `auth`, `remote_session`).
+  - `src/features/login/LoginScreen.tsx`: Captures OAuth token exchange failures, PKCE browser launch failures, and email authentication errors.
+  - `src/store/RemoteSessionContext.tsx`: Captures WebSocket connection anomalies and abnormal relay disconnections.
+  - `src/features/puku_bot/PukuBotScreen.tsx`: Captures server stream timeout fallbacks, tool invocation failures, and client errors.
+
+### 6.2 LLM Observability & Evaluation (Langfuse)
+- **Engine Client:** `src/services/langfuse.ts` provides a zero-dependency, non-blocking React Native client interacting directly with the Langfuse Ingestion API (`POST /api/public/ingestion`).
+- **Credentials:** `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` (`https://cloud.langfuse.com`).
+- **Traced Generations:**
+  - **Main AI Chat (`src/store/AppContext.tsx`):** Traces `chat-generation-incognito` and `chat-generation-persistent` with input prompts, completions, latency timestamps, user identifiers, and model parameters.
+  - **Puku Bot (`src/features/puku_bot/PukuBotScreen.tsx`):** Traces server turns (`puku-bot-turn`), intelligent fallback generations (`puku-bot-fallback-generation`), and failures with full tool invocation metadata.
+

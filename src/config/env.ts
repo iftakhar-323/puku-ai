@@ -31,7 +31,19 @@ export const ENV = {
   PUKU_BOT_EMULATOR_BASE_URL: 'http://10.0.2.2:3001/api/v1',
   PUKU_BOT_REDIRECT_URI: pick('PUKU_BOT_REDIRECT_URI', 'pukubot://auth/callback'),
   // A Sentry DSN is a public write-only ingest key, safe to ship in the
-  // client. Leave empty to keep crash reporting disabled (e.g. local dev).
-  SENTRY_DSN: pick('SENTRY_DSN', ''),
+  SENTRY_DSN: pick(
+    'SENTRY_DSN',
+    'https://da380d2f2dc1524fd8acd6a84e11b04c@o4512247979048960.ingest.de.sentry.io/4512248044650576'
+  ),
   SENTRY_ENVIRONMENT: pick('SENTRY_ENVIRONMENT', __DEV__ ? 'development' : 'production'),
+  LANGFUSE_PUBLIC_KEY: pick(
+    'LANGFUSE_PUBLIC_KEY',
+    'pk-lf-a396c604-0463-4e10-a902-4aa3fac240f6'
+  ),
+  LANGFUSE_SECRET_KEY: pick(
+    'LANGFUSE_SECRET_KEY',
+    'sk-lf-1849c69e-2ff0-4723-8970-9c81c5669d2b'
+  ),
+  LANGFUSE_BASE_URL: pick('LANGFUSE_BASE_URL', 'https://cloud.langfuse.com'),
 };
+

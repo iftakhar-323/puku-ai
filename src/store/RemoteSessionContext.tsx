@@ -23,7 +23,7 @@ import { ENV } from '../config/env';
 import { pukuApi } from '../services/api';
 import { tokenManager } from '../services/tokenManager';
 import { secureStorage } from '../services/secureStorage';
-import { devWarn, ignore } from '../utils/devLog';
+import { captureError, devWarn, ignore } from '../utils/devLog';
 import { useApp } from './AppContext';
 import {
   MAX_RECONNECT_ATTEMPTS,
@@ -387,6 +387,7 @@ export function RemoteSessionProvider({
 
     ws.onerror = (err: Event) => {
       devWarn('remote.socket', err);
+      captureError('remote.socket', (err as any)?.message || 'Relay WebSocket error');
     };
 
     ws.onclose = (e: WebSocketCloseEvent) => {
@@ -395,6 +396,12 @@ export function RemoteSessionProvider({
       wsRef.current = null;
       if (stateRef.current.phase === 'closed') return;
       devWarn('remote.closed', `${e.code} ${e.reason || ''}`);
+      if (e.code !== 1000 && e.code !== 1001) {
+        captureError('remote.relay_disconnect', `Relay WebSocket closed unexpectedly with code ${e.code}`, {
+          code: e.code,
+          reason: e.reason,
+        });
+      }
       scheduleReconnect(e.code);
     };
   }, [runEffects, scheduleReconnect, update]);
