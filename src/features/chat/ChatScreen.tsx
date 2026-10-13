@@ -198,9 +198,9 @@ export function ChatScreen() {
           backgroundColor: theme.background,
           paddingTop: Math.max(insets.top, 12),
           paddingBottom:
-            Platform.OS === 'android'
-              ? Math.max(insets.bottom, 12)
-              : (keyboardHeight > 0 ? keyboardHeight : Math.max(insets.bottom, 12)),
+            keyboardHeight > 0
+              ? (Platform.OS === 'android' ? keyboardHeight + 8 : keyboardHeight)
+              : Math.max(insets.bottom, 12),
         },
       ]}>
       {/* 1:1 Authentic Header with SidebarToggle, Terminal, Bot, and Theme toggle */}

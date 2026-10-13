@@ -13,6 +13,8 @@ import { ThemeColors } from '../../../theme/theme';
 import { ChatMessage } from '../../../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { TypingIndicator } from './TypingIndicator';
+import { ChatSourcesBar } from '../../../components/common/ChatSourcesBar';
+import { extractSources } from '../../../utils/sourceExtractor';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -131,6 +133,12 @@ export function MessageBubble({
     return null;
   }
 
+  const { sources, cleanText } = extractSources(
+    message.content,
+    undefined,
+    (message as any).sources
+  );
+
   return (
     <View style={styles.assistantWrapper}>
       <View style={styles.assistantRow}>
@@ -139,7 +147,14 @@ export function MessageBubble({
             styles.assistantCard,
             { backgroundColor: theme.assistantBubble },
           ]}>
-          <MarkdownRenderer content={message.content} theme={theme} />
+          {sources.length > 0 && (
+            <ChatSourcesBar
+              sources={sources}
+              theme={theme}
+              isDark={theme.isDark}
+            />
+          )}
+          <MarkdownRenderer content={cleanText} theme={theme} />
         </View>
       </View>
       {!!message.content && (

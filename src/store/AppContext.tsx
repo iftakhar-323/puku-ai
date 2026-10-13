@@ -1465,7 +1465,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (convId: string, message: { role: 'user' | 'assistant'; text: string; toolCalls?: any[] }) => {
       setBotConversations(prev => {
         const target = prev.find(c => c.id === convId);
-        if (!target) return prev;
         const newMsg = {
           id: 'bm_' + Date.now() + Math.random().toString(36).substring(2, 6),
           role: message.role,
@@ -1473,6 +1472,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           timestamp: 'Just now',
           toolCalls: message.toolCalls,
         };
+        if (!target) {
+          const newConv: BotConversation = {
+            id: convId,
+            botId: activeBotId || 'general-assistant',
+            title: message.text.slice(0, 30) || 'New conversation',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            messages: [newMsg],
+          };
+          return [newConv, ...prev];
+        }
         let newTitle = target.title;
         if (target.messages.length === 0 && message.role === 'user') {
           newTitle = message.text.slice(0, 30) + (message.text.length > 30 ? '...' : '');
@@ -1489,7 +1499,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         );
       });
     },
-    []
+    [activeBotId]
   );
 
   return (
