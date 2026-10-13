@@ -1,5 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PukuBotApiClient } from '../src/services/pukuBotApi';
+import {
+  PukuBotApiClient,
+  DEFAULT_AGENTS,
+  DEFAULT_TEMPLATES,
+  DEFAULT_SKILLS_LIST,
+} from '../src/services/pukuBotApi';
+import { tokenManager } from '../src/services/tokenManager';
 import { generatePkcePair, sha256, toBase64Url } from '../src/utils/auth';
 
 class MockXMLHttpRequest {
@@ -869,6 +875,19 @@ describe('PukuBot API (v1) Client & PKCE Flow', () => {
     expect(JSON.parse(calls[2][1].body)).toEqual({ instructions: 'Shorter.' });
     expect([calls[3][0], calls[3][1].method]).toEqual([`${origin}/api/channels/channel_9/pin`, 'PUT']);
     expect(JSON.parse(calls[3][1].body)).toEqual({ pinned: true });
+  });
+
+  test('bridges tokenManager token and provides default rosters when offline', async () => {
+    jest.spyOn(tokenManager, 'getAccessTokenSync').mockReturnValue('app_token_123');
+    (client as any).token = null;
+
+    expect(client.getToken()).toBe('app_token_123');
+    expect(client.hasServerToken()).toBe(true);
+    expect(client.isAuthenticated()).toBe(true);
+
+    expect(DEFAULT_AGENTS.length).toBeGreaterThanOrEqual(3);
+    expect(DEFAULT_TEMPLATES.length).toBeGreaterThanOrEqual(8);
+    expect(DEFAULT_SKILLS_LIST.length).toBeGreaterThanOrEqual(4);
   });
 });
 

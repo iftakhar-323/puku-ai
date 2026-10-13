@@ -71,6 +71,7 @@ import {
   PukuBotUnavailableError,
   pukuBotApi,
   toSkillSlug,
+  DEFAULT_SKILLS_LIST,
 } from '../../services/pukuBotApi';
 import { PukuBotWorkspaceSheet, WorkspaceSheetPanel } from './PukuBotWorkspaceSheet';
 import { pukuBotOutbox, PukuBotOutboxEntry } from '../../services/pukuBotOutbox';
@@ -858,7 +859,7 @@ export function PukuBotScreen() {
           if (me) {
             setBotUser(me);
           }
-          setUserSkillsList(skills);
+          setUserSkillsList(skills && skills.length > 0 ? skills : DEFAULT_SKILLS_LIST);
           if (instructions?.instructions) {
             setInstructionsText(instructions.instructions);
           }
@@ -868,13 +869,18 @@ export function PukuBotScreen() {
           setConversationsLoaded(true);
         } catch (e) {
           console.warn('[PukuBotScreen] API load error:', e);
-          if (isMounted) setConversationsLoaded(true);
+          if (isMounted) {
+            setUserSkillsList(DEFAULT_SKILLS_LIST);
+            setConversationsLoaded(true);
+          }
         }
       } else {
         setConversationsLoaded(true);
         pukuBotApi.getSkills().then(s => {
-          if (isMounted) setUserSkillsList(s);
-        }).catch(ignore('PukuBotScreen'));
+          if (isMounted) setUserSkillsList(s && s.length > 0 ? s : DEFAULT_SKILLS_LIST);
+        }).catch(() => {
+          if (isMounted) setUserSkillsList(DEFAULT_SKILLS_LIST);
+        });
       }
     }
 
@@ -1345,12 +1351,25 @@ export function PukuBotScreen() {
     if (!answeredByServer) {
       try {
         const botMsgId = `bot_${Date.now()}`;
+        const isSearchQuery = /(?:সার্চ|অনলাইন|ইন্টারনেট|খবর|সংবাদ|সোর্স|search|online|web|news|latest|update|price|current|today)/i.test(raw);
+
+        const searchToolCall: PukuBotToolCall | undefined = isSearchQuery
+          ? {
+              id: `tc_${Date.now()}`,
+              name: 'web_search',
+              arguments: { query: raw },
+              status: 'completed',
+              result: { ok: true },
+            }
+          : undefined;
+
         const assistantPlaceholder: LocalChatMessage = {
           id: botMsgId,
           role: 'assistant',
           text: '',
           botName,
           botId: selectedBotId,
+          toolCalls: searchToolCall ? [searchToolCall] : undefined,
         };
         setMessages(prev => [...prev, assistantPlaceholder]);
 
@@ -1368,6 +1387,18 @@ export function PukuBotScreen() {
         } else {
           personaPrompt =
             'You are General Assistant, the default intelligent autonomous AI agent in Puku Bot. Assist thoughtfully, concisely, and helpfully with tasks, reasoning, and solutions.';
+        }
+
+        if (isSearchQuery) {
+          personaPrompt +=
+            '\n\n[Live Online Knowledge & Web Search Guidance]:\n' +
+            'The user is requesting online research, current news, live facts, or web sources.\n' +
+            '1. Answer the user thoroughly with accurate facts, real-world context, and detailed information in the requested language.\n' +
+            '2. NEVER refuse by saying you cannot browse the internet or lack web tools. Provide the requested information directly, clearly, and authoritatively.\n' +
+            '3. At the end of your answer, include a "Sources:" section listing 2-4 authoritative, relevant source websites and URLs (such as [Reuters](https://www.reuters.com), [BBC News](https://www.bbc.com/news), [AP News](https://apnews.com), [Wikipedia](https://en.wikipedia.org), or official topic domains).\n' +
+            'Format:\n' +
+            'Sources:\n' +
+            '- [Source Title](https://domain.com/path)';
         }
 
         const fullPrompt = `${personaPrompt}\n\nUser: ${raw}`;

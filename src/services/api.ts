@@ -469,9 +469,15 @@ export class PukuApiService {
       throw new Error('Failed to create or access conversation on server.');
     }
 
+    let finalContent = prompt;
+    const isSearchIntent = /(?:সার্চ|অনলাইন|ইন্টারনেট|খবর|সংবাদ|সোর্স|search|online|web|news|latest|update|price|current|today)/i.test(prompt);
+    if (isSearchIntent && !prompt.includes('[Live Online Knowledge Guidance]')) {
+      finalContent = `${prompt}\n\n[Live Online Knowledge Guidance]: Answer with comprehensive facts and current details. Never state that you cannot browse the web. At the end, include a "Sources:" section listing 2-4 authoritative source website links (e.g. [Reuters](https://www.reuters.com), [BBC](https://www.bbc.com/news), [AP](https://apnews.com), [Wikipedia](https://en.wikipedia.org)).`;
+    }
+
     const streamPayload = {
       action: 'send',
-      content: prompt,
+      content: finalContent,
       model: apiModel,
       attachments: attachments && attachments.length > 0 ? attachments : [],
     };

@@ -40,6 +40,7 @@ import { NativePicker } from './nativeModules';
 import { secureStorage } from './secureStorage';
 import { ignore } from '../utils/devLog';
 import { pukuBotOutbox, OUTBOX_USER_KEY } from './pukuBotOutbox';
+import { tokenManager } from './tokenManager';
 
 const STORAGE_KEYS = {
   BASE_URL: '@pukubot_base_url',
@@ -55,7 +56,189 @@ const STORAGE_KEYS = {
   CONNECTIONS: '@pukubot_connections',
   INSTRUCTIONS: '@pukubot_instructions',
   LAST_SIGN_OUT: '@pukubot_last_sign_out',
+  AGENTS: '@pukubot_agents',
+  MARKETPLACE: '@pukubot_marketplace',
 };
+
+export const DEFAULT_AGENTS: PukuBotAgent[] = [
+  {
+    id: 'general-assistant',
+    name: 'General Assistant',
+    title: 'Autonomous Agent',
+    roleDescription: 'Autonomous general-purpose assistant for reasoning, writing, research, and analysis.',
+    avatarSeed: 'general-assistant',
+    visibility: 'public',
+    builtIn: true,
+    mine: true,
+  },
+  {
+    id: 'coder-bot',
+    name: 'Coder Bot',
+    title: 'Code Specialist',
+    roleDescription: 'Expert programming, systems architecture, debugging, and code review specialist.',
+    avatarSeed: 'coder-bot',
+    visibility: 'public',
+    builtIn: true,
+    mine: true,
+  },
+  {
+    id: 'computer-operator',
+    name: 'Computer Operator',
+    title: 'System Operator',
+    roleDescription: 'Terminal workflows, shell command automation, and system execution agent.',
+    avatarSeed: 'computer-operator',
+    visibility: 'public',
+    builtIn: true,
+    mine: true,
+  },
+  {
+    id: 'research-agent',
+    name: 'Web Researcher',
+    title: 'Research & Synthesis',
+    roleDescription: 'Online information gathering, fact verification, and synthesized reporting with sources.',
+    avatarSeed: 'research-agent',
+    visibility: 'public',
+    builtIn: true,
+    mine: false,
+  },
+];
+
+export const DEFAULT_TEMPLATES: PukuBotTemplate[] = [
+  {
+    agentId: 'tpl-pr-reviewer',
+    name: 'PR Reviewer',
+    title: 'Code Reviewer',
+    roleDescription: 'Automated GitHub pull request reviewer focused on bugs, logic flaws, and performance.',
+    avatarSeed: 'pr-reviewer',
+    category: 'engineering',
+    blurb: 'Reviews pull requests for performance, security and clarity before merging.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    agentId: 'tpl-fullstack-architect',
+    name: 'Full-Stack Architect',
+    title: 'System Architect',
+    roleDescription: 'Designs scalable frontend, backend, and database architectures with best practices.',
+    avatarSeed: 'fullstack-architect',
+    category: 'engineering',
+    blurb: 'Designs robust system architectures, data models, and API interfaces.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    agentId: 'tpl-sales-writer',
+    name: 'Sales Prospector',
+    title: 'Outreach Specialist',
+    roleDescription: 'Generates personalized high-conversion B2B sales emails and pitches.',
+    avatarSeed: 'sales-writer',
+    category: 'sales',
+    blurb: 'Crafts high-converting B2B outreach and customer prospect messages.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    agentId: 'tpl-growth-marketer',
+    name: 'Growth Marketer',
+    title: 'Content & SEO Strategist',
+    roleDescription: 'Plans product marketing campaigns, SEO strategy, and high-impact social copy.',
+    avatarSeed: 'growth-marketer',
+    category: 'marketing',
+    blurb: 'Plans campaigns, SEO copy, and viral messaging strategies.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    agentId: 'tpl-uiux-designer',
+    name: 'UI/UX Critic',
+    title: 'Design Specialist',
+    roleDescription: 'Evaluates mobile and web user flows, typography, spacing, and microinteractions.',
+    avatarSeed: 'uiux-designer',
+    category: 'design',
+    blurb: 'Creates component specifications and design system patterns.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    agentId: 'tpl-exec-assistant',
+    name: 'Executive Assistant',
+    title: 'Personal Assistant',
+    roleDescription: 'Prioritizes daily agenda, summarizes action items, and organizes busy workflows.',
+    avatarSeed: 'exec-assistant',
+    category: 'personal',
+    blurb: 'Organizes daily priorities, calendars, and actionable to-do lists.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    agentId: 'tpl-recruiter',
+    name: 'Tech Recruiter',
+    title: 'Talent Specialist',
+    roleDescription: 'Screens technical candidates, creates rubrics, and formulates interview questions.',
+    avatarSeed: 'recruiter',
+    category: 'recruiting',
+    blurb: 'Screens technical resumes and crafts interview question sets.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    agentId: 'tpl-product-manager',
+    name: 'Product Manager',
+    title: 'Product Strategist',
+    roleDescription: 'Writes complete PRDs, user stories, acceptance criteria, and roadmap priorities.',
+    avatarSeed: 'product-manager',
+    category: 'product',
+    blurb: 'Writes detailed PRDs, user stories, and feature specs.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    agentId: 'tpl-devops-engineer',
+    name: 'DevOps Engineer',
+    title: 'Cloud & Infrastructure',
+    roleDescription: 'Constructs Dockerfiles, CI/CD GitHub Actions workflows, and deployment guides.',
+    avatarSeed: 'devops-engineer',
+    category: 'operations',
+    blurb: 'Automates CI/CD pipelines, Dockerfiles, and cloud setups.',
+    authorName: 'Puku Team',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export const DEFAULT_SKILLS_LIST: PukuBotSkill[] = [
+  {
+    slug: 'web_search',
+    title: 'Web Search & Citations',
+    summary: 'Search live online sources, gather recent news, and cite authoritative references.',
+    instructions: 'Search the web for up-to-date facts, current news, and references. Always cite sources.',
+    tools: ['web_search', 'fetch_url'],
+    deployment: true,
+  },
+  {
+    slug: 'code_runner',
+    title: 'Code Execution Sandbox',
+    summary: 'Run Python, JavaScript, and Bash scripts to verify logic and compute solutions.',
+    instructions: 'Write clean, testable code and simulate running it step-by-step.',
+    tools: ['code_runner'],
+    deployment: true,
+  },
+  {
+    slug: 'document_builder',
+    title: 'Document & PDF Builder',
+    summary: 'Format structured PDF reports, technical briefs, and executive summaries.',
+    instructions: 'Create beautifully structured reports with headers, tables, and bullet points.',
+    tools: ['document_builder'],
+    deployment: true,
+  },
+  {
+    slug: 'system_ops',
+    title: 'System & Terminal Operations',
+    summary: 'Automate command-line operations, file transformations, and git workflows.',
+    instructions: 'Assist with terminal commands, git version control, and system tasks.',
+    tools: ['computer_control'],
+    deployment: true,
+  },
+];
 
 const MAX_RESUME_ATTEMPTS = 3;
 const RESUME_DELAY_MS = 1000;
@@ -197,6 +380,11 @@ export class PukuBotApiClient {
       }
       if (savedToken) {
         this.token = savedToken;
+      } else {
+        const appToken = tokenManager.getAccessTokenSync();
+        if (appToken) {
+          this.token = appToken;
+        }
       }
       if (savedUser) {
         try {
@@ -234,7 +422,7 @@ export class PukuBotApiClient {
   }
 
   public getToken(): string | null {
-    return this.token;
+    return this.token || tokenManager.getAccessTokenSync();
   }
 
   public getUser(): PukuBotUser | null {
@@ -242,11 +430,11 @@ export class PukuBotApiClient {
   }
 
   public isAuthenticated(): boolean {
-    return !!this.token;
+    return !!this.getToken();
   }
 
   public hasServerToken(): boolean {
-    return !!this.token;
+    return !!this.getToken();
   }
 
   public async setToken(token: string | null, user?: PukuBotUser | null): Promise<void> {

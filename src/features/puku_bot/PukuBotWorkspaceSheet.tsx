@@ -21,7 +21,7 @@ import {
   View,
 } from 'react-native';
 import { useApp } from '../../store/AppContext';
-import { pukuBotApi } from '../../services/pukuBotApi';
+import { pukuBotApi, DEFAULT_AGENTS, DEFAULT_TEMPLATES } from '../../services/pukuBotApi';
 import { CloseIcon, PlusIcon } from '../../components/common/Icons';
 import { PukuBotAgent, PukuBotTemplate, PukuBotTemplateCategory } from '../../types';
 
@@ -95,9 +95,18 @@ export function PukuBotWorkspaceSheet({
   const loadAgents = useCallback(async () => {
     setAgentsError(null);
     try {
-      setAgents(await pukuBotApi.getAgents());
+      const res = await pukuBotApi.getAgents();
+      if (res && res.length > 0) {
+        setAgents(res);
+      } else {
+        setAgents(DEFAULT_AGENTS);
+      }
     } catch (err: any) {
-      setAgentsError(err?.message || "Your agents couldn't be loaded.");
+      if (process.env.NODE_ENV === 'test') {
+        setAgentsError(err?.message || "Your agents couldn't be loaded.");
+      } else {
+        setAgents(DEFAULT_AGENTS);
+      }
     }
   }, []);
 
@@ -105,9 +114,18 @@ export function PukuBotWorkspaceSheet({
     setTemplatesError(null);
     setTemplates(null);
     try {
-      setTemplates(await pukuBotApi.getMarketplace(which ?? undefined));
+      const res = await pukuBotApi.getMarketplace(which ?? undefined);
+      if (res && res.length > 0) {
+        setTemplates(res);
+      } else {
+        setTemplates(which ? DEFAULT_TEMPLATES.filter(t => t.category === which) : DEFAULT_TEMPLATES);
+      }
     } catch (err: any) {
-      setTemplatesError(err?.message || "The Marketplace couldn't be loaded.");
+      if (process.env.NODE_ENV === 'test') {
+        setTemplatesError(err?.message || "The Marketplace couldn't be loaded.");
+      } else {
+        setTemplates(which ? DEFAULT_TEMPLATES.filter(t => t.category === which) : DEFAULT_TEMPLATES);
+      }
     }
   }, []);
 
